@@ -1,0 +1,548 @@
+import 'package:flutter/material.dart';
+
+import '../app/host_store.dart';
+import '../app/errors.dart';
+import '../app/identity_store.dart';
+import 'host_editor.dart';
+
+class HostsPage extends StatefulWidget {
+  final HostStore store;
+  final bool embedded;
+  final ValueChanged<HostProfile>? onConnect;
+  const HostsPage({
+    super.key,
+    required this.store,
+    this.embedded = false,
+    this.onConnect,
+  });
+  @override
+  State<HostsPage> createState() => HostsPageState();
+}
+
+class HostsPageState extends State<HostsPage> {
+  List<HostProfile> hosts = [];
+  bool loading = true, saving = false, favorites = false;
+  String query = '';
+  List<String> folders = [];
+  final collapsed = <String>{};
+  String? error;
+  String? selectedHostId, hoveredHostId;
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final result = await widget.store.read();
+      final store = widget.store;
+      final savedFolders = store is FolderStore
+          ? await (store as FolderStore).readFolders()
+          : <String>[];
+      if (mounted) {
+        setState(() {
+          hosts = result;
+          folders = savedFolders;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '无法读取主机配置：${userFacingError(e)}');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> persist(List<HostProfile> next) async {
+    setState(() => saving = true);
+    try {
+      await widget.store.write(next);
+      if (mounted) {
+        setState(() {
+          hosts = next;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败：${userFacingError(e)}')));
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> edit([HostProfile? profile, String initialGroup = '']) async {
+    final result = await showDialog<HostProfile>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => HostEditor(
+        profile: profile,
+        credentials: widget.store is IdentityStore
+            ? widget.store as IdentityStore
+            : null,
+        initialGroup: initialGroup,
+        folders: {
+          ...folders,
+          ...hosts.map((h) => h.group),
+        }.where((f) => f.isNotEmpty).toList(),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (widget.store is IdentityStore) {
+      await load();
+    } else {
+      await persist([...hosts.where((h) => h.id != result.id), result]);
+    }
+  }
+
+  Future<void> remove(HostProfile profile) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('删除“${profile.name}”？'),
+        content: const Text('仅删除保存的主机配置。正在运行的会话和已验证的服务器指纹仍会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (approved == true && mounted) {
+      await persist(hosts.where((h) => h.id != profile.id).toList());
+    }
+  }
+
+  Future<void> addFolder([String parent = '']) async {
+    var folderName = '';
+    final form = GlobalKey<FormState>();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(parent.isEmpty ? '新建文件夹' : '新建子文件夹'),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            onChanged: (v) => folderName = v,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '文件夹名称'),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return '请输入名称';
+              if (v.contains('/') || v.trim() == '.' || v.trim() == '..') {
+                return '名称不能包含 / 或为 .、..';
+              }
+              final path = parent.isEmpty ? v.trim() : '$parent/${v.trim()}';
+              if (path.split('/').length > 16) return '最多支持 16 层文件夹';
+              return {...folders, ...hosts.map((h) => h.group)}.contains(path)
+                  ? '文件夹已存在'
+                  : null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(
+                  context,
+                  parent.isEmpty
+                      ? folderName.trim()
+                      : '$parent/${folderName.trim()}',
+                );
+              }
+            },
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || !mounted) return;
+    final store = widget.store;
+    if (store is! FolderStore) return;
+    setState(() => saving = true);
+    try {
+      final next = [...folders, name];
+      await (store as FolderStore).writeFolders(next);
+      if (mounted) setState(() => folders = next);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败：${userFacingError(e)}')));
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> deleteFolder(String path) async {
+    final store = widget.store;
+    if (store is! FolderTreeStore) return;
+    final deleteHosts = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('删除文件夹“$path”？'),
+        content: const Text('包含所有子文件夹。请选择如何处理其中的全部主机；保存的身份与密钥仍保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('取消'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('保留主机到未分类'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('删除文件夹及全部主机'),
+          ),
+        ],
+      ),
+    );
+    if (deleteHosts == null || !mounted) return;
+    setState(() => saving = true);
+    try {
+      await (store as FolderTreeStore).deleteFolder(
+        path,
+        deleteHosts: deleteHosts,
+      );
+      collapsed.removeWhere((p) => p == path || p.startsWith('$path/'));
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  void connectHost(HostProfile h) {
+    if (widget.onConnect != null) {
+      widget.onConnect!(h);
+    } else {
+      Navigator.pop(context, h);
+    }
+  }
+
+  Widget hostTile(HostProfile h, int depth) => MouseRegion(
+    onEnter: (_) => setState(() => hoveredHostId = h.id),
+    onExit: (_) {
+      if (hoveredHostId == h.id) setState(() => hoveredHostId = null);
+    },
+    child: Material(
+      key: ValueKey('host-row-${h.id}'),
+      color: selectedHostId == h.id
+          ? Theme.of(context).colorScheme.primaryContainer
+          : hoveredHostId == h.id && !saving
+          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .08)
+          : Colors.transparent,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: saving
+                  ? null
+                  : () => setState(() => selectedHostId = h.id),
+              onDoubleTap: saving
+                  ? null
+                  : () {
+                      setState(() => selectedHostId = h.id);
+                      connectHost(h);
+                    },
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: EdgeInsets.only(
+                  left: 40 + depth * 12.0,
+                  right: 0,
+                ),
+                minLeadingWidth: 16,
+                horizontalTitleGap: 8,
+                leading: Icon(
+                  h.favorite ? Icons.star_rounded : Icons.dns_outlined,
+                  size: 16,
+                  color: h.favorite
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                title: Text(
+                  h.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                subtitle: Text(
+                  '${h.username}@${h.host}:${h.port}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: '主机操作：${h.name}',
+            onOpened: () => setState(() => selectedHostId = h.id),
+            enabled: !saving,
+            iconSize: 17,
+            onSelected: (v) {
+              if (v == 'connect') {
+                connectHost(h);
+              } else if (v == 'favorite') {
+                persist(
+                  hosts
+                      .map((p) => p.id == h.id ? h.toggleFavorite() : p)
+                      .toList(),
+                );
+              } else if (v == 'edit') {
+                edit(h);
+              } else {
+                remove(h);
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'connect', child: Text('连接')),
+              PopupMenuItem(
+                value: 'favorite',
+                child: Text(h.favorite ? '取消收藏' : '收藏主机'),
+              ),
+              const PopupMenuItem(value: 'edit', child: Text('编辑')),
+              const PopupMenuItem(value: 'delete', child: Text('删除')),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  List<Widget> tree(List<HostProfile> visible, bool ready) {
+    final paths = <String>{};
+    for (final path in {...folders, ...hosts.map((h) => h.group)}) {
+      if (path.isEmpty) {
+        paths.add('');
+        continue;
+      }
+      final parts = path.split('/');
+      for (var i = 1; i <= parts.length; i++) {
+        paths.add(parts.take(i).join('/'));
+      }
+    }
+    final all = paths.toList()..sort();
+    final filtered = query.isNotEmpty || favorites;
+    bool within(String group, String path) =>
+        group == path || (path.isNotEmpty && group.startsWith('$path/'));
+    final widgets = <Widget>[];
+    void node(String path, int depth) {
+      final matches = visible.where((h) => within(h.group, path)).toList();
+      if (filtered && matches.isEmpty) return;
+      final open = !collapsed.contains(path) || filtered;
+      widgets.add(
+        ListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          contentPadding: EdgeInsets.only(left: 8 + depth * 12.0, right: 0),
+          minLeadingWidth: 12,
+          horizontalTitleGap: 4,
+          leading: Icon(
+            open ? Icons.expand_more : Icons.chevron_right,
+            size: 16,
+          ),
+          title: Tooltip(
+            message: path.isEmpty ? '未分类' : path,
+            child: Row(
+              children: [
+                const Icon(Icons.folder_outlined, size: 16),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    path.isEmpty ? '未分类' : path.split('/').last,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text('${matches.length}', style: const TextStyle(fontSize: 11)),
+              ],
+            ),
+          ),
+          trailing: PopupMenuButton<String>(
+            tooltip: '文件夹操作：${path.isEmpty ? "未分类" : path}',
+            enabled: ready,
+            iconSize: 16,
+            onSelected: (v) {
+              if (v == 'host') {
+                edit(null, path);
+              } else if (v == 'folder') {
+                addFolder(path);
+              } else {
+                deleteFolder(path);
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'host', child: Text('添加主机')),
+              if (widget.store is FolderStore)
+                const PopupMenuItem(value: 'folder', child: Text('新建子文件夹')),
+              if (path.isNotEmpty && widget.store is FolderTreeStore)
+                const PopupMenuItem(value: 'delete', child: Text('删除文件夹')),
+            ],
+          ),
+          onTap: () => setState(() {
+            if (!collapsed.remove(path)) collapsed.add(path);
+          }),
+        ),
+      );
+      if (!open) return;
+      widgets.addAll(
+        visible.where((h) => h.group == path).map((h) => hostTile(h, depth)),
+      );
+      if (path.isNotEmpty) {
+        for (final child in all.where(
+          (p) =>
+              p.startsWith('$path/') &&
+              !p.substring(path.length + 1).contains('/'),
+        )) {
+          node(child, depth + 1);
+        }
+      }
+    }
+
+    for (final root in all.where((p) => !p.contains('/'))) {
+      node(root, 0);
+    }
+    return widgets;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible =
+        hosts
+            .where((h) => h.matches(query) && (!favorites || h.favorite))
+            .toList()
+          ..sort((a, b) {
+            final f = (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0);
+            return f != 0 ? f : a.name.compareTo(b.name);
+          });
+    final groups = {...folders, ...hosts.map((h) => h.group)}.toList()..sort();
+    final ready = !loading && !saving && error == null;
+    final body = Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 4, 4),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '主机',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              IconButton(
+                tooltip: '新建文件夹',
+                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                onPressed: ready && widget.store is FolderStore
+                    ? () => addFolder()
+                    : null,
+              ),
+              IconButton(
+                tooltip: '添加主机',
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: ready ? () => edit() : null,
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: TextField(
+            decoration: const InputDecoration(
+              isDense: true,
+              prefixIcon: Icon(Icons.search, size: 18),
+              hintText: '搜索主机、标签',
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
+            ),
+            style: const TextStyle(fontSize: 12),
+            onChanged: (v) => setState(() => query = v),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              FilterChip(
+                label: const Text('收藏', style: TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+                selected: favorites,
+                onSelected: (v) => setState(() => favorites = v),
+              ),
+              const Spacer(),
+              Text(
+                '${visible.length} 台主机',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
+          ),
+        ),
+        if (saving) const LinearProgressIndicator(minHeight: 2),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(error!),
+                        TextButton(onPressed: load, child: const Text('重试')),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
+                  children: [
+                    if (groups.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          '添加主机或文件夹，整理你的服务器。',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    if (visible.isEmpty && (query.isNotEmpty || favorites))
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text('没有匹配的主机'),
+                      ),
+                    ...tree(visible, ready),
+                  ],
+                ),
+        ),
+      ],
+    );
+    if (widget.embedded) return body;
+    return PopScope(
+      canPop: !saving,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('主机管理')),
+        body: body,
+      ),
+    );
+  }
+}

@@ -1,0 +1,42 @@
+name: Apple preview
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.98.1'
+          components: rustfmt, clippy
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tests/requirements.txt
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze
+      - run: cargo fmt --manifest-path rust/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml --locked --all-targets -- -D warnings
+      - run: bash scripts/test-core.sh
+        env:
+          WTERM_TEST_PYTHON: python
+      - run: flutter test
+      - run: bash scripts/test-vault-bridge.sh
+      - run: flutter build macos --debug
+      - run: flutter build ios --simulator --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apple-preview
+          path: |
+            build/macos/Build/Products/Debug/*.app
+            build/ios/iphonesimulator/*.app
