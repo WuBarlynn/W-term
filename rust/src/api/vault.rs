@@ -16,7 +16,8 @@ pub struct VaultOpened {
 }
 struct OpenVault {
     token: String,
-    db: Connection,
+    db: Option<Connection>,
+    cancel: Option<std::sync::Arc<tokio::sync::Notify>>,
     path: PathBuf,
 }
 static VAULT: OnceLock<Mutex<Option<OpenVault>>> = OnceLock::new();
@@ -54,7 +55,8 @@ fn key_database_mode(path: &Path, password: &str, readonly: bool) -> Result<Conn
     db.busy_timeout(Duration::from_secs(5))?;
     Ok(db)
 }
-fn open_database(path: &Path, password: &str, create: bool) -> Result<Connection> {
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn open_database(path: &Path, password: &str, create: bool) -> Result<Connection> {
     ensure!(
         password.len() <= 1024 && !password.is_empty(),
         "主密码长度无效"
@@ -86,7 +88,7 @@ fn open_database(path: &Path, password: &str, create: bool) -> Result<Connection
     let version: i32 = db
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .map_err(|_| anyhow!("主密码错误或保险库已损坏"))?;
-    ensure!((1..=2).contains(&version), "不支持的保险库版本");
+    ensure!((1..=3).contains(&version), "不支持的保险库版本");
     let format: String =
         db.query_row("SELECT value FROM metadata WHERE key='format'", [], |r| {
             r.get(0)
@@ -103,6 +105,9 @@ fn open_database(path: &Path, password: &str, create: bool) -> Result<Connection
             PRAGMA user_version=2; COMMIT;",
         )?;
     }
+    if version < 3 {
+        db.execute_batch("PRAGMA user_version=3;")?;
+    }
     Ok(db)
 }
 
@@ -117,30 +122,88 @@ pub fn vault_open(path: String, password: String, create: bool) -> Result<VaultO
     *state = Some(OpenVault {
         token: token.clone(),
         path: PathBuf::from(path),
-        db,
+        db: Some(db),
+        cancel: None,
     });
     Ok(VaultOpened {
         token,
         legacy_imported,
     })
 }
-fn with_vault<T>(token: &str, f: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn with_vault<T>(
+    token: &str,
+    f: impl FnOnce(&mut Connection) -> Result<T>,
+) -> Result<T> {
     let mut state = registry().lock().map_err(|_| anyhow!("保险库状态不可用"))?;
     let vault = state
         .as_mut()
         .filter(|v| v.token == token)
         .context("保险库已锁定，请重新解锁")?;
-    f(&mut vault.db)
+    f(vault.db.as_mut().context("同步正在进行，请稍后重试")?)
 }
 pub fn vault_lock(token: String) -> Result<()> {
     let mut state = registry().lock().map_err(|_| anyhow!("保险库状态不可用"))?;
     if state.as_ref().is_some_and(|v| v.token == token) {
+        if let Some(cancel) = state.as_ref().and_then(|v| v.cancel.as_ref()) {
+            cancel.notify_one();
+        }
         *state = None;
     }
     Ok(())
 }
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) struct VaultLease {
+    token: String,
+    pub(crate) db: Option<Connection>,
+    pub(crate) cancelled: std::sync::Arc<tokio::sync::Notify>,
+}
+impl Drop for VaultLease {
+    fn drop(&mut self) {
+        if let Ok(mut state) = registry().lock() {
+            if let Some(v) = state
+                .as_mut()
+                .filter(|v| v.token == self.token && v.db.is_none())
+            {
+                v.db = self.db.take();
+                v.cancel = None;
+            }
+        }
+    }
+}
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn lease(token: &str) -> Result<VaultLease> {
+    let mut state = registry().lock().map_err(|_| anyhow!("保险库状态不可用"))?;
+    let v = state
+        .as_mut()
+        .filter(|v| v.token == token)
+        .context("保险库已锁定")?;
+    let db = v.db.take().context("同步正在进行，请勿重复操作")?;
+    let cancelled = std::sync::Arc::new(tokio::sync::Notify::new());
+    v.cancel = Some(cancelled.clone());
+    Ok(VaultLease {
+        token: token.into(),
+        db: Some(db),
+        cancelled,
+    })
+}
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn cancel_sync(token: &str) -> Result<()> {
+    let state = registry().lock().map_err(|_| anyhow!("保险库状态不可用"))?;
+    let v = state
+        .as_ref()
+        .filter(|v| v.token == token)
+        .context("保险库已锁定")?;
+    if let Some(cancel) = &v.cancel {
+        cancel.notify_one();
+    }
+    Ok(())
+}
 fn check_kind(kind: &str) -> Result<()> {
-    ensure!(matches!(kind, "hosts" | "folders"), "Unknown vault record");
+    ensure!(
+        matches!(kind, "hosts" | "folders" | "snippets"),
+        "Unknown vault record"
+    );
     Ok(())
 }
 pub fn vault_read(token: String, kind: String) -> Result<String> {
@@ -168,7 +231,8 @@ struct Host {
     #[serde(default, rename = "identityId")]
     identity_id: String,
 }
-fn validate(kind: &str, json: &str) -> Result<()> {
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
     check_kind(kind)?;
     ensure!(json.len() <= 4 * 1024 * 1024, "主机数据过大");
     if kind == "hosts" {
@@ -192,6 +256,25 @@ fn validate(kind: &str, json: &str) -> Result<()> {
             );
             let _ = h.favorite;
         }
+    } else if kind == "snippets" {
+        let entries: Vec<Snippet> = serde_json::from_str(json)?;
+        ensure!(entries.len() <= 1000, "命令片段最多 1000 条");
+        let mut ids = HashSet::new();
+        for e in entries {
+            ensure!(
+                !e.id.is_empty()
+                    && ids.insert(e.id)
+                    && !e.name.trim().is_empty()
+                    && e.name.len() <= 4096,
+                "片段名称无效或 ID 重复"
+            );
+            ensure!(
+                !e.command.trim().is_empty()
+                    && e.command.len() <= 16384
+                    && !e.command.chars().any(char::is_control),
+                "片段仅支持不含控制字符的单行命令，最多 16 KiB"
+            );
+        }
     } else {
         let folders: Vec<String> =
             serde_json::from_str(json).map_err(|_| anyhow!("文件夹格式无效"))?;
@@ -206,6 +289,43 @@ fn validate(kind: &str, json: &str) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Snippet {
+    id: String,
+    name: String,
+    command: String,
+}
+
+pub fn vault_save_snippet(token: String, id: String, name: String, command: String) -> Result<()> {
+    with_vault(&token, |db| {
+        let mut entries: Vec<Snippet> = serde_json::from_str(&read_record(db, "snippets")?)?;
+        let id = if id.is_empty() {
+            uuid::Uuid::new_v4().to_string()
+        } else {
+            ensure!(
+                entries.iter().any(|s| s.id == id),
+                "片段已被删除，请重新创建"
+            );
+            id
+        };
+        entries.retain(|s| s.id != id);
+        entries.push(Snippet {
+            id,
+            name: name.trim().into(),
+            command,
+        });
+        put_record(db, "snippets", &serde_json::to_string(&entries)?)
+    })
+}
+pub fn vault_delete_snippet(token: String, id: String) -> Result<()> {
+    with_vault(&token, |db| {
+        let mut entries: Vec<Snippet> = serde_json::from_str(&read_record(db, "snippets")?)?;
+        entries.retain(|s| s.id != id);
+        put_record(db, "snippets", &serde_json::to_string(&entries)?)
+    })
+}
+
 pub fn vault_write(token: String, kind: String, json: String) -> Result<()> {
     validate(&kind, &json)?;
     with_vault(&token, |db| {
@@ -286,7 +406,8 @@ struct Secrets {
     private_key: Zeroizing<String>,
     passphrase: Zeroizing<String>,
 }
-fn read_record(db: &Connection, kind: &str) -> Result<String> {
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn read_record(db: &Connection, kind: &str) -> Result<String> {
     Ok(db
         .query_row("SELECT value FROM records WHERE kind=?1", [kind], |r| {
             r.get(0)
@@ -294,7 +415,8 @@ fn read_record(db: &Connection, kind: &str) -> Result<String> {
         .optional()?
         .unwrap_or_else(|| "[]".into()))
 }
-fn put_record(db: &Connection, kind: &str, json: &str) -> Result<()> {
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) fn put_record(db: &Connection, kind: &str, json: &str) -> Result<()> {
     validate(kind, json)?;
     db.execute(
         "INSERT INTO records VALUES (?1,?2) ON CONFLICT(kind) DO UPDATE SET value=excluded.value",
@@ -411,6 +533,98 @@ pub fn vault_save_identity(token: String, input: IdentityInput) -> Result<String
         Ok(id)
     })
 }
+/// Generate directly into SQLCipher; only the identity ID crosses the bridge.
+pub fn vault_generate_key(token: String, name: String, username: String) -> Result<String> {
+    with_vault(&token, |db| {
+        ensure!(imported(db)?, "请先完成迁移");
+        ensure!(
+            !name.trim().is_empty()
+                && name.len() <= 4096
+                && !username.trim().is_empty()
+                && username.len() <= 4096,
+            "请输入身份名称和用户名"
+        );
+        let key =
+            russh::keys::PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519)?;
+        let encoded = key.to_openssh(russh::keys::ssh_key::LineEnding::LF)?;
+        save_identity(
+            db,
+            SensitiveInput(IdentityInput {
+                id: String::new(),
+                name: name.trim().into(),
+                username: username.trim().into(),
+                kind: "key".into(),
+                password: String::new(),
+                private_key: encoded.to_string(),
+                passphrase: String::new(),
+                replace_secret: true,
+            }),
+        )
+    })
+}
+
+/// Public material only. Also works for imported password-protected private keys.
+pub fn vault_public_key(token: String, id: String) -> Result<String> {
+    with_vault(&token, |db| {
+        let key = read_private_key(db, &id)?;
+        Ok(key.public_key().to_openssh()?)
+    })
+}
+
+fn read_private_key(db: &Connection, id: &str) -> Result<russh::keys::PrivateKey> {
+    let (private_key, passphrase) = db
+        .query_row(
+            "SELECT private_key,passphrase FROM identities WHERE id=?1 AND kind='key'",
+            [id],
+            |r| {
+                Ok((
+                    Zeroizing::new(r.get::<_, String>(0)?),
+                    Zeroizing::new(r.get::<_, String>(1)?),
+                ))
+            },
+        )
+        .map_err(|_| anyhow!("私钥身份不存在"))?;
+    let key = russh::keys::decode_secret_key(
+        &private_key,
+        if passphrase.is_empty() {
+            None
+        } else {
+            Some(passphrase.as_str())
+        },
+    )
+    .map_err(|_| anyhow!("私钥无法解析，请检查文件和口令"))?;
+    Ok(key)
+}
+
+/// Only encrypted OpenSSH bytes are written. Never replaces an existing file.
+pub fn vault_export_private_key(
+    token: String,
+    id: String,
+    path: String,
+    password: String,
+) -> Result<()> {
+    use std::io::Write;
+    let password = Zeroizing::new(password);
+    ensure!(
+        password.chars().count() >= 12 && password.len() <= 1024,
+        "导出口令至少 12 个字符，最多 1024 字节"
+    );
+    with_vault(&token, |db| {
+        let key = read_private_key(db, &id)?;
+        let encrypted = key.encrypt(&mut rand::rng(), password.as_bytes())?;
+        let encoded = encrypted.to_openssh(russh::keys::ssh_key::LineEnding::LF)?;
+        let destination = Path::new(&path);
+        let mut staging =
+            tempfile::NamedTempFile::new_in(destination.parent().context("无效的导出路径")?)?;
+        staging.write_all(encoded.as_bytes())?;
+        staging.as_file().sync_all()?;
+        staging
+            .persist_noclobber(destination)
+            .map_err(|_| anyhow!("无法保存私钥，目标可能已存在"))?;
+        Ok(())
+    })
+}
+
 pub fn vault_delete_identity(token: String, id: String) -> Result<()> {
     with_vault(&token, |db| {
         let hosts: Vec<Host> = serde_json::from_str(&read_record(db, "hosts")?)?;
@@ -517,6 +731,64 @@ pub fn vault_delete_folder(token: String, path: String, delete_hosts: bool) -> R
         Ok(())
     })
 }
+/// Rename a whole subtree atomically, retaining host and identity IDs.
+pub fn vault_rename_folder(token: String, path: String, name: String) -> Result<String> {
+    let leaf = name.trim();
+    ensure!(!path.is_empty(), "未分类不能重命名");
+    ensure!(
+        !leaf.is_empty()
+            && leaf != "."
+            && leaf != ".."
+            && !leaf.contains('/')
+            && !leaf.chars().any(char::is_control),
+        "请输入有效的文件夹名称"
+    );
+    let destination = match path.rsplit_once('/') {
+        Some((parent, _)) => format!("{parent}/{leaf}"),
+        None => leaf.to_string(),
+    };
+    ensure!(destination.len() <= 4096, "文件夹路径过长");
+    with_vault(&token, |db| {
+        let tx = db.transaction()?;
+        let mut hosts: Vec<Host> = serde_json::from_str(&read_record(&tx, "hosts")?)?;
+        let mut folders: Vec<String> = serde_json::from_str(&read_record(&tx, "folders")?)?;
+        ensure!(
+            folders
+                .iter()
+                .chain(hosts.iter().map(|h| &h.group))
+                .any(|f| within_folder(f, &path)),
+            "文件夹不存在，请刷新列表"
+        );
+        if destination == path {
+            return Ok(destination.clone());
+        }
+        ensure!(
+            !folders
+                .iter()
+                .chain(hosts.iter().map(|h| &h.group))
+                .any(|f| within_folder(f, &destination)),
+            "同级文件夹已存在，不能合并覆盖"
+        );
+        for folder in &mut folders {
+            if within_folder(folder, &path) {
+                *folder = format!("{}{}", destination, &folder[path.len()..]);
+            }
+        }
+        for host in &mut hosts {
+            if within_folder(&host.group, &path) {
+                host.group = format!("{}{}", destination, &host.group[path.len()..]);
+            }
+        }
+        if !folders.contains(&destination) {
+            folders.push(destination.clone());
+        }
+        put_record(&tx, "folders", &serde_json::to_string(&folders)?)?;
+        put_record(&tx, "hosts", &serde_json::to_string(&hosts)?)?;
+        tx.commit()?;
+        Ok(destination.clone())
+    })
+}
+
 pub fn vault_change_password(
     token: String,
     current_password: String,
@@ -533,6 +805,10 @@ pub fn vault_change_password(
         .as_mut()
         .filter(|v| v.token == token)
         .context("保险库已锁定")?;
+    let db = vault
+        .db
+        .as_mut()
+        .context("同步正在进行，请稍后修改主密码")?;
     let verified = key_database_mode(&vault.path, &current, true)?;
     verified
         .query_row("SELECT count(*) FROM sqlite_master", [], |r| {
@@ -540,9 +816,8 @@ pub fn vault_change_password(
         })
         .map_err(|_| anyhow!("当前主密码错误"))?;
     drop(verified);
-    let rc = unsafe {
-        rusqlite::ffi::sqlite3_rekey(vault.db.handle(), new.as_ptr().cast(), new.len() as i32)
-    };
+    let rc =
+        unsafe { rusqlite::ffi::sqlite3_rekey(db.handle(), new.as_ptr().cast(), new.len() as i32) };
     ensure!(rc == rusqlite::ffi::SQLITE_OK, "主密码修改失败");
     Ok(())
 }
@@ -563,7 +838,7 @@ pub fn vault_export_backup(token: String, path: String, password: String) -> Res
         let result = (|| -> Result<()> {
             db.execute_batch("PRAGMA vault_backup.cipher_compatibility=4;")?;
             db.query_row("SELECT sqlcipher_export('vault_backup')", [], |_| Ok(()))?;
-            db.execute_batch("PRAGMA vault_backup.user_version=2;")?;
+            db.execute_batch("PRAGMA vault_backup.user_version=3;")?;
             Ok(())
         })();
         let detached = db.execute_batch("DETACH DATABASE vault_backup");
@@ -587,7 +862,7 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
     let version: i32 = source
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(|_| anyhow!("备份密码错误或文件损坏"))?;
-    ensure!((1..=2).contains(&version), "不支持的备份版本");
+    ensure!((1..=3).contains(&version), "不支持的备份版本");
     let format: String =
         source.query_row("SELECT value FROM metadata WHERE key='format'", [], |r| {
             r.get(0)
@@ -595,6 +870,8 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
     ensure!(format == "wterm-vault-v1", "不是 W Term 备份");
     let host_json = read_record(&source, "hosts")?;
     let folder_json = read_record(&source, "folders")?;
+    let snippet_json = read_record(&source, "snippets")?;
+    validate("snippets", &snippet_json)?;
     validate("hosts", &host_json)?;
     validate("folders", &folder_json)?;
     let mut restored: Vec<Host> = serde_json::from_str(&host_json)?;
@@ -602,7 +879,7 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
     with_vault(&token, |db| {
         let tx = db.transaction()?;
         let mut ids = HashMap::new();
-        if version == 2 {
+        if version >= 2 {
             let mut stmt = source.prepare(
                 "SELECT id,name,username,kind,password,private_key,passphrase FROM identities",
             )?;
@@ -644,6 +921,13 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
         folders.dedup();
         put_record(&tx, "hosts", &serde_json::to_string(&hosts)?)?;
         put_record(&tx, "folders", &serde_json::to_string(&folders)?)?;
+        let mut snippets: Vec<Snippet> = serde_json::from_str(&read_record(&tx, "snippets")?)?;
+        for mut entry in serde_json::from_str::<Vec<Snippet>>(&snippet_json)? {
+            entry.id = uuid::Uuid::new_v4().to_string();
+            entry.name.push_str(" (恢复)");
+            snippets.push(entry);
+        }
+        put_record(&tx, "snippets", &serde_json::to_string(&snippets)?)?;
         tx.commit()?;
         Ok(count)
     })
@@ -653,6 +937,219 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
 mod tests {
     use super::*;
     static SERIAL: Mutex<()> = Mutex::new(());
+    #[test]
+    fn sync_lease_cancel_lock_and_reopen_do_not_reattach_stale_database() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("lease.db").to_string_lossy().to_string();
+        let password = "lease fixture master password".to_owned();
+        let token = vault_open(path.clone(), password.clone(), true)?.token;
+        let first = lease(&token)?;
+        assert!(with_vault(&token, |_| Ok(())).is_err());
+        assert!(lease(&token).is_err());
+        assert!(vault_change_password(
+            token.clone(),
+            password.clone(),
+            "another long password".into()
+        )
+        .is_err());
+        cancel_sync(&token)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        runtime.block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                first.cancelled.notified(),
+            )
+            .await
+            .unwrap();
+        });
+        drop(first);
+        with_vault(&token, |_| Ok(()))?;
+        let old = lease(&token)?;
+        vault_lock(token.clone())?;
+        runtime.block_on(async {
+            tokio::time::timeout(std::time::Duration::from_secs(1), old.cancelled.notified())
+                .await
+                .unwrap();
+        });
+        let fresh = vault_open(path, password, false)?.token;
+        let current = lease(&fresh)?;
+        drop(old);
+        assert!(with_vault(&fresh, |_| Ok(())).is_err());
+        drop(current);
+        with_vault(&fresh, |_| Ok(()))?;
+        assert!(cancel_sync(&token).is_err());
+        vault_lock(fresh)?;
+        Ok(())
+    }
+    #[test]
+    fn snippets_are_encrypted_backed_up_and_reject_control_characters() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("vault.db").to_string_lossy().to_string();
+        let token = vault_open(path.clone(), "snippet master password".into(), true)?.token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        with_vault(&token, |db| {
+            db.execute_batch("PRAGMA user_version=2;")?;
+            Ok(())
+        })?;
+        vault_lock(token)?;
+        let token = vault_open(path.clone(), "snippet master password".into(), false)?.token;
+        with_vault(&token, |db| {
+            let version: i32 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+            assert_eq!(version, 3);
+            Ok(())
+        })?;
+        for command in ["ls\nreboot", "\u{1b}[200~", "", "tab\t"] {
+            assert!(
+                vault_save_snippet(token.clone(), "".into(), "Bad".into(), command.into()).is_err()
+            );
+        }
+        vault_save_snippet(
+            token.clone(),
+            "".into(),
+            "Secret snippet".into(),
+            "echo unique-snippet-fixture".into(),
+        )?;
+        let entries: Vec<Snippet> =
+            serde_json::from_str(&vault_read(token.clone(), "snippets".into())?)?;
+        let id = entries[0].id.clone();
+        let backup = dir.path().join("backup").to_string_lossy().to_string();
+        vault_export_backup(
+            token.clone(),
+            backup.clone(),
+            "snippet backup password".into(),
+        )?;
+        vault_restore_backup(token.clone(), backup, "snippet backup password".into())?;
+        let restored: Vec<Snippet> =
+            serde_json::from_str(&vault_read(token.clone(), "snippets".into())?)?;
+        assert_eq!(restored.len(), 2);
+        assert_ne!(restored[0].id, restored[1].id);
+        vault_delete_snippet(token.clone(), id.clone())?;
+        assert!(vault_save_snippet(token.clone(), id, "stale".into(), "ls".into()).is_err());
+        vault_lock(token.clone())?;
+        assert!(vault_read(token, "snippets".into()).is_err());
+        let bytes = std::fs::read(&path)?;
+        assert!(!bytes
+            .windows(b"unique-snippet-fixture".len())
+            .any(|w| w == b"unique-snippet-fixture"));
+        let token = vault_open(path, "snippet master password".into(), false)?.token;
+        assert_eq!(
+            serde_json::from_str::<Vec<Snippet>>(&vault_read(token.clone(), "snippets".into())?)?
+                .len(),
+            1
+        );
+        vault_lock(token)?;
+        Ok(())
+    }
+    #[test]
+    fn encrypted_key_export_roundtrip_and_no_overwrite() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let token = vault_open(
+            dir.path().join("vault.db").to_string_lossy().into(),
+            "export fixture master".into(),
+            true,
+        )?
+        .token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        let id = vault_generate_key(token.clone(), "Export key".into(), "root".into())?;
+        let public = vault_public_key(token.clone(), id.clone())?;
+        let path = dir.path().join("id_ed25519").to_string_lossy().to_string();
+        let password = "separate export password".to_string();
+        assert!(
+            vault_export_private_key(token.clone(), id.clone(), path.clone(), "short".into())
+                .is_err()
+        );
+        assert!(!Path::new(&path).exists());
+        vault_export_private_key(token.clone(), id.clone(), path.clone(), password.clone())?;
+        let encoded = std::fs::read_to_string(&path)?;
+        let encrypted = russh::keys::PrivateKey::from_openssh(&encoded)?;
+        assert!(encrypted.is_encrypted());
+        assert!(russh::keys::decode_secret_key(&encoded, Some("wrong")).is_err());
+        let decoded = russh::keys::decode_secret_key(&encoded, Some(&password))?;
+        assert_eq!(decoded.public_key().to_openssh()?, public);
+        assert!(vault_export_private_key(
+            token.clone(),
+            id.clone(),
+            path.clone(),
+            password.clone()
+        )
+        .is_err());
+        assert_eq!(std::fs::read_to_string(&path)?, encoded);
+        let imported = vault_save_identity(
+            token.clone(),
+            IdentityInput {
+                id: String::new(),
+                name: "Imported export".into(),
+                username: "root".into(),
+                kind: "key".into(),
+                password: String::new(),
+                private_key: encoded,
+                passphrase: password.clone(),
+                replace_secret: true,
+            },
+        )?;
+        assert_eq!(vault_public_key(token.clone(), imported.clone())?, public);
+        let second = dir.path().join("second").to_string_lossy().to_string();
+        vault_export_private_key(
+            token.clone(),
+            imported,
+            second.clone(),
+            "different export password".into(),
+        )?;
+        let reexported = std::fs::read_to_string(&second)?;
+        assert!(russh::keys::decode_secret_key(&reexported, Some(&password)).is_err());
+        assert_eq!(
+            russh::keys::decode_secret_key(&reexported, Some("different export password"))?
+                .public_key()
+                .to_openssh()?,
+            public
+        );
+        vault_lock(token.clone())?;
+        assert!(vault_export_private_key(
+            token,
+            id,
+            dir.path().join("locked").to_string_lossy().into(),
+            password
+        )
+        .is_err());
+        Ok(())
+    }
+    #[test]
+    fn generated_keys_persist_and_are_distinct() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("keys.db").to_string_lossy().to_string();
+        let password = "generated key test password".to_string();
+        let token = vault_open(path.clone(), password.clone(), true)?.token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        assert!(vault_generate_key(token.clone(), " ".into(), "root".into()).is_err());
+        let first = vault_generate_key(token.clone(), "Mac key".into(), "root".into())?;
+        let second = vault_generate_key(token.clone(), "Phone key".into(), "user".into())?;
+        let public = vault_public_key(token.clone(), first.clone())?;
+        assert!(public.starts_with("ssh-ed25519 "));
+        assert_ne!(public, vault_public_key(token.clone(), second)?);
+        assert!(!public.contains("PRIVATE"));
+        let parsed = russh::keys::PublicKey::from_openssh(&public)?;
+        with_vault(&token, |db| {
+            let encoded = Zeroizing::new(db.query_row(
+                "SELECT private_key FROM identities WHERE id=?1",
+                [&first],
+                |r| r.get::<_, String>(0),
+            )?);
+            let key = russh::keys::decode_secret_key(&encoded, None)?;
+            assert_eq!(key.public_key(), &parsed);
+            Ok(())
+        })?;
+        vault_lock(token.clone())?;
+        assert!(vault_public_key(token.clone(), first.clone()).is_err());
+        assert!(vault_generate_key(token, "Locked".into(), "root".into()).is_err());
+        let token = vault_open(path, password, false)?.token;
+        assert_eq!(public, vault_public_key(token.clone(), first)?);
+        vault_lock(token)?;
+        Ok(())
+    }
     #[test]
     fn encrypted_lifecycle_migration_and_stale_tokens() -> Result<()> {
         let _serial = SERIAL.lock().unwrap();
@@ -721,6 +1218,53 @@ mod tests {
             replace_secret: true,
         }
     }
+    #[test]
+    fn folder_rename_is_atomic_and_preserves_ids() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let token = vault_open(
+            dir.path().join("rename.db").to_string_lossy().into(),
+            "rename fixture password".into(),
+            true,
+        )?
+        .token;
+        vault_import_legacy(
+            token.clone(),
+            "[]".into(),
+            r#"["Work/Sub","Work2","Other/Child"]"#.into(),
+        )?;
+        let input = r#"{"id":"rename-host","name":"Saved","host":"127.0.0.1","username":"wterm","port":22,"group":"Work/Sub","tags":[],"favorite":true}"#;
+        let saved: Host = serde_json::from_str(&vault_save_host(
+            token.clone(),
+            input.into(),
+            Some(password_input()),
+        )?)?;
+        assert_eq!(
+            vault_rename_folder(token.clone(), "Work".into(), "生产".into())?,
+            "生产"
+        );
+        let hosts: Vec<Host> = serde_json::from_str(&vault_read(token.clone(), "hosts".into())?)?;
+        assert_eq!(hosts[0].group, "生产/Sub");
+        assert_eq!(hosts[0].id, saved.id);
+        assert_eq!(hosts[0].identity_id, saved.identity_id);
+        assert!(hosts[0].favorite);
+        let before_hosts = vault_read(token.clone(), "hosts".into())?;
+        let before_folders = vault_read(token.clone(), "folders".into())?;
+        for name in ["Other", "Work2", "bad/name", "..", "", "bad\0name"] {
+            assert!(vault_rename_folder(token.clone(), "生产".into(), name.into()).is_err());
+            assert_eq!(vault_read(token.clone(), "hosts".into())?, before_hosts);
+            assert_eq!(vault_read(token.clone(), "folders".into())?, before_folders);
+        }
+        assert!(vault_rename_folder(token.clone(), "missing".into(), "Next".into()).is_err());
+        assert!(vault_rename_folder(token.clone(), "".into(), "Next".into()).is_err());
+        assert_eq!(
+            vault_rename_folder(token.clone(), "生产/Sub".into(), " 服务 ".into())?,
+            "生产/服务"
+        );
+        vault_lock(token)?;
+        Ok(())
+    }
+
     #[test]
     fn credentials_folders_rotation_and_backup_roundtrip() -> Result<()> {
         let _serial = SERIAL.lock().unwrap();

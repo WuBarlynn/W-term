@@ -1,3 +1,5 @@
+import '../app/snippet_store.dart';
+import 'snippets_dialog.dart';
 import '../app/errors.dart';
 import 'terminal_search.dart';
 import '../app/terminal_appearance.dart';
@@ -14,10 +16,12 @@ import '../src/rust/api/client.dart' as native;
 
 class TerminalPane extends StatefulWidget {
   final String connectionId;
+  final SnippetStore? snippets;
   final VoidCallback onDisconnected;
   const TerminalPane({
     super.key,
     required this.connectionId,
+    this.snippets,
     required this.onDisconnected,
   });
   @override
@@ -132,6 +136,19 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (mounted) focus.requestFocus();
   }
 
+  Future<void> openSnippets() async {
+    if (ended || widget.snippets == null) return;
+    final command = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => SnippetsDialog(store: widget.snippets!),
+    );
+    if (!mounted || ended || command == null) return;
+    if (validateSnippetCommand(command) != null) return;
+    terminal.paste(command);
+    focus.requestFocus();
+  }
+
   Future<void> copy() async {
     final selection = controller.selection;
     if (selection != null) {
@@ -221,6 +238,16 @@ class _TerminalPaneState extends State<TerminalPane> {
                 style: const TextStyle(color: Color(0xffa5adba), fontSize: 12),
               ),
             ),
+            if (widget.snippets != null)
+              IconButton(
+                tooltip: '命令片段',
+                onPressed: ended ? null : openSnippets,
+                icon: const Icon(
+                  Icons.code,
+                  color: Color(0xffa5adba),
+                  size: 17,
+                ),
+              ),
             IconButton(
               tooltip: '终端外观',
               onPressed: editAppearance,

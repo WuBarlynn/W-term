@@ -16,6 +16,7 @@ pub struct RemoteEntry {
     pub is_directory: bool,
     pub is_symlink: bool,
     pub size: u64,
+    pub modified_at: Option<u32>,
 }
 #[derive(Clone, Debug)]
 pub struct DirectoryListing {
@@ -117,6 +118,7 @@ pub async fn list_directory(connection_id: String, path: String) -> Result<Direc
             is_directory: entry.metadata().is_dir(),
             is_symlink: entry.metadata().is_symlink(),
             size: entry.metadata().size.unwrap_or(0),
+            modified_at: entry.metadata().mtime,
         })
         .collect();
     entries.sort_by(|a, b| {
@@ -335,6 +337,104 @@ pub async fn upload_file_with_policy(
     result
 }
 
+fn mutable_remote_path(path: &str) -> Result<()> {
+    anyhow::ensure!(
+        path.starts_with('/')
+            && !path.contains('\0')
+            && path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .all(|s| s != "." && s != "..")
+            && path.split('/').any(|s| !s.is_empty()),
+        "只能操作有效的远程项目路径，不能操作根目录"
+    );
+    anyhow::ensure!(!path.ends_with('/'), "远程项目路径不能以 / 结尾");
+    Ok(())
+}
+
+/// SFTP v3 rename refuses replacement, including a concurrently-created target.
+pub async fn rename_remote_entry(connection_id: String, path: String, name: String) -> Result<()> {
+    mutable_remote_path(&path)?;
+    anyhow::ensure!(
+        !name.trim().is_empty()
+            && !name.contains('/')
+            && !name.contains('\0')
+            && name != "."
+            && name != "..",
+        "请输入有效的项目名称"
+    );
+    let parent = path.rsplit_once('/').context("无效路径")?.0;
+    let destination = format!("{parent}/{name}");
+    if destination == path {
+        return Ok(());
+    }
+    let sftp = session::sftp(&connection_id).await?;
+    anyhow::ensure!(
+        upload_metadata(&sftp, &destination).await?.is_none(),
+        "同名项目已存在，不能覆盖"
+    );
+    sftp.rename(path, destination).await?;
+    Ok(())
+}
+
+/// Never recurses or resolves links: unlink links themselves, rmdir empty directories.
+pub async fn delete_remote_entry(connection_id: String, path: String) -> Result<()> {
+    mutable_remote_path(&path)?;
+    let sftp = session::sftp(&connection_id).await?;
+    let metadata = sftp.symlink_metadata(&path).await?;
+    if metadata.is_dir() && !metadata.is_symlink() {
+        sftp.remove_dir(path)
+            .await
+            .context("无法删除文件夹：请确认目录为空且有权限")?;
+    } else {
+        sftp.remove_file(path).await?;
+    }
+    Ok(())
+}
+
+/// Read current mode without following the final symlink.
+pub async fn remote_permissions(connection_id: String, path: String) -> Result<u32> {
+    mutable_remote_path(&path)?;
+    let sftp = session::sftp(&connection_id).await?;
+    let metadata = sftp.symlink_metadata(path).await?;
+    anyhow::ensure!(
+        !metadata.is_symlink() && (metadata.is_dir() || metadata.is_regular()),
+        "只支持普通文件和文件夹的权限"
+    );
+    Ok(metadata.permissions.context("服务器未返回权限信息")? & 0o7777)
+}
+
+/// Optimistic conflict check preserves special bits, and verifies the server result.
+pub async fn change_remote_permissions(
+    connection_id: String,
+    path: String,
+    expected: u32,
+    permissions: u32,
+) -> Result<()> {
+    anyhow::ensure!(
+        permissions <= 0o777 && expected <= 0o7777,
+        "权限必须为 000 至 777"
+    );
+    let current = remote_permissions(connection_id.clone(), path.clone()).await?;
+    anyhow::ensure!(
+        current == expected,
+        "权限已被其他程序修改，请重新打开权限窗口"
+    );
+    let next = (current & 0o7000) | permissions;
+    let sftp = session::sftp(&connection_id).await?;
+    sftp.set_metadata(
+        &path,
+        russh_sftp::protocol::FileAttributes {
+            permissions: Some(next),
+            ..Default::default()
+        },
+    )
+    .await?;
+    let actual = remote_permissions(connection_id, path).await?;
+    anyhow::ensure!(actual == next, "服务器返回的权限与请求不一致，请刷新后检查");
+    Ok(())
+}
+
 pub async fn create_directory(connection_id: String, path: String) -> Result<()> {
     session::sftp(&connection_id)
         .await?
@@ -342,6 +442,121 @@ pub async fn create_directory(connection_id: String, path: String) -> Result<()>
         .await?;
     Ok(())
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RemoteTextSnapshot {
+    pub text: String,
+    pub permissions: u32,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+    pub modified_at: Option<u32>,
+}
+
+pub async fn read_remote_text(connection_id: String, path: String) -> Result<RemoteTextSnapshot> {
+    mutable_remote_path(&path)?;
+    let sftp = session::sftp(&connection_id).await?;
+    let before = sftp.symlink_metadata(&path).await?;
+    anyhow::ensure!(
+        before.is_regular() && !before.is_symlink(),
+        "仅支持编辑普通文件，不能编辑链接或文件夹"
+    );
+    let permissions = before
+        .permissions
+        .context("服务器未返回文件权限，无法安全编辑")?;
+    let text = preview_text(connection_id, path.clone()).await?;
+    anyhow::ensure!(!text.contains('\0'), "文件包含二进制数据，请下载后编辑");
+    let after = sftp.symlink_metadata(&path).await?;
+    anyhow::ensure!(
+        after.is_regular()
+            && before.size == after.size
+            && before.mtime == after.mtime
+            && before.permissions == after.permissions
+            && before.uid == after.uid
+            && before.gid == after.gid,
+        "文件读取期间发生变化，请重新打开"
+    );
+    Ok(RemoteTextSnapshot {
+        text,
+        permissions: permissions & 0o7777,
+        uid: before.uid,
+        gid: before.gid,
+        modified_at: before.mtime,
+    })
+}
+
+/// Optimistic conflict detection, followed by atomic POSIX replacement.
+/// SFTP does not offer atomic compare-and-swap; a final check/rename race remains.
+pub async fn save_remote_text(
+    connection_id: String,
+    path: String,
+    expected: RemoteTextSnapshot,
+    text: String,
+) -> Result<()> {
+    anyhow::ensure!(
+        text.len() <= 256 * 1024 && expected.text.len() <= 256 * 1024,
+        "文本编辑最多支持 256 KiB"
+    );
+    anyhow::ensure!(!text.contains('\0'), "文本不能包含二进制空字符");
+    let current = read_remote_text(connection_id.clone(), path.clone()).await?;
+    anyhow::ensure!(
+        current == expected,
+        "远程文件已变化，未保存。请保留本地修改并重新打开文件"
+    );
+    if text == expected.text {
+        return Ok(());
+    }
+    let sftp = session::sftp(&connection_id).await?;
+    let temporary = format!("{}.wterm-{}.part", path, uuid::Uuid::new_v4());
+    let mut target = sftp
+        .open_with_flags(
+            &temporary,
+            OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::EXCLUDE,
+        )
+        .await?;
+    let result = async {
+        sftp.set_metadata(
+            &temporary,
+            russh_sftp::protocol::FileAttributes {
+                permissions: Some(0o600),
+                ..Default::default()
+            },
+        )
+        .await?;
+        target.write_all(text.as_bytes()).await?;
+        target.flush().await?;
+        target.shutdown().await?;
+        // Refuse replacement if the server cannot preserve ownership and mode.
+        sftp.set_metadata(
+            &temporary,
+            russh_sftp::protocol::FileAttributes {
+                uid: expected.uid,
+                gid: expected.gid,
+                permissions: Some(expected.permissions),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let staged = sftp.symlink_metadata(&temporary).await?;
+        anyhow::ensure!(
+            staged.uid == expected.uid
+                && staged.gid == expected.gid
+                && staged.permissions.map(|p| p & 0o7777) == Some(expected.permissions),
+            "无法保留文件属主或权限，原文件未改变"
+        );
+        let latest = read_remote_text(connection_id.clone(), path.clone()).await?;
+        anyhow::ensure!(
+            latest == expected,
+            "远程文件已变化，未保存。请保留本地修改并重新打开文件"
+        );
+        replace_upload(&connection_id, &temporary, &path).await
+    }
+    .await;
+    drop(target);
+    if result.is_err() {
+        let _ = sftp.remove_file(&temporary).await;
+    }
+    result
+}
+
 /// Small preview only. Never load an arbitrary remote file into memory.
 pub async fn preview_text(connection_id: String, path: String) -> Result<String> {
     let sftp = session::sftp(&connection_id).await?;

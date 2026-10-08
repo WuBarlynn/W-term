@@ -50,8 +50,14 @@ pub enum Input {
     Data(Vec<u8>),
     Resize(u32, u32),
 }
+pub(crate) struct ForwardTask {
+    pub info: crate::api::forward::LocalForward,
+    pub error: Arc<std::sync::Mutex<Option<String>>>,
+    pub task: tokio::task::JoinHandle<()>,
+}
 pub struct Live {
     pub handle: Transport,
+    pub forwards: Mutex<HashMap<String, ForwardTask>>,
     pub input: mpsc::Sender<Input>,
     pub output: Mutex<Option<mpsc::Receiver<Vec<u8>>>>,
     pub ack: Semaphore,
@@ -207,6 +213,7 @@ pub async fn authenticate(
         ack: Semaphore::new(0),
         stop,
         sftp: Mutex::new(None),
+        forwards: Mutex::new(HashMap::new()),
     });
     {
         let mut r = registry().lock().await;
@@ -219,6 +226,7 @@ pub async fn authenticate(
     let actor_id = id.to_string();
     tokio::spawn(async move {
         let _ = terminal_actor(channel, input_rx, output, stop_rx).await;
+        live.stop.send_replace(true);
         // Keep the registry entry while Dart drains and ACKs the final output.
         let _ = live
             .handle
@@ -322,6 +330,11 @@ pub async fn disconnect(id: &str) -> Result<()> {
     if let Some(s) = live {
         s.stop.send_replace(true);
         s.ack.close();
+        let forwards: Vec<_> = s.forwards.lock().await.drain().map(|(_, f)| f).collect();
+        for forward in forwards {
+            forward.task.abort();
+            let _ = forward.task.await;
+        }
         let _ = s
             .handle
             .disconnect(Disconnect::ByApplication, "Disconnected", "en")
@@ -453,12 +466,209 @@ mod tests {
     }
     #[tokio::test]
     #[ignore = "Run scripts/test-core.sh to start the loopback fixture"]
+    async fn fixture_sftp_rename_delete_preserves_conflicts_and_link_targets() {
+        let id = password_session().await;
+        let dir = tempfile::tempdir().unwrap();
+        let local = dir.path().join("source");
+        tokio::fs::write(&local, b"preserved content")
+            .await
+            .unwrap();
+        let root = format!("/actions-{}", Uuid::new_v4());
+        client::create_directory(id.clone(), root.clone())
+            .await
+            .unwrap();
+        let a = format!("{root}/original");
+        let b = format!("{root}/existing");
+        for path in [&a, &b] {
+            client::upload_file(id.clone(), local.to_string_lossy().into(), path.clone())
+                .await
+                .unwrap();
+        }
+        assert!(
+            client::rename_remote_entry(id.clone(), a.clone(), "existing".into())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            client::preview_text(id.clone(), b.clone()).await.unwrap(),
+            "preserved content"
+        );
+        let mode = client::remote_permissions(id.clone(), a.clone())
+            .await
+            .unwrap();
+        client::change_remote_permissions(id.clone(), a.clone(), mode, 0o640)
+            .await
+            .unwrap();
+        assert_eq!(
+            client::remote_permissions(id.clone(), a.clone())
+                .await
+                .unwrap()
+                & 0o777,
+            0o640
+        );
+        assert!(
+            client::change_remote_permissions(id.clone(), a.clone(), 0o777, 0o600)
+                .await
+                .is_err()
+        );
+        assert!(
+            client::change_remote_permissions(id.clone(), a.clone(), 0o640, 0o1777)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            client::remote_permissions(id.clone(), a.clone())
+                .await
+                .unwrap()
+                & 0o777,
+            0o640
+        );
+        assert!(client::delete_remote_entry(id.clone(), root.clone())
+            .await
+            .is_err());
+        for invalid in ["/", "/..", "/x/../", "."] {
+            assert!(client::delete_remote_entry(id.clone(), invalid.into())
+                .await
+                .is_err());
+        }
+        assert!(
+            client::rename_remote_entry(id.clone(), a.clone(), "../bad".into())
+                .await
+                .is_err()
+        );
+        client::rename_remote_entry(id.clone(), a, "中文新名".into())
+            .await
+            .unwrap();
+        let renamed = format!("{root}/中文新名");
+        assert_eq!(
+            client::preview_text(id.clone(), renamed.clone())
+                .await
+                .unwrap(),
+            "preserved content"
+        );
+        // Place synthetic links inside the fixture root, not in user directories.
+        let fixture = std::path::PathBuf::from(std::env::var("WTERM_FIXTURE_ROOT").unwrap());
+        let link = format!("{root}/link");
+        std::os::unix::fs::symlink("中文新名", fixture.join(link.trim_start_matches('/'))).unwrap();
+        assert!(client::remote_permissions(id.clone(), link.clone())
+            .await
+            .is_err());
+        assert!(
+            client::change_remote_permissions(id.clone(), link.clone(), 0o640, 0o777)
+                .await
+                .is_err()
+        );
+        client::delete_remote_entry(id.clone(), link).await.unwrap();
+        assert_eq!(
+            client::preview_text(id.clone(), renamed.clone())
+                .await
+                .unwrap(),
+            "preserved content"
+        );
+        client::delete_remote_entry(id.clone(), renamed)
+            .await
+            .unwrap();
+        client::delete_remote_entry(id.clone(), b).await.unwrap();
+        client::rename_remote_entry(id.clone(), root.clone(), "renamed-empty-folder".into())
+            .await
+            .unwrap();
+        client::delete_remote_entry(id.clone(), "/renamed-empty-folder".into())
+            .await
+            .unwrap();
+        disconnect(&id).await.unwrap();
+    }
+    #[tokio::test]
+    #[ignore = "Run scripts/test-core.sh to start the loopback fixture"]
+    async fn fixture_remote_text_edit_and_conflicts() {
+        let id = password_session().await;
+        let dir = tempfile::tempdir().unwrap();
+        let local = dir.path().join("text");
+        let path = format!("/editor-{}.txt", Uuid::new_v4());
+        tokio::fs::write(&local, "原内容\r\n").await.unwrap();
+        client::upload_file(id.clone(), local.to_string_lossy().into(), path.clone())
+            .await
+            .unwrap();
+        let snapshot = client::read_remote_text(id.clone(), path.clone())
+            .await
+            .unwrap();
+        client::save_remote_text(
+            id.clone(),
+            path.clone(),
+            snapshot.clone(),
+            "编辑后\r\n".into(),
+        )
+        .await
+        .unwrap();
+        let updated = client::read_remote_text(id.clone(), path.clone())
+            .await
+            .unwrap();
+        assert_eq!(updated.text, "编辑后\r\n");
+        assert_eq!(updated.permissions, snapshot.permissions);
+        assert_eq!((updated.uid, updated.gid), (snapshot.uid, snapshot.gid));
+        assert!(
+            client::save_remote_text(id.clone(), path.clone(), snapshot, "stale".into())
+                .await
+                .is_err()
+        );
+        assert!(client::save_remote_text(
+            id.clone(),
+            path.clone(),
+            updated.clone(),
+            "x".repeat(256 * 1024 + 1)
+        )
+        .await
+        .is_err());
+        assert_eq!(
+            client::preview_text(id.clone(), path).await.unwrap(),
+            "编辑后\r\n"
+        );
+        let denied = "/denied-rename.bin".to_string();
+        // Other fixture tests may have created this file; use its current snapshot.
+        if client::read_remote_text(id.clone(), denied.clone())
+            .await
+            .is_err()
+        {
+            client::upload_file(id.clone(), local.to_string_lossy().into(), denied.clone())
+                .await
+                .unwrap();
+        }
+        let original = client::read_remote_text(id.clone(), denied.clone())
+            .await
+            .unwrap();
+        assert!(client::save_remote_text(
+            id.clone(),
+            denied.clone(),
+            original.clone(),
+            "reject save".into()
+        )
+        .await
+        .is_err());
+        assert_eq!(
+            client::preview_text(id.clone(), denied.clone())
+                .await
+                .unwrap(),
+            original.text
+        );
+        client::delete_remote_entry(id.clone(), denied)
+            .await
+            .unwrap();
+        let listing = client::list_directory(id.clone(), "/".into())
+            .await
+            .unwrap();
+        assert!(!listing.entries.iter().any(|e| e.name.ends_with(".part")));
+        disconnect(&id).await.unwrap();
+    }
+    #[tokio::test]
+    #[ignore = "Run scripts/test-core.sh to start the loopback fixture"]
     async fn fixture_sftp_roundtrip_and_no_overwrite() {
         let id = password_session().await;
         let listing = client::list_directory(id.clone(), ".".into())
             .await
             .unwrap();
-        assert!(listing.entries.iter().any(|e| e.name == "fixture.txt"));
+        assert!(listing
+            .entries
+            .iter()
+            .any(|e| e.name == "fixture.txt" && e.modified_at.is_some()));
         assert!(client::preview_text(id.clone(), "/fixture.txt".into())
             .await
             .unwrap()

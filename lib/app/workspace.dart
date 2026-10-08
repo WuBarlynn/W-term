@@ -1,7 +1,13 @@
+import '../features/forwarding_dialog.dart';
+import '../src/rust/api/forward.dart' as forwards;
 import 'errors.dart';
 import 'app_version_label.dart';
 import 'host_store.dart';
 import 'identity_store.dart';
+import 'snippet_store.dart';
+import 'sync_store.dart';
+import '../features/sync_dialog.dart';
+import '../features/snippets_dialog.dart';
 import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
@@ -40,6 +46,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final hostPanelKey = GlobalKey<HostsPageState>();
   bool showIdentities = false;
+  int identitiesEpoch = 0;
   final sessions = <_Session>[];
   int selected = -1, attempt = 0;
   bool connecting = false, preparing = false;
@@ -463,7 +470,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           ),
         Expanded(
           child: showIdentities && hostStore is IdentityStore
-              ? IdentitiesPane(store: hostStore as IdentityStore)
+              ? IdentitiesPane(
+                  key: ValueKey(identitiesEpoch),
+                  store: hostStore as IdentityStore,
+                )
               : HostsPage(
                   key: hostPanelKey,
                   store: hostStore,
@@ -476,6 +486,40 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         ),
         const Divider(height: 1),
         const Padding(padding: EdgeInsets.all(8), child: AppVersionLabel()),
+        if (hostStore is SnippetStore)
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.code, size: 17),
+            title: const Text('命令片段', style: TextStyle(fontSize: 12)),
+            onTap: () async {
+              if (drawer) scaffoldKey.currentState?.closeDrawer();
+              await showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => SnippetsDialog(
+                  store: hostStore as SnippetStore,
+                  allowInsert: false,
+                ),
+              );
+            },
+          ),
+        if (hostStore is SyncStore)
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.sync, size: 17),
+            title: const Text('GitHub 同步', style: TextStyle(fontSize: 12)),
+            onTap: () async {
+              if (drawer) scaffoldKey.currentState?.closeDrawer();
+              await showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => SyncDialog(store: hostStore as SyncStore),
+              );
+              if (!mounted) return;
+              setState(() => identitiesEpoch++);
+              await hostPanelKey.currentState?.load();
+            },
+          ),
         if (hostStore is VaultMaintenance)
           ListTile(
             dense: true,
@@ -742,6 +786,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                                         _SessionView(
                                           key: ValueKey(s.id),
                                           session: s,
+                                          snippets: hostStore is SnippetStore
+                                              ? hostStore as SnippetStore
+                                              : null,
                                           active:
                                               selected >= 0 &&
                                               sessions[selected] == s,
@@ -786,12 +833,14 @@ class _Feature extends StatelessWidget {
 }
 
 class _SessionView extends StatefulWidget {
+  final SnippetStore? snippets;
   final _Session session;
   final bool active;
   final VoidCallback onDisconnected;
   const _SessionView({
     super.key,
     required this.session,
+    this.snippets,
     required this.active,
     required this.onDisconnected,
   });
@@ -801,6 +850,7 @@ class _SessionView extends StatefulWidget {
 
 class _SessionViewState extends State<_SessionView> {
   bool files = false, openedFiles = false;
+  final filesPaneKey = GlobalKey();
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, size) {
@@ -823,6 +873,32 @@ class _SessionViewState extends State<_SessionView> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                IconButton(
+                  tooltip: '端口转发',
+                  icon: const Icon(Icons.settings_ethernet, size: 18),
+                  onPressed: !widget.session.connected
+                      ? null
+                      : () => showDialog<void>(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => ForwardingDialog(
+                            onList: () => forwards.listLocalForwards(
+                              connectionId: widget.session.id,
+                            ),
+                            onStart: (local, host, port) =>
+                                forwards.startLocalForward(
+                                  connectionId: widget.session.id,
+                                  localPort: local,
+                                  targetHost: host,
+                                  targetPort: port,
+                                ),
+                            onStop: (id) => forwards.stopLocalForward(
+                              connectionId: widget.session.id,
+                              forwardId: id,
+                            ),
+                          ),
+                        ),
                 ),
                 TextButton.icon(
                   onPressed: () => setState(() {
@@ -849,6 +925,7 @@ class _SessionViewState extends State<_SessionView> {
                         offstage: files && !split,
                         child: TerminalPane(
                           connectionId: widget.session.id,
+                          snippets: widget.snippets,
                           onDisconnected: widget.onDisconnected,
                         ),
                       ),
@@ -856,6 +933,7 @@ class _SessionViewState extends State<_SessionView> {
                         Offstage(
                           offstage: !files,
                           child: FilesPane(
+                            key: filesPaneKey,
                             connectionId: widget.session.id,
                             dropActive:
                                 widget.active &&
@@ -872,6 +950,7 @@ class _SessionViewState extends State<_SessionView> {
                     child: SizedBox(
                       width: 340,
                       child: FilesPane(
+                        key: filesPaneKey,
                         connectionId: widget.session.id,
                         dropActive:
                             widget.active && files && widget.session.connected,

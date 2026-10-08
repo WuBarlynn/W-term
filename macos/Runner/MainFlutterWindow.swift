@@ -1,9 +1,10 @@
-import Security
 import LocalAuthentication
 import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  private let quickUnlockQueue = DispatchQueue(label: "dev.wterm.quick-unlock", qos: .userInitiated)
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -19,7 +20,41 @@ class MainFlutterWindow: NSWindow {
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     biometricChannel.setMethodCallHandler { call, result in
       if call.method == "keychainAccessIssue" {
-        result(Self.keychainAccessIssue())
+        DispatchQueue.global(qos: .userInitiated).async {
+          let issue = BiometricSigningPolicy.currentIssue()
+          DispatchQueue.main.async { result(issue) }
+        }
+        return
+      }
+      if ["quickUnlockEnabled", "quickUnlockEnroll", "quickUnlockRead", "quickUnlockDisable"].contains(call.method) {
+        self.quickUnlockQueue.async {
+          do {
+            if call.method == "quickUnlockEnroll" || call.method == "quickUnlockRead",
+               let issue = BiometricSigningPolicy.currentIssue() {
+              throw QuickUnlockFailure(issue)
+            }
+            let store = try MacQuickUnlock.applicationStore()
+            var value: Any?
+            switch call.method {
+            case "quickUnlockEnabled": value = store.enabled()
+            case "quickUnlockEnroll":
+              guard let args = call.arguments as? [String: Any], let password = args["password"] as? String else {
+                throw QuickUnlockFailure("缺少快速解锁凭证")
+              }
+              try store.enroll(password)
+            case "quickUnlockRead": value = try store.read()
+            default: try store.disable()
+            }
+            DispatchQueue.main.async { result(value) }
+          } catch {
+            // Do not return system details that may contain file paths or data.
+            let message = (error as? QuickUnlockFailure)?.message ??
+              "Touch ID 未完成或凭证已失效，请重试；仍可使用主密码解锁。首次启用请确认系统已录入指纹。"
+            DispatchQueue.main.async {
+              result(FlutterError(code: "quick_unlock_failed", message: message, details: nil))
+            }
+          }
+        }
         return
       }
       if call.method == "buildVersion" {
@@ -43,27 +78,4 @@ class MainFlutterWindow: NSWindow {
 
     super.awakeFromNib()
   }
-  private static func keychainAccessIssue() -> String? {
-    var code: SecCode?
-    var staticCode: SecStaticCode?
-    var info: CFDictionary?
-    guard SecCodeCopySelf(SecCSFlags(rawValue: 0), &code) == errSecSuccess,
-          let code = code,
-          SecCodeCopyStaticCode(code, SecCSFlags(rawValue: 0), &staticCode) == errSecSuccess,
-          let staticCode = staticCode,
-          SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
-          let dict = info as? [String: Any] else {
-      return "无法读取应用签名。请使用正确签名的 W Term 版本。"
-    }
-    let team = dict[kSecCodeInfoTeamIdentifier as String] as? String
-    let entitlements = dict[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
-    let appID = entitlements["com.apple.application-identifier"] as? String
-    let groups = entitlements["keychain-access-groups"] as? [String]
-    guard let team = team, !team.isEmpty,
-          (appID?.isEmpty == false || groups?.isEmpty == false) else {
-      return "当前 App 为临时签名或缺少钥匙串权限，无法启用 Touch ID。请使用 Apple Development 或 Developer ID 证书签名并配置 Keychain 权限。移除 com.apple.quarantine 不能替代签名。"
-    }
-    return nil
-  }
-
 }

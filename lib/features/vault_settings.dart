@@ -106,7 +106,9 @@ class _VaultSettingsState extends State<VaultSettings> {
             );
             if (target == null) return;
             await XFile(path).saveTo(target.path);
-            if (mounted) setState(() => message = '加密备份已保存，包含主机、文件夹和身份凭证。');
+            if (mounted) {
+              setState(() => message = '加密备份已保存，包含主机、文件夹、命令片段和身份凭证。');
+            }
           }
         } else {
           if (await source!.length() > 512 * 1024 * 1024) {
@@ -117,7 +119,9 @@ class _VaultSettingsState extends State<VaultSettings> {
           );
           final count = await widget.store.restoreBackup(path, values[0]);
           if (mounted) {
-            setState(() => message = '已恢复 $count 台主机。恢复的主机和身份标注为“恢复”，原数据保留。');
+            setState(
+              () => message = '已恢复 $count 台主机及备份中的命令片段和身份。恢复项目标注为“恢复”，原数据保留。',
+            );
           }
         }
       }
@@ -158,7 +162,7 @@ class _VaultSettingsState extends State<VaultSettings> {
                 label: const Text('关闭快速解锁'),
               ),
             const SizedBox(height: 16),
-            const Text('备份包含保存的密码和私钥，使用独立密码加密。请妥善保管备份文件与密码。'),
+            const Text('备份包含主机、命令片段及保存的密码和私钥，使用独立密码加密。请妥善保管备份文件与密码。'),
             const SizedBox(height: 16),
             const SizedBox(height: 12),
             OutlinedButton.icon(

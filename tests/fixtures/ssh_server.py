@@ -9,6 +9,9 @@ import asyncssh
 
 
 class TestServer(asyncssh.SSHServer):
+    def connection_requested(self, dest_host, dest_port, orig_host, orig_port):
+        return dest_host == "127.0.0.1"
+
     def begin_auth(self, username):
         return True
 

@@ -29,6 +29,23 @@ class MemoryLibrary
   }
 
   @override
+  Future<String> renameFolder(String path, String name) async {
+    final parts = path.split('/')..removeLast();
+    final destination = [...parts, name].join('/');
+    String renamed(String value) => value == path || value.startsWith('$path/')
+        ? '$destination${value.substring(path.length)}'
+        : value;
+    folders = folders.map(renamed).toList();
+    hosts = hosts
+        .map(
+          (h) =>
+              HostProfile.fromJson({...h.toJson(), 'group': renamed(h.group)}),
+        )
+        .toList();
+    return destination;
+  }
+
+  @override
   Future<void> deleteFolder(String path, {bool deleteHosts = false}) async {
     bool within(String p) => p == path || p.startsWith('$path/');
     folders.removeWhere(within);
@@ -246,6 +263,40 @@ void main() {
     expect(store.hosts.single.name, 'Outside');
     expect(find.text('Inside'), findsNothing);
   });
+  testWidgets(
+    'renaming a collapsed folder preserves collapse and host identity',
+    (tester) async {
+      final store = MemoryLibrary()
+        ..folders = ['Work', 'Work/Sub']
+        ..hosts = [
+          HostProfile(
+            id: 'h',
+            name: 'Server',
+            host: 'host',
+            username: 'u',
+            group: 'Work/Sub',
+            identityId: 'identity',
+          ),
+        ];
+      await tester.pumpWidget(MaterialApp(home: HostsPage(store: store)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Work'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('文件夹操作：Work'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('重命名'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), 'Production');
+      await tester.tap(find.widgetWithText(FilledButton, '保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('Server'), findsNothing);
+      await tester.tap(find.text('Production'));
+      await tester.pumpAndSettle();
+      expect(find.text('Server'), findsOneWidget);
+      expect(store.hosts.single.group, 'Production/Sub');
+      expect(store.hosts.single.identityId, 'identity');
+    },
+  );
   testWidgets('host hover and click selection highlight without connecting', (
     tester,
   ) async {

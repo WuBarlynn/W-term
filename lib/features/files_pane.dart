@@ -1,5 +1,19 @@
 import '../app/errors.dart';
+import '../app/directory_history.dart';
+import 'directory_history_bar.dart';
+import '../app/upload_conflict.dart';
+import '../app/folder_upload.dart';
+import 'folder_upload_preview.dart';
+import '../app/folder_access.dart';
+import '../app/download_task.dart';
+import 'download_task_dialog.dart';
+import '../app/upload_batch.dart';
+import 'upload_tasks_dialog.dart';
 import 'upload_conflict_dialog.dart';
+import 'remote_entry_actions.dart';
+import 'file_browser_filter.dart';
+import 'remote_permissions_dialog.dart';
+import 'remote_text_editor.dart';
 
 import 'package:desktop_drop/desktop_drop.dart';
 
@@ -31,6 +45,16 @@ class _FilesPaneState extends State<FilesPane> {
   String? error;
   bool busy = false, dragging = false;
   String activity = '';
+  bool scanningFolder = false, cancelFolderScan = false;
+  UploadBatch? uploadBatch;
+  FolderAccess? folderAccess;
+  DownloadTask? downloadTask;
+  native.RemoteEntry? downloadEntry;
+  List<XFile> uploadSources = const [];
+  final history = DirectoryHistory();
+  final search = TextEditingController();
+  bool showHidden = true, descending = false;
+  FileSort sort = FileSort.name;
   final path = TextEditingController(text: '.');
   @override
   void initState() {
@@ -40,11 +64,14 @@ class _FilesPaneState extends State<FilesPane> {
 
   @override
   void dispose() {
+    uploadBatch?.cancelRemaining();
+    folderAccess?.release().catchError((Object _) {});
     path.dispose();
+    search.dispose();
     super.dispose();
   }
 
-  Future<void> load(String target) async {
+  Future<void> load(String target, {int? historyIndex}) async {
     if (busy) return;
     setState(() {
       busy = true;
@@ -58,12 +85,18 @@ class _FilesPaneState extends State<FilesPane> {
       );
       if (mounted) {
         setState(() {
+          history.commit(result.path, historyIndex: historyIndex);
           listing = result;
           path.text = result.path;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = userFacingError(e));
+      if (mounted) {
+        setState(() {
+          error = userFacingError(e);
+          if (listing != null) path.text = listing!.path;
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -132,25 +165,187 @@ class _FilesPaneState extends State<FilesPane> {
     }
   }
 
-  Future<void> uploadFiles(List<XFile> files, {String? destination}) async {
+  Future<void> uploadFolder({DropItemDirectory? dropped}) async {
+    if (busy || listing == null) return;
+    final destination = listing!.path;
+    setState(() {
+      busy = true;
+      error = null;
+      dragging = false;
+      activity = '选择并扫描文件夹…';
+    });
+    List<FolderUploadItem>? plan;
+    FolderAccess? selectedAccess;
+    try {
+      final String? selected;
+      if (dropped != null) {
+        selectedAccess = await FolderAccess.fromDrop(dropped);
+        selected = selectedAccess.path;
+      } else if (Platform.isIOS) {
+        selectedAccess = await FolderAccess.pick();
+        selected = selectedAccess?.path;
+      } else {
+        selected = await getDirectoryPath();
+      }
+      if (selected == null || !mounted) return;
+      setState(() {
+        scanningFolder = true;
+        cancelFolderScan = false;
+        activity = '正在扫描文件夹…';
+      });
+      plan = await planFolderUpload(
+        selected,
+        isCancelled: () => !mounted || cancelFolderScan,
+        onProgress: (count) {
+          if (mounted && (count == 1 || count % 20 == 0)) {
+            setState(() => activity = '已扫描 $count 项…');
+          }
+        },
+      );
+      if (mounted) setState(() => scanningFolder = false);
+      if (!mounted) return;
+      final snapshot = plan;
+      final selection = await showDialog<FolderUploadSelection>(
+        context: context,
+        builder: (_) =>
+            FolderUploadPreview(items: snapshot, destination: destination),
+      );
+      plan = selection == null
+          ? null
+          : renameUploadRoot(
+              selectFolderUploadItems(
+                snapshot,
+                includeHidden: selection.includeHidden,
+              ),
+              selection.targetName,
+            );
+    } on FolderScanCancelled {
+      plan = null;
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('已取消文件夹扫描，未上传任何项目')));
+      }
+    } catch (e) {
+      plan = null;
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (!mounted || plan == null) {
+        await selectedAccess?.release();
+        selectedAccess = null;
+      }
+      if (mounted) {
+        setState(() {
+          busy = false;
+          scanningFolder = false;
+        });
+      }
+    }
+    if (mounted && plan != null) {
+      await uploadFiles(
+        plan,
+        destination: destination,
+        newFolderAccess: selectedAccess,
+      );
+    }
+  }
+
+  Future<void> showUploadTasks() async {
+    final batch = uploadBatch;
+    if (batch == null) return;
+    final retry = await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          UploadTasksDialog(batch: batch, allowRetry: !busy || batch.active),
+    );
+    if (retry == true && mounted && identical(batch, uploadBatch)) {
+      await uploadFiles(uploadSources, retryBatch: batch);
+    }
+  }
+
+  Future<void> uploadFiles(
+    List<XFile> files, {
+    String? destination,
+    UploadBatch? retryBatch,
+    FolderAccess? newFolderAccess,
+  }) async {
     if (listing == null || busy || files.isEmpty) return;
-    final directory = destination ?? listing!.path;
+    final directory = retryBatch?.destination ?? destination ?? listing!.path;
+    final batch =
+        retryBatch ??
+        UploadBatch(
+          directory,
+          files.map(
+            (file) => file is FolderUploadItem ? file.relativePath : file.name,
+          ),
+        );
+    final indices = retryBatch == null
+        ? List.generate(files.length, (i) => i)
+        : batch.retryFailures();
+    if (indices.isEmpty) return;
+    if (retryBatch == null) {
+      final previous = folderAccess;
+      folderAccess = newFolderAccess;
+      previous?.release().catchError((Object _) {});
+    }
+    final transferAccess = folderAccess;
+    transferAccess?.retain();
     setState(() {
       busy = true;
       dragging = false;
       error = null;
     });
+    setState(() {
+      uploadBatch = batch;
+      uploadSources = List.unmodifiable(files);
+    });
+    final conflictDecisions = UploadConflictDecisions();
     var uploaded = 0;
+    var skipped = 0;
     var cancelled = false;
     final failures = <String>[];
     try {
-      for (final file in files) {
-        if (!mounted) break;
+      for (final index in indices) {
+        if (!mounted || !batch.start(index)) break;
+        final file = files[index];
         Directory? temporary;
         var scoped = false;
         final bookmark = file is DropItem ? file.extraAppleBookmark : null;
         try {
           final name = file.name;
+          final relative = file is FolderUploadItem ? file.relativePath : name;
+          if (file is FolderUploadItem) {
+            final parent = file.parentIndex;
+            if (parent != null &&
+                batch.tasks[parent].state != UploadState.completed) {
+              throw const FormatException('父文件夹未创建，未上传此项目');
+            }
+            var ancestor = parent;
+            while (ancestor != null) {
+              final parentFile = files[ancestor] as FolderUploadItem;
+              if (await FileSystemEntity.type(
+                    parentFile.path,
+                    followLinks: false,
+                  ) !=
+                  FileSystemEntityType.directory) {
+                throw const FormatException('本地父目录类型已变化，请重新选择文件夹');
+              }
+              ancestor = parentFile.parentIndex;
+            }
+            if (await FileSystemEntity.type(file.path, followLinks: false) !=
+                (file.isDirectory
+                    ? FileSystemEntityType.directory
+                    : FileSystemEntityType.file)) {
+              throw const FormatException('本地项目类型已变化，请重新选择文件夹');
+            }
+            if (file.isDirectory) {
+              await native.createDirectory(
+                connectionId: widget.connectionId,
+                path: '${directory == '/' ? '' : directory}/$relative',
+              );
+              batch.complete(index, '已创建文件夹');
+              continue;
+            }
+          }
           if (name.isEmpty ||
               name.contains('/') ||
               name.contains('\x00') ||
@@ -158,9 +353,7 @@ class _FilesPaneState extends State<FilesPane> {
               name == '..') {
             throw const FormatException('无效的文件名');
           }
-          setState(
-            () => activity = '上传 $name（${uploaded + 1}/${files.length}）…',
-          );
+          setState(() => activity = '上传 $name（${index + 1}/${files.length}）…');
           if (Platform.isMacOS && bookmark != null && bookmark.isNotEmpty) {
             scoped = await DesktopDrop.instance
                 .startAccessingSecurityScopedResource(bookmark: bookmark);
@@ -170,7 +363,7 @@ class _FilesPaneState extends State<FilesPane> {
           }
           if (await FileSystemEntity.type(file.path) !=
               FileSystemEntityType.file) {
-            throw const FormatException('当前支持上传文件；文件夹递归上传尚未实现');
+            throw const FormatException('此入口仅支持文件；文件夹请通过上传菜单选择');
           }
           temporary = await createAppTemporaryDirectory('wterm-upload-');
           final local = File('${temporary.path}/payload');
@@ -182,10 +375,14 @@ class _FilesPaneState extends State<FilesPane> {
               final result = await native.uploadFileWithPolicy(
                 connectionId: widget.connectionId,
                 localPath: local.path,
-                remotePath: '${directory == '/' ? '' : directory}/$name',
+                remotePath: '${directory == '/' ? '' : directory}/$relative',
                 policy: policy,
               );
               uploaded++;
+              batch.complete(
+                index,
+                '${result.remotePath} · ${formatSize(result.bytes)}',
+              );
               if (mounted) {
                 setState(
                   () => activity =
@@ -194,20 +391,32 @@ class _FilesPaneState extends State<FilesPane> {
               }
               break;
             } catch (e) {
-              if (!e.toString().contains('Destination already exists') ||
+              if (policy != 'reject' ||
+                  !e.toString().contains('Destination already exists') ||
                   !mounted) {
                 rethrow;
               }
-              final choice = await chooseUploadConflict(context, name);
+              final choice = await conflictDecisions.resolve(
+                () => chooseUploadConflict(context, relative),
+              );
               if (choice == null) {
                 cancelled = true;
+                batch.cancelCurrent(index);
+                batch.cancelRemaining();
+                break;
+              }
+              if (choice == 'skip') {
+                batch.skip(index);
+                skipped++;
                 break;
               }
               policy = choice;
             }
           }
         } catch (e) {
-          failures.add('${file.name}：${userFacingError(e)}');
+          final message = userFacingError(e);
+          batch.fail(index, message);
+          failures.add('${file.name}：$message');
         } finally {
           if (scoped && bookmark != null) {
             try {
@@ -229,65 +438,106 @@ class _FilesPaneState extends State<FilesPane> {
         if (cancelled) break;
       }
     } finally {
-      if (mounted) {
-        setState(() => busy = false);
-        await load(directory);
+      cancelled = cancelled || batch.cancelRequested;
+      try {
         if (mounted) {
-          setState(() {
-            if (failures.isNotEmpty) error = failures.join('\n');
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '已上传 $uploaded 个文件${cancelled ? '，已取消剩余上传' : ''}${failures.isEmpty ? '' : '，${failures.length} 个失败'}',
+          setState(() => busy = false);
+          await load(directory);
+          if (mounted) {
+            setState(() {
+              if (failures.isNotEmpty) error = failures.join('\n');
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '已上传 $uploaded 个文件${skipped == 0 ? '' : '，跳过 $skipped 个'}${cancelled ? '，已取消剩余上传' : ''}${failures.isEmpty ? '' : '，${failures.length} 个失败'}',
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
+      } finally {
+        batch.finish();
+        await transferAccess?.release();
       }
     }
   }
 
+  Future<void> showDownloadTask() async {
+    final task = downloadTask;
+    final entry = downloadEntry;
+    if (task == null || entry == null) return;
+    final retry = await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          DownloadTaskDialog(task: task, allowRetry: !busy || task.active),
+    );
+    if (retry == true && mounted && !busy) await download(entry);
+  }
+
   Future<void> download(native.RemoteEntry entry) async {
+    if (busy) return;
     Directory? temporary;
-    try {
-      setState(() {
-        busy = true;
-        error = null;
-        activity = '下载 ${entry.name}…';
-      });
-      temporary = await createAppTemporaryDirectory('wterm-download-');
-      // Remote names are never used as local paths.
-      final local = '${temporary.path}/download';
-      final count = await native.downloadFile(
-        connectionId: widget.connectionId,
-        remotePath: entry.path,
-        localPath: local,
-      );
-      if (!mounted) return;
-      if (Platform.isIOS) {
-        final box = context.findRenderObject() as RenderBox;
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(local)],
-            fileNameOverrides: [entry.name],
-            sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
-          ),
+    String? local;
+    final task = DownloadTask(entry.name, entry.path);
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '下载 ${entry.name}…';
+      downloadTask = task;
+      downloadEntry = entry;
+    });
+    await task.run(
+      fetch: () async {
+        temporary = await createAppTemporaryDirectory('wterm-download-');
+        // Never use a remote name as a local path.
+        local = '${temporary!.path}/download';
+        return native.downloadFile(
+          connectionId: widget.connectionId,
+          remotePath: entry.path,
+          localPath: local!,
         );
-      } else {
+      },
+      deliver: () async {
+        if (!mounted) return DownloadOutcome.cancelled;
+        setState(() => activity = '等待保存或分享 ${entry.name}…');
+        if (Platform.isIOS) {
+          final box = context.findRenderObject() as RenderBox;
+          final result = await SharePlus.instance.share(
+            ShareParams(
+              files: [XFile(local!)],
+              fileNameOverrides: [entry.name],
+              sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+            ),
+          );
+          return switch (result.status) {
+            ShareResultStatus.success => DownloadOutcome.shared,
+            ShareResultStatus.dismissed => DownloadOutcome.cancelled,
+            ShareResultStatus.unavailable => DownloadOutcome.unconfirmed,
+          };
+        }
         final destination = await getSaveLocation(suggestedName: entry.name);
-        if (destination != null) await XFile(local).saveTo(destination.path);
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('下载完成 · ${formatSize(count)}')));
-      }
-    } catch (e) {
-      if (mounted) setState(() => error = userFacingError(e));
-    } finally {
-      if (temporary != null) await temporary.delete(recursive: true);
-      if (mounted) setState(() => busy = false);
+        if (destination == null || !mounted) return DownloadOutcome.cancelled;
+        await XFile(local!).saveTo(destination.path);
+        return DownloadOutcome.saved;
+      },
+      cleanup: () async {
+        if (temporary != null && await temporary!.exists()) {
+          await temporary!.delete(recursive: true);
+        }
+      },
+    );
+    if (mounted) {
+      setState(() {
+        busy = false;
+        error = [
+          task.error,
+          task.cleanupWarning,
+        ].whereType<String>().join('\n');
+        if (error!.isEmpty) error = null;
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(task.status)));
     }
   }
 
@@ -354,6 +604,159 @@ class _FilesPaneState extends State<FilesPane> {
     }
   }
 
+  Future<void> mutateEntry(
+    native.RemoteEntry entry, {
+    required bool delete,
+  }) async {
+    if (busy || listing == null) return;
+    final directory = listing!.path;
+    String? name;
+    if (delete) {
+      final confirmed = await confirmRemoteDelete(
+        context,
+        name: entry.name,
+        isDirectory: entry.isDirectory,
+        isSymlink: entry.isSymlink,
+      );
+      if (!confirmed || !mounted) return;
+    } else {
+      name = await nameDialog('重命名', entry.name);
+      if (name == null || name == entry.name || !mounted) return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+      activity = delete ? '删除项目…' : '重命名…';
+    });
+    String? failure;
+    try {
+      if (delete) {
+        await native.deleteRemoteEntry(
+          connectionId: widget.connectionId,
+          path: entry.path,
+        );
+      } else {
+        await native.renameRemoteEntry(
+          connectionId: widget.connectionId,
+          path: entry.path,
+          name: name!,
+        );
+      }
+    } catch (e) {
+      failure = userFacingError(e);
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        await load(directory);
+        if (mounted) {
+          if (failure != null) {
+            setState(() => error = failure);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(delete ? '已删除 ${entry.name}' : '已重命名为 $name'),
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> editPermissions(native.RemoteEntry entry) async {
+    if (busy || listing == null || entry.isSymlink) return;
+    final directory = listing!.path;
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '读取权限…';
+    });
+    var changed = false;
+    try {
+      final permissions = await native.remotePermissions(
+        connectionId: widget.connectionId,
+        path: entry.path,
+      );
+      if (!mounted) return;
+      changed =
+          await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => RemotePermissionsDialog(
+              name: entry.name,
+              permissions: permissions,
+              onSave: (value) => native.changeRemotePermissions(
+                connectionId: widget.connectionId,
+                path: entry.path,
+                expected: permissions,
+                permissions: value,
+              ),
+            ),
+          ) ??
+          false;
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        if (changed) {
+          await load(directory);
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('权限已更新')));
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> editText(native.RemoteEntry entry) async {
+    if (busy || listing == null || entry.isDirectory || entry.isSymlink) return;
+    final directory = listing!.path;
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '读取文本…';
+    });
+    var saved = false;
+    try {
+      final snapshot = await native.readRemoteText(
+        connectionId: widget.connectionId,
+        path: entry.path,
+      );
+      if (!mounted) return;
+      saved =
+          await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => RemoteTextEditor(
+              name: entry.name,
+              text: snapshot.text,
+              onSave: (text) => native.saveRemoteText(
+                connectionId: widget.connectionId,
+                path: entry.path,
+                expected: snapshot,
+                text: text,
+              ),
+            ),
+          ) ??
+          false;
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        if (saved) {
+          await load(directory);
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('文本已保存')));
+          }
+        }
+      }
+    }
+  }
+
   void setDragging(bool value) {
     Future.microtask(() {
       if (mounted) setState(() => dragging = value);
@@ -361,171 +764,274 @@ class _FilesPaneState extends State<FilesPane> {
   }
 
   @override
-  Widget build(BuildContext context) => DropTarget(
-    enable:
-        Platform.isMacOS &&
-        widget.dropActive &&
-        (ModalRoute.of(context)?.isCurrent ?? true) &&
-        !busy &&
-        listing != null,
-    onDragEntered: (_) => setDragging(true),
-    onDragExited: (_) => setDragging(false),
-    onDragDone: (details) {
-      if (widget.dropActive && (ModalRoute.of(context)?.isCurrent ?? true)) {
-        uploadFiles(details.files);
-      }
-    },
-    child: Stack(
-      children: [
-        Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: '上级目录',
-                    onPressed: busy || listing == null
-                        ? null
-                        : () => load(remote('..')),
-                    icon: const Icon(Icons.arrow_upward, size: 19),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: path,
-                      enabled: !busy,
-                      style: const TextStyle(fontSize: 12, fontFamily: 'Menlo'),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.folder_outlined, size: 18),
+  Widget build(BuildContext context) {
+    final entries = filterRemoteEntries(
+      listing?.entries ?? [],
+      query: search.text,
+      showHidden: showHidden,
+      sort: sort,
+      descending: descending,
+    );
+    return DropTarget(
+      enable:
+          Platform.isMacOS &&
+          widget.dropActive &&
+          (ModalRoute.of(context)?.isCurrent ?? true) &&
+          !busy &&
+          listing != null,
+      onDragEntered: (_) => setDragging(true),
+      onDragExited: (_) => setDragging(false),
+      onDragDone: (details) {
+        if (widget.dropActive && (ModalRoute.of(context)?.isCurrent ?? true)) {
+          if (busy || listing == null) return;
+          try {
+            final folder = droppedFolder(details.files);
+            if (folder != null) {
+              uploadFolder(dropped: folder);
+            } else {
+              uploadFiles(details.files);
+            }
+          } catch (e) {
+            setState(() {
+              dragging = false;
+              error = userFacingError(e);
+            });
+          }
+        }
+      },
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              DirectoryHistoryBar(
+                history: history,
+                busy: busy,
+                onNavigate: (index) =>
+                    load(history.paths[index], historyIndex: index),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: '上级目录',
+                      onPressed: busy || listing == null
+                          ? null
+                          : () => load(remote('..')),
+                      icon: const Icon(Icons.arrow_upward, size: 19),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: path,
+                        enabled: !busy,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Menlo',
+                        ),
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.folder_outlined, size: 18),
+                        ),
+                        onSubmitted: load,
                       ),
-                      onSubmitted: load,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: '刷新',
-                    onPressed: busy ? null : () => load(path.text),
-                    icon: const Icon(Icons.refresh, size: 19),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  Text(
-                    '${listing?.entries.length ?? 0} 个项目',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: '新建文件夹',
-                    onPressed: busy || listing == null ? null : mkdir,
-                    icon: const Icon(
-                      Icons.create_new_folder_outlined,
-                      size: 19,
+                    IconButton(
+                      tooltip: '刷新',
+                      onPressed: busy ? null : () => load(path.text),
+                      icon: const Icon(Icons.refresh, size: 19),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: '上传文件',
-                    onPressed: busy || listing == null ? null : upload,
-                    icon: const Icon(Icons.upload_outlined, size: 19),
-                  ),
-                ],
-              ),
-            ),
-            if (busy) const LinearProgressIndicator(minHeight: 2),
-            if (busy)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  activity,
-                  style: Theme.of(context).textTheme.labelSmall,
+                  ],
                 ),
               ),
-            if (error != null)
               Padding(
-                padding: const EdgeInsets.all(12),
-                child: SelectableText(
-                  error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            const Divider(height: 1),
-            Expanded(
-              child: listing == null
-                  ? Center(child: Text(busy ? '连接 SFTP…' : '无法读取目录'))
-                  : listing!.entries.isEmpty
-                  ? const Center(child: Text('此文件夹为空'))
-                  : ListView.builder(
-                      itemCount: listing!.entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = listing!.entries[index];
-                        return ListTile(
-                          dense: true,
-                          enabled: !busy,
-                          leading: Icon(
-                            entry.isDirectory
-                                ? Icons.folder_outlined
-                                : entry.isSymlink
-                                ? Icons.link
-                                : Icons.insert_drive_file_outlined,
-                            size: 21,
-                            color: entry.isDirectory
-                                ? Theme.of(context).colorScheme.primary
-                                : null,
-                          ),
-                          title: Text(
-                            entry.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: entry.isDirectory
-                              ? null
-                              : Text(
-                                  formatSize(entry.size),
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                          onTap: () => entry.isDirectory
-                              ? load(entry.path)
-                              : preview(entry),
-                          trailing: entry.isDirectory
-                              ? const Icon(Icons.chevron_right, size: 16)
-                              : IconButton(
-                                  tooltip: '下载',
-                                  onPressed: busy
-                                      ? null
-                                      : () => download(entry),
-                                  icon: const Icon(
-                                    Icons.download_outlined,
-                                    size: 18,
-                                  ),
-                                ),
-                        );
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      '${entries.length} / ${listing?.entries.length ?? 0} 个项目',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: '新建文件夹',
+                      onPressed: busy || listing == null ? null : mkdir,
+                      icon: const Icon(
+                        Icons.create_new_folder_outlined,
+                        size: 19,
+                      ),
+                    ),
+                    if (uploadBatch != null || downloadTask != null)
+                      PopupMenuButton<String>(
+                        tooltip: '传输任务',
+                        icon: const Icon(Icons.playlist_add_check, size: 19),
+                        onSelected: (value) {
+                          if (value == 'upload') {
+                            showUploadTasks();
+                          } else {
+                            showDownloadTask();
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          if (uploadBatch != null)
+                            const PopupMenuItem(
+                              value: 'upload',
+                              child: Text('上传任务'),
+                            ),
+                          if (downloadTask != null)
+                            const PopupMenuItem(
+                              value: 'download',
+                              child: Text('最近下载'),
+                            ),
+                        ],
+                      ),
+                    PopupMenuButton<String>(
+                      tooltip: '上传',
+                      enabled: !busy && listing != null,
+                      icon: const Icon(Icons.upload_outlined, size: 19),
+                      onSelected: (value) {
+                        if (value == 'folder') {
+                          uploadFolder();
+                        } else {
+                          upload();
+                        }
                       },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'files',
+                          child: Text('上传文件'),
+                        ),
+                        if (Platform.isMacOS || Platform.isIOS)
+                          const PopupMenuItem(
+                            value: 'folder',
+                            child: Text('上传文件夹'),
+                          ),
+                      ],
                     ),
-            ),
-          ],
-        ),
-        if (dragging && widget.dropActive && !busy)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                color: Theme.of(context).colorScheme.primaryContainer
-                    .withValues(alpha: .93),
-                alignment: Alignment.center,
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  '松开上传到\n${listing?.path ?? ""}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  ],
+                ),
+              ),
+              FileBrowserControls(
+                search: search,
+                showHidden: showHidden,
+                descending: descending,
+                sort: sort,
+                onFilterChanged: () => setState(() {}),
+                onToggleHidden: () => setState(() => showHidden = !showHidden),
+                onToggleDirection: () =>
+                    setState(() => descending = !descending),
+                onSort: (value) => setState(() => sort = value),
+              ),
+              if (busy) const LinearProgressIndicator(minHeight: 2),
+              if (busy)
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    activity,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+              if (scanningFolder)
+                TextButton(
+                  onPressed: cancelFolderScan
+                      ? null
+                      : () => setState(() {
+                          cancelFolderScan = true;
+                          activity = '正在取消扫描…';
+                        }),
+                  child: Text(cancelFolderScan ? '正在取消…' : '取消扫描'),
+                ),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SelectableText(
+                    error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              const Divider(height: 1),
+              Expanded(
+                child: listing == null
+                    ? Center(child: Text(busy ? '连接 SFTP…' : '无法读取目录'))
+                    : entries.isEmpty
+                    ? Center(
+                        child: Text(
+                          listing!.entries.isEmpty
+                              ? '此文件夹为空'
+                              : '没有匹配项目，请调整搜索或隐藏文件设置',
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          return ListTile(
+                            dense: true,
+                            enabled: !busy,
+                            leading: Icon(
+                              entry.isDirectory
+                                  ? Icons.folder_outlined
+                                  : entry.isSymlink
+                                  ? Icons.link
+                                  : Icons.insert_drive_file_outlined,
+                              size: 21,
+                              color: entry.isDirectory
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                            ),
+                            title: Text(
+                              entry.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${entry.isDirectory ? "" : "${formatSize(entry.size)} · "}${remoteModifiedLabel(entry.modifiedAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            onTap: () => entry.isDirectory
+                                ? load(entry.path)
+                                : preview(entry),
+                            trailing: RemoteEntryActions(
+                              enabled: !busy,
+                              isDirectory: entry.isDirectory,
+                              onDownload: () => download(entry),
+                              onEdit: entry.isDirectory || entry.isSymlink
+                                  ? null
+                                  : () => editText(entry),
+                              onPermissions: entry.isSymlink
+                                  ? null
+                                  : () => editPermissions(entry),
+                              onRename: () => mutateEntry(entry, delete: false),
+                              onDelete: () => mutateEntry(entry, delete: true),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+          if (dragging && widget.dropActive && !busy)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  color: Theme.of(context).colorScheme.primaryContainer
+                      .withValues(alpha: .93),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    '松开上传文件或单个文件夹到\n${listing?.path ?? ""}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 String formatSize(int bytes) {

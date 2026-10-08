@@ -7,6 +7,9 @@ import '../src/rust/api/vault.dart' as native;
 import 'host_store.dart';
 import 'quick_unlock.dart';
 import 'identity_store.dart';
+import 'snippet_store.dart';
+import 'sync_store.dart';
+import '../src/rust/api/sync.dart' as sync_native;
 
 abstract interface class VaultService {
   Future<bool> exists();
@@ -40,7 +43,15 @@ class NativeVaultService implements VaultService {
 }
 
 class NativeVaultSession
-    implements VaultSession, IdentityStore, FolderTreeStore, VaultMaintenance {
+    implements
+        VaultSession,
+        IdentityStore,
+        FolderTreeStore,
+        VaultMaintenance,
+        KeyStore,
+        PrivateKeyExportStore,
+        SnippetStore,
+        SyncStore {
   final String _token;
   final QuickUnlock _quick;
   @override
@@ -78,6 +89,139 @@ class NativeVaultSession
         hostsJson: jsonEncode(hosts.map((h) => h.toJson()).toList()),
         foldersJson: jsonEncode(folders),
       );
+  @override
+  Future<SyncProfile> syncSettings() async {
+    final s = await sync_native.syncSettings(token: _token);
+    return SyncProfile(
+      configured: s.configured,
+      tokenSaved: s.tokenSaved,
+      initialized: s.initialized,
+      recoveryConfirmed: s.recoveryConfirmed,
+      pending: s.pending,
+      owner: s.owner,
+      repository: s.repository,
+      branch: s.branch,
+      revision: s.revision,
+    );
+  }
+
+  @override
+  Future<void> saveSyncSettings(
+    String owner,
+    String repository,
+    String branch,
+    String accessToken,
+  ) => sync_native.syncSaveSettings(
+    token: _token,
+    owner: owner,
+    repository: repository,
+    branch: branch,
+    accessToken: accessToken,
+  );
+  @override
+  Future<String> checkSync() => sync_native.syncCheck(token: _token);
+  @override
+  Future<String> initializeSync(String mode, String secret) =>
+      sync_native.syncInitialize(token: _token, mode: mode, secret: secret);
+  @override
+  Future<void> confirmSyncRecovery(String code) =>
+      sync_native.syncConfirmRecovery(token: _token, code: code);
+  @override
+  Future<String> runSync() => sync_native.syncRun(token: _token);
+  @override
+  Future<SyncReview?> syncConflicts() async {
+    final r = await sync_native.syncConflicts(token: _token);
+    if (r == null) return null;
+    return SyncReview(r.id, [
+      for (final i in r.items)
+        SyncConflictEntry(
+          kind: i.kind,
+          id: i.id,
+          localSummary: i.localSummary,
+          remoteSummary: i.remoteSummary,
+          localDeleted: i.localDeleted,
+          remoteDeleted: i.remoteDeleted,
+          changedFields: i.changedFields,
+        ),
+    ]);
+  }
+
+  @override
+  Future<String> resolveSync(String reviewId, List<SyncChoice> choices) =>
+      sync_native.syncResolve(
+        token: _token,
+        reviewId: reviewId,
+        choices: [
+          for (final c in choices)
+            sync_native.SyncConflictChoice(
+              kind: c.kind,
+              id: c.id,
+              side: c.side,
+            ),
+        ],
+      );
+  @override
+  Future<String> adoptSyncKey(String mode, String secret) =>
+      sync_native.syncAdoptKey(token: _token, mode: mode, secret: secret);
+  @override
+  Future<void> cancelSync() => sync_native.syncCancel(token: _token);
+  @override
+  Future<SyncScopeView> syncScope([List<SyncScopeKey>? selection]) async {
+    final s = await sync_native.syncScope(
+      token: _token,
+      selection: selection
+          ?.map((k) => sync_native.SyncScopeKey(kind: k.kind, id: k.id))
+          .toList(),
+    );
+    return SyncScopeView(
+      s.revision,
+      s.items
+          .map(
+            (i) => SyncScopeItem(
+              SyncScopeKey(i.kind, i.id),
+              i.summary,
+              selected: i.selected,
+              excluded: i.excluded,
+              published: i.published,
+            ),
+          )
+          .toList(),
+      blockedReason: s.blockedReason,
+    );
+  }
+
+  @override
+  Future<void> saveSyncScope(String revision, List<SyncScopeKey> selection) =>
+      sync_native.syncSaveScope(
+        token: _token,
+        revision: revision,
+        selection: selection
+            .map((k) => sync_native.SyncScopeKey(kind: k.kind, id: k.id))
+            .toList(),
+      );
+  @override
+  Future<SyncRotation> rotationStatus() async {
+    final s = await sync_native.syncRotationStatus(token: _token);
+    return SyncRotation(
+      canBegin: s.canBegin,
+      batchId: s.batchId,
+      recoveryConfirmed: s.recoveryConfirmed,
+      canDiscard: s.canDiscard,
+    );
+  }
+
+  @override
+  Future<String> beginRotation(String password) =>
+      sync_native.syncBeginRotation(token: _token, password: password);
+  @override
+  Future<void> confirmRotation(String batchId, String code) => sync_native
+      .syncConfirmRotation(token: _token, batchId: batchId, code: code);
+  @override
+  Future<void> discardRotation(String batchId) =>
+      sync_native.syncDiscardRotation(token: _token, batchId: batchId);
+  @override
+  Future<String> publishRotation(String batchId) =>
+      sync_native.syncPublishRotation(token: _token, batchId: batchId);
   native.IdentityInput _input(IdentityDraft d) => native.IdentityInput(
     id: d.id,
     name: d.name,
@@ -113,6 +257,20 @@ class NativeVaultSession
   }
 
   @override
+  Future<String> generateKey(String name, String username) =>
+      native.vaultGenerateKey(token: _token, name: name, username: username);
+  @override
+  Future<String> publicKey(String id) =>
+      native.vaultPublicKey(token: _token, id: id);
+  @override
+  Future<void> exportPrivateKey(String id, String path, String password) =>
+      native.vaultExportPrivateKey(
+        token: _token,
+        id: id,
+        path: path,
+        password: password,
+      );
+  @override
   Future<void> deleteIdentity(String id) =>
       native.vaultDeleteIdentity(token: _token, id: id);
   @override
@@ -147,6 +305,9 @@ class NativeVaultSession
     approvedFingerprint: fingerprint,
   );
   @override
+  Future<String> renameFolder(String path, String name) =>
+      native.vaultRenameFolder(token: _token, path: path, name: name);
+  @override
   Future<void> deleteFolder(String path, {bool deleteHosts = false}) => native
       .vaultDeleteFolder(token: _token, path: path, deleteHosts: deleteHosts);
   @override
@@ -167,6 +328,24 @@ class NativeVaultSession
   @override
   Future<int> restoreBackup(String path, String password) =>
       native.vaultRestoreBackup(token: _token, path: path, password: password);
+  @override
+  Future<List<CommandSnippet>> readSnippets() async =>
+      (jsonDecode(await native.vaultRead(token: _token, kind: 'snippets'))
+              as List)
+          .map(
+            (s) => CommandSnippet(
+              s['id'] as String,
+              s['name'] as String,
+              s['command'] as String,
+            ),
+          )
+          .toList();
+  @override
+  Future<void> saveSnippet(String id, String name, String command) => native
+      .vaultSaveSnippet(token: _token, id: id, name: name, command: command);
+  @override
+  Future<void> deleteSnippet(String id) =>
+      native.vaultDeleteSnippet(token: _token, id: id);
   @override
   Future<void> lock() => native.vaultLock(token: _token);
 }

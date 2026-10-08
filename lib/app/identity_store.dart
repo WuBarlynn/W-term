@@ -44,6 +44,7 @@ abstract interface class IdentityStore {
 }
 
 abstract interface class FolderTreeStore {
+  Future<String> renameFolder(String path, String name);
   Future<void> deleteFolder(String path, {bool deleteHosts = false});
 }
 
@@ -51,4 +52,13 @@ abstract interface class VaultMaintenance {
   Future<void> changePassword(String current, String next);
   Future<void> exportBackup(String path, String password);
   Future<int> restoreBackup(String path, String password);
+}
+
+abstract interface class KeyStore {
+  Future<String> generateKey(String name, String username);
+  Future<String> publicKey(String id);
+}
+
+abstract interface class PrivateKeyExportStore {
+  Future<void> exportPrivateKey(String id, String path, String password);
 }

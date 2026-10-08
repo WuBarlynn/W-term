@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `check_kind`, `imported`, `key_database_mode`, `key_database`, `open_database`, `put_record`, `read_record`, `registry`, `save_identity`, `validate_references`, `validate`, `with_vault`, `within_folder`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Host`, `OpenVault`, `Secrets`, `SensitiveInput`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref_mut`, `deref`, `drop`
+// These functions are ignored because they are not marked as `pub`: `cancel_sync`, `check_kind`, `imported`, `key_database_mode`, `key_database`, `lease`, `open_database`, `put_record`, `read_private_key`, `read_record`, `registry`, `save_identity`, `validate_references`, `validate`, `with_vault`, `within_folder`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Host`, `OpenVault`, `Secrets`, `SensitiveInput`, `Snippet`, `VaultLease`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref_mut`, `deref`, `drop`, `drop`
 
 /// Expensive SQLCipher KDF runs on the bridge worker pool, never the Flutter UI.
 Future<VaultOpened> vaultOpen({
@@ -27,6 +27,21 @@ Future<void> vaultLock({required String token}) =>
 
 Future<String> vaultRead({required String token, required String kind}) =>
     RustLib.instance.api.crateApiVaultVaultRead(token: token, kind: kind);
+
+Future<void> vaultSaveSnippet({
+  required String token,
+  required String id,
+  required String name,
+  required String command,
+}) => RustLib.instance.api.crateApiVaultVaultSaveSnippet(
+  token: token,
+  id: id,
+  name: name,
+  command: command,
+);
+
+Future<void> vaultDeleteSnippet({required String token, required String id}) =>
+    RustLib.instance.api.crateApiVaultVaultDeleteSnippet(token: token, id: id);
 
 Future<void> vaultWrite({
   required String token,
@@ -58,6 +73,34 @@ Future<String> vaultSaveIdentity({
 }) => RustLib.instance.api.crateApiVaultVaultSaveIdentity(
   token: token,
   input: input,
+);
+
+/// Generate directly into SQLCipher; only the identity ID crosses the bridge.
+Future<String> vaultGenerateKey({
+  required String token,
+  required String name,
+  required String username,
+}) => RustLib.instance.api.crateApiVaultVaultGenerateKey(
+  token: token,
+  name: name,
+  username: username,
+);
+
+/// Public material only. Also works for imported password-protected private keys.
+Future<String> vaultPublicKey({required String token, required String id}) =>
+    RustLib.instance.api.crateApiVaultVaultPublicKey(token: token, id: id);
+
+/// Only encrypted OpenSSH bytes are written. Never replaces an existing file.
+Future<void> vaultExportPrivateKey({
+  required String token,
+  required String id,
+  required String path,
+  required String password,
+}) => RustLib.instance.api.crateApiVaultVaultExportPrivateKey(
+  token: token,
+  id: id,
+  path: path,
+  password: password,
 );
 
 Future<void> vaultDeleteIdentity({required String token, required String id}) =>
@@ -94,6 +137,17 @@ Future<void> vaultDeleteFolder({
   token: token,
   path: path,
   deleteHosts: deleteHosts,
+);
+
+/// Rename a whole subtree atomically, retaining host and identity IDs.
+Future<String> vaultRenameFolder({
+  required String token,
+  required String path,
+  required String name,
+}) => RustLib.instance.api.crateApiVaultVaultRenameFolder(
+  token: token,
+  path: path,
+  name: name,
 );
 
 Future<void> vaultChangePassword({

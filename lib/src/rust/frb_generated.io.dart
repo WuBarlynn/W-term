@@ -4,6 +4,8 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/client.dart';
+import 'api/forward.dart';
+import 'api/sync.dart';
 import 'api/vault.dart';
 
 import 'dart:async';
@@ -43,6 +45,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IdentityInput dco_decode_box_autoadd_identity_input(dynamic raw);
 
   @protected
+  RemoteTextSnapshot dco_decode_box_autoadd_remote_text_snapshot(dynamic raw);
+
+  @protected
+  SyncConflictReview dco_decode_box_autoadd_sync_conflict_review(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   DirectoryListing dco_decode_directory_listing(dynamic raw);
 
   @protected
@@ -52,7 +63,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IdentitySummary dco_decode_identity_summary(dynamic raw);
 
   @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
   List<IdentitySummary> dco_decode_list_identity_summary(dynamic raw);
+
+  @protected
+  List<LocalForward> dco_decode_list_local_forward(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -64,13 +81,69 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RemoteEntry> dco_decode_list_remote_entry(dynamic raw);
 
   @protected
+  List<SyncConflictChoice> dco_decode_list_sync_conflict_choice(dynamic raw);
+
+  @protected
+  List<SyncConflictItem> dco_decode_list_sync_conflict_item(dynamic raw);
+
+  @protected
+  List<SyncScopeItem> dco_decode_list_sync_scope_item(dynamic raw);
+
+  @protected
+  List<SyncScopeKey> dco_decode_list_sync_scope_key(dynamic raw);
+
+  @protected
+  LocalForward dco_decode_local_forward(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
   IdentityInput? dco_decode_opt_box_autoadd_identity_input(dynamic raw);
+
+  @protected
+  SyncConflictReview? dco_decode_opt_box_autoadd_sync_conflict_review(
+    dynamic raw,
+  );
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
+  List<SyncScopeKey>? dco_decode_opt_list_sync_scope_key(dynamic raw);
 
   @protected
   RemoteEntry dco_decode_remote_entry(dynamic raw);
 
   @protected
+  RemoteTextSnapshot dco_decode_remote_text_snapshot(dynamic raw);
+
+  @protected
   ServerIdentity dco_decode_server_identity(dynamic raw);
+
+  @protected
+  SyncConflictChoice dco_decode_sync_conflict_choice(dynamic raw);
+
+  @protected
+  SyncConflictItem dco_decode_sync_conflict_item(dynamic raw);
+
+  @protected
+  SyncConflictReview dco_decode_sync_conflict_review(dynamic raw);
+
+  @protected
+  SyncRotationStatus dco_decode_sync_rotation_status(dynamic raw);
+
+  @protected
+  SyncScopeItem dco_decode_sync_scope_item(dynamic raw);
+
+  @protected
+  SyncScopeKey dco_decode_sync_scope_key(dynamic raw);
+
+  @protected
+  SyncScopeView dco_decode_sync_scope_view(dynamic raw);
+
+  @protected
+  SyncSettings dco_decode_sync_settings(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -116,6 +189,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RemoteTextSnapshot sse_decode_box_autoadd_remote_text_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncConflictReview sse_decode_box_autoadd_sync_conflict_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   DirectoryListing sse_decode_directory_listing(SseDeserializer deserializer);
 
   @protected
@@ -125,7 +211,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IdentitySummary sse_decode_identity_summary(SseDeserializer deserializer);
 
   @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
   List<IdentitySummary> sse_decode_list_identity_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<LocalForward> sse_decode_list_local_forward(
     SseDeserializer deserializer,
   );
 
@@ -139,7 +233,46 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RemoteEntry> sse_decode_list_remote_entry(SseDeserializer deserializer);
 
   @protected
+  List<SyncConflictChoice> sse_decode_list_sync_conflict_choice(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<SyncConflictItem> sse_decode_list_sync_conflict_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<SyncScopeItem> sse_decode_list_sync_scope_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<SyncScopeKey> sse_decode_list_sync_scope_key(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalForward sse_decode_local_forward(SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
   IdentityInput? sse_decode_opt_box_autoadd_identity_input(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncConflictReview? sse_decode_opt_box_autoadd_sync_conflict_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  List<SyncScopeKey>? sse_decode_opt_list_sync_scope_key(
     SseDeserializer deserializer,
   );
 
@@ -147,7 +280,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RemoteEntry sse_decode_remote_entry(SseDeserializer deserializer);
 
   @protected
+  RemoteTextSnapshot sse_decode_remote_text_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ServerIdentity sse_decode_server_identity(SseDeserializer deserializer);
+
+  @protected
+  SyncConflictChoice sse_decode_sync_conflict_choice(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncConflictItem sse_decode_sync_conflict_item(SseDeserializer deserializer);
+
+  @protected
+  SyncConflictReview sse_decode_sync_conflict_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncRotationStatus sse_decode_sync_rotation_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncScopeItem sse_decode_sync_scope_item(SseDeserializer deserializer);
+
+  @protected
+  SyncScopeKey sse_decode_sync_scope_key(SseDeserializer deserializer);
+
+  @protected
+  SyncScopeView sse_decode_sync_scope_view(SseDeserializer deserializer);
+
+  @protected
+  SyncSettings sse_decode_sync_settings(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_16(SseDeserializer deserializer);
@@ -201,6 +369,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_remote_text_snapshot(
+    RemoteTextSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_sync_conflict_review(
+    SyncConflictReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_directory_listing(
     DirectoryListing self,
     SseSerializer serializer,
@@ -216,8 +399,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_identity_summary(
     List<IdentitySummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_local_forward(
+    List<LocalForward> self,
     SseSerializer serializer,
   );
 
@@ -237,8 +429,53 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_sync_conflict_choice(
+    List<SyncConflictChoice> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_sync_conflict_item(
+    List<SyncConflictItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_sync_scope_item(
+    List<SyncScopeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_sync_scope_key(
+    List<SyncScopeKey> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_local_forward(LocalForward self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_identity_input(
     IdentityInput? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_sync_conflict_review(
+    SyncConflictReview? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_list_sync_scope_key(
+    List<SyncScopeKey>? self,
     SseSerializer serializer,
   );
 
@@ -246,10 +483,52 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_remote_entry(RemoteEntry self, SseSerializer serializer);
 
   @protected
+  void sse_encode_remote_text_snapshot(
+    RemoteTextSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_server_identity(
     ServerIdentity self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_sync_conflict_choice(
+    SyncConflictChoice self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_conflict_item(
+    SyncConflictItem self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_conflict_review(
+    SyncConflictReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_rotation_status(
+    SyncRotationStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_scope_item(SyncScopeItem self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_scope_key(SyncScopeKey self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_scope_view(SyncScopeView self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_settings(SyncSettings self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);

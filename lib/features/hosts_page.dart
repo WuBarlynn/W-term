@@ -4,6 +4,7 @@ import '../app/host_store.dart';
 import '../app/errors.dart';
 import '../app/identity_store.dart';
 import 'host_editor.dart';
+import 'openssh_import_dialog.dart';
 
 class HostsPage extends StatefulWidget {
   final HostStore store;
@@ -101,6 +102,20 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
+  Future<void> importConfig() async {
+    final count = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => OpenSshImportDialog(store: widget.store),
+    );
+    if (!mounted || count == null) return;
+    await load();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('已导入 $count 台主机，相同配置已跳过')));
+    }
+  }
+
   Future<void> remove(HostProfile profile) async {
     final approved = await showDialog<bool>(
       context: context,
@@ -185,6 +200,79 @@ class HostsPageState extends State<HostsPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('保存失败：${userFacingError(e)}')));
       }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> renameFolder(String path) async {
+    final store = widget.store;
+    if (store is! FolderTreeStore || saving) return;
+    var name = path.split('/').last;
+    final form = GlobalKey<FormState>();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('重命名文件夹'),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            initialValue: name,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '文件夹名称',
+              helperText: '子文件夹和主机归属会一起更新',
+            ),
+            onChanged: (v) => name = v,
+            validator: (v) =>
+                v == null ||
+                    v.trim().isEmpty ||
+                    v.trim() == '.' ||
+                    v.trim() == '..' ||
+                    v.contains('/') ||
+                    RegExp(r'[\x00-\x1f\x7f]').hasMatch(v)
+                ? '请输入不含 / 或控制字符的有效名称'
+                : null,
+            onFieldSubmitted: (_) {
+              if (form.currentState!.validate()) Navigator.pop(c, name.trim());
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) Navigator.pop(c, name.trim());
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => saving = true);
+    try {
+      final destination = await (store as FolderTreeStore).renameFolder(
+        path,
+        result,
+      );
+      if (!mounted) return;
+      final nextCollapsed = collapsed
+          .map(
+            (p) => p == path || p.startsWith('$path/')
+                ? '$destination${p.substring(path.length)}'
+                : p,
+          )
+          .toSet();
+      collapsed
+        ..clear()
+        ..addAll(nextCollapsed);
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -390,6 +478,8 @@ class HostsPageState extends State<HostsPage> {
                 edit(null, path);
               } else if (v == 'folder') {
                 addFolder(path);
+              } else if (v == 'rename') {
+                renameFolder(path);
               } else {
                 deleteFolder(path);
               }
@@ -398,6 +488,8 @@ class HostsPageState extends State<HostsPage> {
               const PopupMenuItem(value: 'host', child: Text('添加主机')),
               if (widget.store is FolderStore)
                 const PopupMenuItem(value: 'folder', child: Text('新建子文件夹')),
+              if (path.isNotEmpty && widget.store is FolderTreeStore)
+                const PopupMenuItem(value: 'rename', child: Text('重命名')),
               if (path.isNotEmpty && widget.store is FolderTreeStore)
                 const PopupMenuItem(value: 'delete', child: Text('删除文件夹')),
             ],
@@ -451,6 +543,11 @@ class HostsPageState extends State<HostsPage> {
                   '主机',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
+              ),
+              IconButton(
+                tooltip: '导入 OpenSSH 配置',
+                icon: const Icon(Icons.file_open_outlined, size: 18),
+                onPressed: ready ? importConfig : null,
               ),
               IconButton(
                 tooltip: '新建文件夹',

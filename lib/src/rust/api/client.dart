@@ -7,8 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `numbered_upload_path`, `replace_upload`, `upload_metadata`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `mutable_remote_path`, `numbered_upload_path`, `replace_upload`, `upload_metadata`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<ServerIdentity> probeServer({required String host, required int port}) =>
     RustLib.instance.api.crateApiClientProbeServer(host: host, port: port);
@@ -103,12 +103,76 @@ Future<UploadResult> uploadFileWithPolicy({
   policy: policy,
 );
 
+/// SFTP v3 rename refuses replacement, including a concurrently-created target.
+Future<void> renameRemoteEntry({
+  required String connectionId,
+  required String path,
+  required String name,
+}) => RustLib.instance.api.crateApiClientRenameRemoteEntry(
+  connectionId: connectionId,
+  path: path,
+  name: name,
+);
+
+/// Never recurses or resolves links: unlink links themselves, rmdir empty directories.
+Future<void> deleteRemoteEntry({
+  required String connectionId,
+  required String path,
+}) => RustLib.instance.api.crateApiClientDeleteRemoteEntry(
+  connectionId: connectionId,
+  path: path,
+);
+
+/// Read current mode without following the final symlink.
+Future<int> remotePermissions({
+  required String connectionId,
+  required String path,
+}) => RustLib.instance.api.crateApiClientRemotePermissions(
+  connectionId: connectionId,
+  path: path,
+);
+
+/// Optimistic conflict check preserves special bits, and verifies the server result.
+Future<void> changeRemotePermissions({
+  required String connectionId,
+  required String path,
+  required int expected,
+  required int permissions,
+}) => RustLib.instance.api.crateApiClientChangeRemotePermissions(
+  connectionId: connectionId,
+  path: path,
+  expected: expected,
+  permissions: permissions,
+);
+
 Future<void> createDirectory({
   required String connectionId,
   required String path,
 }) => RustLib.instance.api.crateApiClientCreateDirectory(
   connectionId: connectionId,
   path: path,
+);
+
+Future<RemoteTextSnapshot> readRemoteText({
+  required String connectionId,
+  required String path,
+}) => RustLib.instance.api.crateApiClientReadRemoteText(
+  connectionId: connectionId,
+  path: path,
+);
+
+/// Optimistic conflict detection, followed by atomic POSIX replacement.
+/// SFTP does not offer atomic compare-and-swap; a final check/rename race remains.
+Future<void> saveRemoteText({
+  required String connectionId,
+  required String path,
+  required RemoteTextSnapshot expected,
+  required String text,
+}) => RustLib.instance.api.crateApiClientSaveRemoteText(
+  connectionId: connectionId,
+  path: path,
+  expected: expected,
+  text: text,
 );
 
 /// Small preview only. Never load an arbitrary remote file into memory.
@@ -144,6 +208,7 @@ class RemoteEntry {
   final bool isDirectory;
   final bool isSymlink;
   final int size;
+  final int? modifiedAt;
 
   const RemoteEntry({
     required this.name,
@@ -151,6 +216,7 @@ class RemoteEntry {
     required this.isDirectory,
     required this.isSymlink,
     required this.size,
+    this.modifiedAt,
   });
 
   @override
@@ -159,7 +225,8 @@ class RemoteEntry {
       path.hashCode ^
       isDirectory.hashCode ^
       isSymlink.hashCode ^
-      size.hashCode;
+      size.hashCode ^
+      modifiedAt.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -170,7 +237,43 @@ class RemoteEntry {
           path == other.path &&
           isDirectory == other.isDirectory &&
           isSymlink == other.isSymlink &&
-          size == other.size;
+          size == other.size &&
+          modifiedAt == other.modifiedAt;
+}
+
+class RemoteTextSnapshot {
+  final String text;
+  final int permissions;
+  final int? uid;
+  final int? gid;
+  final int? modifiedAt;
+
+  const RemoteTextSnapshot({
+    required this.text,
+    required this.permissions,
+    this.uid,
+    this.gid,
+    this.modifiedAt,
+  });
+
+  @override
+  int get hashCode =>
+      text.hashCode ^
+      permissions.hashCode ^
+      uid.hashCode ^
+      gid.hashCode ^
+      modifiedAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemoteTextSnapshot &&
+          runtimeType == other.runtimeType &&
+          text == other.text &&
+          permissions == other.permissions &&
+          uid == other.uid &&
+          gid == other.gid &&
+          modifiedAt == other.modifiedAt;
 }
 
 class ServerIdentity {
