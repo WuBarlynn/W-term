@@ -15,6 +15,8 @@ class SyncProfile {
 }
 
 abstract interface class SyncStore {
+  Future<SyncDisconnectInfo> disconnectPreview();
+  Future<void> disconnectSync(String revision, String confirmation);
   Future<SyncScopeView> syncScope([List<SyncScopeKey>? selection]);
   Future<void> saveSyncScope(String revision, List<SyncScopeKey> selection);
   Future<SyncProfile> syncSettings();
@@ -104,4 +106,15 @@ class SyncScopeView {
   final String revision, blockedReason;
   final List<SyncScopeItem> items;
   const SyncScopeView(this.revision, this.items, {this.blockedReason = ''});
+}
+
+class SyncDisconnectInfo {
+  final String revision, target, blockedReason;
+  final bool initialized;
+  const SyncDisconnectInfo(
+    this.revision,
+    this.target, {
+    this.initialized = false,
+    this.blockedReason = '',
+  });
 }

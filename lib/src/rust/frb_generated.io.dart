@@ -131,6 +131,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SyncConflictReview dco_decode_sync_conflict_review(dynamic raw);
 
   @protected
+  SyncDisconnectInfo dco_decode_sync_disconnect_info(dynamic raw);
+
+  @protected
   SyncRotationStatus dco_decode_sync_rotation_status(dynamic raw);
 
   @protected
@@ -297,6 +300,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncConflictReview sse_decode_sync_conflict_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncDisconnectInfo sse_decode_sync_disconnect_info(
     SseDeserializer deserializer,
   );
 
@@ -509,6 +517,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_sync_conflict_review(
     SyncConflictReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_disconnect_info(
+    SyncDisconnectInfo self,
     SseSerializer serializer,
   );
 

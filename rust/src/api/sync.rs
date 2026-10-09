@@ -177,3 +177,18 @@ pub fn sync_save_scope(
         crate::sync::scope::save(db, &revision, selection)
     })
 }
+
+pub struct SyncDisconnectInfo {
+    pub revision: String,
+    pub target: String,
+    pub initialized: bool,
+    pub blocked_reason: String,
+}
+pub fn sync_disconnect_preview(token: String) -> Result<SyncDisconnectInfo> {
+    vault::with_vault(&token, crate::sync::disconnect::preview)
+}
+pub fn sync_disconnect(token: String, revision: String, confirmation: String) -> Result<()> {
+    vault::with_vault(&token, |db| {
+        crate::sync::disconnect::disconnect(db, &revision, &confirmation)
+    })
+}

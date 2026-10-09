@@ -1,6 +1,7 @@
 //! Versioned in-memory sync protocol. No network, file export, or Flutter secret API.
 //! A common baseline is mandatory; conflict resolution never uses wall-clock time.
 pub mod crypto;
+pub mod disconnect;
 pub mod github;
 pub mod outbox;
 mod review;

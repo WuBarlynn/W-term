@@ -5,6 +5,7 @@ import '../app/sync_store.dart';
 import 'sync_conflicts_dialog.dart';
 import 'sync_rotation_dialog.dart';
 import 'sync_scope_dialog.dart';
+import 'sync_disconnect_dialog.dart';
 
 class SyncDialog extends StatefulWidget {
   final SyncStore store;
@@ -211,6 +212,58 @@ class _SyncDialogState extends State<SyncDialog> {
                           : () => action(widget.store.checkSync),
                       icon: const Icon(Icons.fact_check_outlined),
                       label: const Text('检查仓库与分支'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: busy || settingsDirty
+                          ? null
+                          : () async {
+                              final done = await showDialog<bool>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) =>
+                                    SyncDisconnectDialog(store: widget.store),
+                              );
+                              if (done != true || !mounted) return;
+                              for (final c in [
+                                owner,
+                                repository,
+                                branch,
+                                token,
+                                secret,
+                                recovery,
+                                adoptionSecret,
+                              ]) {
+                                c.clear();
+                              }
+                              setState(() {
+                                profile = null;
+                                settingsDirty = false;
+                                recoveryCode = '';
+                                savedRecovery = false;
+                                consent = false;
+                                adoptionConfirmed = false;
+                                mode = 'create';
+                                adoptionMode = 'password';
+                                busy = true;
+                              });
+                              try {
+                                await refresh(fields: true);
+                                if (mounted) {
+                                  setState(
+                                    () => message =
+                                        '已断开旧仓库。本机数据和仅本机规则保留，可填写新仓库后重新创建或接入。',
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() => message = userFacingError(e));
+                                }
+                              } finally {
+                                if (mounted) setState(() => busy = false);
+                              }
+                            },
+                      child: const Text('断开 / 更换同步仓库'),
                     ),
                     const SizedBox(height: 12),
                   ],

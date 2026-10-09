@@ -129,6 +129,19 @@ Future<void> syncSaveScope({
   selection: selection,
 );
 
+Future<SyncDisconnectInfo> syncDisconnectPreview({required String token}) =>
+    RustLib.instance.api.crateApiSyncSyncDisconnectPreview(token: token);
+
+Future<void> syncDisconnect({
+  required String token,
+  required String revision,
+  required String confirmation,
+}) => RustLib.instance.api.crateApiSyncSyncDisconnect(
+  token: token,
+  revision: revision,
+  confirmation: confirmation,
+);
+
 class SyncConflictChoice {
   final String kind;
   final String id;
@@ -212,6 +225,37 @@ class SyncConflictReview {
           runtimeType == other.runtimeType &&
           id == other.id &&
           items == other.items;
+}
+
+class SyncDisconnectInfo {
+  final String revision;
+  final String target;
+  final bool initialized;
+  final String blockedReason;
+
+  const SyncDisconnectInfo({
+    required this.revision,
+    required this.target,
+    required this.initialized,
+    required this.blockedReason,
+  });
+
+  @override
+  int get hashCode =>
+      revision.hashCode ^
+      target.hashCode ^
+      initialized.hashCode ^
+      blockedReason.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncDisconnectInfo &&
+          runtimeType == other.runtimeType &&
+          revision == other.revision &&
+          target == other.target &&
+          initialized == other.initialized &&
+          blockedReason == other.blockedReason;
 }
 
 class SyncRotationStatus {

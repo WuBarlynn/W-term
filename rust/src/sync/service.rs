@@ -66,6 +66,9 @@ fn save(db: &Connection, c: &Config) -> Result<()> {
     Ok(())
 }
 pub fn settings(db: &mut Connection) -> Result<SyncSettings> {
+    read_settings(db)
+}
+pub(super) fn read_settings(db: &Connection) -> Result<SyncSettings> {
     let c = config(db)?;
     let s = state::load(db)?;
     Ok(SyncSettings {
@@ -179,6 +182,7 @@ pub(super) async fn initialize_with(
             !github::journal::exists(&tx)? && !super::outbox::exists_in_transaction(&tx)?,
             "存在待处理发布"
         );
+        state::retain_policy(&tx, s.policy())?;
         tx.execute(
             "DELETE FROM metadata WHERE key IN ('sync_state_v1','sync_key_v1')",
             [],

@@ -35,6 +35,22 @@ void main() {
         quickUnlock: NoQuickUnlock(),
       );
       expect((await session.syncSettings()).configured, isFalse);
+      await expectLater(session.disconnectPreview(), throwsA(anything));
+      await session.saveSyncSettings(
+        'fixture',
+        'old-vault',
+        'main',
+        'synthetic-old-token',
+      );
+      final unlink = await session.disconnectPreview();
+      expect(unlink.target, 'fixture/old-vault · main');
+      expect(unlink.blockedReason, isEmpty);
+      await expectLater(
+        session.disconnectSync(unlink.revision, 'wrong'),
+        throwsA(anything),
+      );
+      await session.disconnectSync(unlink.revision, '断开');
+      expect((await session.syncSettings()).configured, isFalse);
       expect(await session.syncConflicts(), isNull);
       await expectLater(session.checkSync(), throwsA(anything));
       expect((await session.syncSettings()).configured, isFalse);

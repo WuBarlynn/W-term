@@ -166,6 +166,24 @@ class NativeVaultSession
   @override
   Future<void> cancelSync() => sync_native.syncCancel(token: _token);
   @override
+  Future<SyncDisconnectInfo> disconnectPreview() async {
+    final v = await sync_native.syncDisconnectPreview(token: _token);
+    return SyncDisconnectInfo(
+      v.revision,
+      v.target,
+      initialized: v.initialized,
+      blockedReason: v.blockedReason,
+    );
+  }
+
+  @override
+  Future<void> disconnectSync(String revision, String confirmation) =>
+      sync_native.syncDisconnect(
+        token: _token,
+        revision: revision,
+        confirmation: confirmation,
+      );
+  @override
   Future<SyncScopeView> syncScope([List<SyncScopeKey>? selection]) async {
     final s = await sync_native.syncScope(
       token: _token,

@@ -1388,3 +1388,53 @@ async fn rotation_service_discard_is_atomic_and_rejects_stale_dialogs() -> Resul
     assert!(service::rotation_status(&mut db)?.can_begin);
     Ok(())
 }
+
+#[tokio::test]
+async fn disconnect_and_reinitialize_preserve_scope_without_remote_mutation() -> Result<()> {
+    use crate::sync::{disconnect, service};
+    let server = Server::new().await;
+    let client = server.client();
+    let dir = tempfile::tempdir()?;
+    let mut db = service_db(&dir);
+    put_record(
+        &db,
+        "snippets",
+        r#"[{"id":"private","name":"Private","command":"echo private"}]"#,
+    )?;
+    service::initialize_with(&mut db, "create", PASSWORD, &client).await?;
+    let s = state::load(&db)?.unwrap();
+    state::set_policy(
+        &mut db,
+        s.generation(),
+        state::Policy::new(BTreeSet::from([Key {
+            kind: Kind::Snippet,
+            id: "private".into(),
+        }]))?,
+    )?;
+    // Regenerating an unconfirmed recovery code must not reset exclusions.
+    let code = service::initialize_with(&mut db, "create", PASSWORD, &client).await?;
+    assert_eq!(state::load(&db)?.unwrap().policy().local_only().len(), 1);
+    service::confirm(&mut db, &code)?;
+    service::run_with(&mut db, &client).await?;
+    let old_space = crypto::load(&db)?.unwrap().0.space().to_owned();
+    let requests = server.data.lock().unwrap().requests.len();
+    let v = disconnect::preview(&mut db)?;
+    disconnect::disconnect(&mut db, &v.revision, "断开")?;
+    assert_eq!(server.data.lock().unwrap().requests.len(), requests);
+    assert!(crypto::load(&db)?.is_none());
+    assert!(!journal::exists(&db)?);
+    service::save_config(
+        &mut db,
+        "fixture".into(),
+        "vault".into(),
+        "sync".into(),
+        TOKEN,
+    )?;
+    // Rejoining the old space needs its existing recovery credential.
+    service::initialize_with(&mut db, "recovery", &code, &client).await?;
+    assert_eq!(crypto::load(&db)?.unwrap().0.space(), old_space);
+    assert_eq!(state::load(&db)?.unwrap().policy().local_only().len(), 1);
+    service::run_with(&mut db, &client).await?;
+    assert!(crate::api::vault::read_record(&db, "snippets")?.contains("echo private"));
+    Ok(())
+}

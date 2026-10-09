@@ -7,6 +7,12 @@ import 'package:wterm/features/sync_dialog.dart';
 
 class MemorySync implements SyncStore {
   @override
+  Future<SyncDisconnectInfo> disconnectPreview() async =>
+      const SyncDisconnectInfo('fixture', 'fixture/vault · main');
+  @override
+  Future<void> disconnectSync(String revision, String confirmation) async {}
+
+  @override
   Future<SyncScopeView> syncScope([List<SyncScopeKey>? selection]) async =>
       const SyncScopeView("fixture", []);
   @override

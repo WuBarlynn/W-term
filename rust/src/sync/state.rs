@@ -3,6 +3,7 @@ use super::*;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 const STATE_KEY: &str = "sync_state_v1";
+const RETAINED_POLICY: &str = "sync_local_policy_v1";
 const STATE_LIMIT: usize = 64 * 1024 * 1024;
 
 fn required_option<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
@@ -79,6 +80,36 @@ impl Policy {
         }
         excluded
     }
+}
+
+pub(super) fn retained_policy(db: &Connection) -> Result<Policy> {
+    let len: Option<i64> = db
+        .query_row(
+            "SELECT length(CAST(value AS BLOB)) FROM metadata WHERE key=?1",
+            [RETAINED_POLICY],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let Some(len) = len else {
+        return Ok(Policy::default());
+    };
+    ensure!((0..=MAX_BYTES as i64).contains(&len), "仅本机规则过大");
+    let value: String = db.query_row(
+        "SELECT value FROM metadata WHERE key=?1",
+        [RETAINED_POLICY],
+        |r| r.get(0),
+    )?;
+    let policy: Policy =
+        serde_json::from_str(&value).map_err(|_| anyhow::anyhow!("仅本机规则已损坏"))?;
+    policy.validate()?;
+    Ok(policy)
+}
+pub(super) fn retain_policy(db: &Connection, policy: &Policy) -> Result<()> {
+    policy.validate()?;
+    let value = serde_json::to_string(policy)?;
+    ensure!(value.len() <= MAX_BYTES, "仅本机规则过大");
+    db.execute("INSERT INTO metadata(key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![RETAINED_POLICY,value])?;
+    Ok(())
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -287,7 +318,7 @@ pub(super) fn initialize_in_transaction(db: &Connection, space: String) -> Resul
         base,
         remote_revision: None,
         key_revision: None,
-        policy: Policy::default(),
+        policy: retained_policy(db)?,
         pending: None,
         last_receipt: None,
     };
@@ -329,6 +360,7 @@ pub(super) fn set_policy_in_transaction(
     let mut state = checked(db, generation)?;
     let full = vault::capture_in_transaction(db, &state.local, &state.device)?;
     validate_policy_change(&state, &full, &policy)?;
+    retain_policy(db, &policy)?;
     state.policy = policy;
     state.advance()?;
     save(db, &state)?;
