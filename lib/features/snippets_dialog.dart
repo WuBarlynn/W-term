@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/snippet_store.dart';
 import '../app/errors.dart';
 import '../app/snippet_catalog.dart';
+import '../app/snippet_market.dart';
 import '../app/pinned_commands.dart';
 
 class SnippetsDialog extends StatefulWidget {
@@ -23,7 +24,10 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
   String query = '';
   String? error;
   bool busy = true;
-  bool market = false;
+  int tab = 0;
+  List<MarketSnippet> online = const [];
+  bool onlineLoading = false;
+  String? onlineError;
   @override
   void initState() {
     super.initState();
@@ -39,6 +43,37 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
           entries = result;
           error = null;
         });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> loadMarket({bool refresh = false}) async {
+    setState(() {
+      onlineLoading = true;
+      onlineError = null;
+    });
+    try {
+      final result = await snippetMarket.load(refresh: refresh);
+      if (mounted) setState(() => online = result);
+    } catch (e) {
+      if (mounted) setState(() => onlineError = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => onlineLoading = false);
+    }
+  }
+
+  Future<void> addMarket(MarketSnippet entry) async {
+    setState(() => busy = true);
+    try {
+      await widget.store.saveSnippet('', entry.name, entry.command);
+      await load();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('已添加片段：${entry.name}')));
       }
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -149,6 +184,62 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
     );
   }
 
+  Widget _marketList() {
+    if (onlineLoading) return const Center(child: CircularProgressIndicator());
+    if (onlineError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(onlineError!, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => loadMarket(refresh: true),
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (online.isEmpty) {
+      return Center(
+        child: OutlinedButton(
+          onPressed: () => loadMarket(),
+          child: const Text('加载在线市场'),
+        ),
+      );
+    }
+    final needle = query.trim().toLowerCase();
+    final visible = online
+        .where(
+          (entry) => '${entry.name} ${entry.category} ${entry.command}'
+              .toLowerCase()
+              .contains(needle),
+        )
+        .toList();
+    if (visible.isEmpty) return const Center(child: Text('没有匹配的在线片段'));
+    return ListView(
+      children: [
+        for (final entry in visible)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(entry.name),
+            subtitle: Text(
+              '${entry.category} · ${entry.command}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: IconButton(
+              tooltip: '添加到我的片段',
+              onPressed: busy ? null : () => addMarket(entry),
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+            ),
+            onTap: busy ? null : () => addMarket(entry),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = entries
@@ -184,14 +275,19 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 8),
-              SegmentedButton<bool>(
+              SegmentedButton<int>(
                 segments: const [
-                  ButtonSegment(value: false, label: Text('我的片段')),
-                  ButtonSegment(value: true, label: Text('官方精选')),
+                  ButtonSegment(value: 0, label: Text('我的片段')),
+                  ButtonSegment(value: 1, label: Text('官方精选')),
+                  ButtonSegment(value: 2, label: Text('在线市场')),
                 ],
-                selected: {market},
-                onSelectionChanged: (value) =>
-                    setState(() => market = value.first),
+                selected: {tab},
+                onSelectionChanged: (value) {
+                  setState(() => tab = value.first);
+                  if (tab == 2 && online.isEmpty && !onlineLoading) {
+                    loadMarket();
+                  }
+                },
               ),
               const SizedBox(height: 8),
               TextField(
@@ -205,8 +301,10 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               Expanded(
-                child: market
+                child: tab == 1
                     ? _catalogList(visible.length)
+                    : tab == 2
+                    ? _marketList()
                     : visible.isEmpty
                     ? const Center(child: Text('没有匹配片段'))
                     : ListView(

@@ -1,0 +1,646 @@
+{
+  "version": 1,
+  "updated": "2026-10-30",
+  "snippets": [
+    {
+      "name": "系统负载",
+      "category": "系统诊断",
+      "command": "uptime"
+    },
+    {
+      "name": "内存使用",
+      "category": "系统诊断",
+      "command": "free -h"
+    },
+    {
+      "name": "磁盘空间",
+      "category": "系统诊断",
+      "command": "df -h"
+    },
+    {
+      "name": "CPU 占用前 20",
+      "category": "系统诊断",
+      "command": "top -bn1 | head -20"
+    },
+    {
+      "name": "失败的服务",
+      "category": "系统诊断",
+      "command": "systemctl --failed"
+    },
+    {
+      "name": "最近日志",
+      "category": "系统诊断",
+      "command": "journalctl -xe --no-pager | tail -100"
+    },
+    {
+      "name": "系统信息",
+      "category": "系统诊断",
+      "command": "uname -a"
+    },
+    {
+      "name": "CPU 信息",
+      "category": "系统诊断",
+      "command": "lscpu"
+    },
+    {
+      "name": "块设备",
+      "category": "系统诊断",
+      "command": "lsblk"
+    },
+    {
+      "name": "登录用户",
+      "category": "系统诊断",
+      "command": "who -a"
+    },
+    {
+      "name": "监听端口",
+      "category": "网络",
+      "command": "ss -tulpn"
+    },
+    {
+      "name": "网卡地址",
+      "category": "网络",
+      "command": "ip addr"
+    },
+    {
+      "name": "路由表",
+      "category": "网络",
+      "command": "ip route"
+    },
+    {
+      "name": "连通性测试",
+      "category": "网络",
+      "command": "ping -c 4 1.1.1.1"
+    },
+    {
+      "name": "DNS 查询",
+      "category": "网络",
+      "command": "dig +short example.com"
+    },
+    {
+      "name": "HTTP 响应头",
+      "category": "网络",
+      "command": "curl -I https://example.com"
+    },
+    {
+      "name": "路由追踪",
+      "category": "网络",
+      "command": "traceroute 1.1.1.1"
+    },
+    {
+      "name": "网络统计",
+      "category": "网络",
+      "command": "nstat -az | head -40"
+    },
+    {
+      "name": "运行中的容器",
+      "category": "容器",
+      "command": "docker ps"
+    },
+    {
+      "name": "容器资源",
+      "category": "容器",
+      "command": "docker stats --no-stream"
+    },
+    {
+      "name": "本地镜像",
+      "category": "容器",
+      "command": "docker images"
+    },
+    {
+      "name": "容器日志",
+      "category": "容器",
+      "command": "docker logs --tail 100 CONTAINER"
+    },
+    {
+      "name": "Kubernetes Pods",
+      "category": "容器",
+      "command": "kubectl get pods -A"
+    },
+    {
+      "name": "Docker 服务状态",
+      "category": "容器",
+      "command": "systemctl status docker"
+    },
+    {
+      "name": "最近修改文件",
+      "category": "文件",
+      "command": "find . -maxdepth 2 -type f -printf \"%T@ %p\\n\" | sort -nr | head -20"
+    },
+    {
+      "name": "目录占用",
+      "category": "文件",
+      "command": "du -sh * | sort -h | tail -20"
+    },
+    {
+      "name": "详细列表",
+      "category": "文件",
+      "command": "ls -lah"
+    },
+    {
+      "name": "文件元信息",
+      "category": "文件",
+      "command": "stat ."
+    },
+    {
+      "name": "搜索 TODO",
+      "category": "文件",
+      "command": "grep -RIn \"TODO\" . | head -50"
+    },
+    {
+      "name": "最近登录",
+      "category": "安全",
+      "command": "last -n 20"
+    },
+    {
+      "name": "SSH 今日日志",
+      "category": "安全",
+      "command": "journalctl -u ssh --since today"
+    },
+    {
+      "name": "当前 sudo 权限",
+      "category": "安全",
+      "command": "sudo -l"
+    },
+    {
+      "name": "平均负载",
+      "category": "系统诊断",
+      "command": "cat /proc/loadavg"
+    },
+    {
+      "name": "内核消息",
+      "category": "系统诊断",
+      "command": "dmesg -T | tail -60"
+    },
+    {
+      "name": "系统时间",
+      "category": "系统诊断",
+      "command": "timedatectl status"
+    },
+    {
+      "name": "主机信息",
+      "category": "系统诊断",
+      "command": "hostnamectl status"
+    },
+    {
+      "name": "虚拟内存统计",
+      "category": "系统诊断",
+      "command": "vmstat 1 3"
+    },
+    {
+      "name": "IO 统计",
+      "category": "系统诊断",
+      "command": "iostat -xz 1 2"
+    },
+    {
+      "name": "CPU 历史",
+      "category": "系统诊断",
+      "command": "sar -u 1 3"
+    },
+    {
+      "name": "启动耗时",
+      "category": "系统诊断",
+      "command": "systemd-analyze blame | head -20"
+    },
+    {
+      "name": "环境变量",
+      "category": "系统诊断",
+      "command": "env | sort"
+    },
+    {
+      "name": "内核版本",
+      "category": "系统诊断",
+      "command": "uname -r"
+    },
+    {
+      "name": "MTR 路由",
+      "category": "网络",
+      "command": "mtr -rw -c 5 1.1.1.1"
+    },
+    {
+      "name": "HTTP 状态码",
+      "category": "网络",
+      "command": "curl -sS -o /dev/null -w \"%{http_code} %{time_total}s\\n\" https://example.com"
+    },
+    {
+      "name": "套接字统计",
+      "category": "网络",
+      "command": "ss -s"
+    },
+    {
+      "name": "网卡流量",
+      "category": "网络",
+      "command": "ip -s link"
+    },
+    {
+      "name": "DNS 配置",
+      "category": "网络",
+      "command": "resolvectl status"
+    },
+    {
+      "name": "端口连通性",
+      "category": "网络",
+      "command": "nc -vz example.com 443"
+    },
+    {
+      "name": "TLS 证书链",
+      "category": "网络",
+      "command": "openssl s_client -connect example.com:443 -servername example.com </dev/null"
+    },
+    {
+      "name": "抓包前 20 包",
+      "category": "网络",
+      "command": "tcpdump -c 20 -nn"
+    },
+    {
+      "name": "网络设备",
+      "category": "网络",
+      "command": "nmcli device status"
+    },
+    {
+      "name": "网络连接配置",
+      "category": "网络",
+      "command": "nmcli connection show"
+    },
+    {
+      "name": "网卡速率",
+      "category": "网络",
+      "command": "ethtool eth0"
+    },
+    {
+      "name": "ARP 表",
+      "category": "网络",
+      "command": "ip neigh"
+    },
+    {
+      "name": "Docker Compose",
+      "category": "容器",
+      "command": "docker compose ps"
+    },
+    {
+      "name": "容器状态",
+      "category": "容器",
+      "command": "docker inspect --format \"{{.State.Status}}\" CONTAINER"
+    },
+    {
+      "name": "Docker 网络",
+      "category": "容器",
+      "command": "docker network ls"
+    },
+    {
+      "name": "Docker 数据卷",
+      "category": "容器",
+      "command": "docker volume ls"
+    },
+    {
+      "name": "Docker 空间",
+      "category": "容器",
+      "command": "docker system df"
+    },
+    {
+      "name": "Kubernetes 节点",
+      "category": "容器",
+      "command": "kubectl get nodes -o wide"
+    },
+    {
+      "name": "Kubernetes 资源",
+      "category": "容器",
+      "command": "kubectl top pods -A"
+    },
+    {
+      "name": "Pod 描述",
+      "category": "容器",
+      "command": "kubectl describe pod POD -n NAMESPACE"
+    },
+    {
+      "name": "Kubernetes 事件",
+      "category": "容器",
+      "command": "kubectl get events --sort-by=.lastTimestamp -A | tail -30"
+    },
+    {
+      "name": "inode 使用",
+      "category": "文件",
+      "command": "df -i"
+    },
+    {
+      "name": "挂载点",
+      "category": "文件",
+      "command": "mount | column -t"
+    },
+    {
+      "name": "最近文件",
+      "category": "文件",
+      "command": "ls -lt | head -20"
+    },
+    {
+      "name": "大文件前 20",
+      "category": "文件",
+      "command": "find / -xdev -type f -size +100M -printf \"%s %p\\n\" 2>/dev/null | sort -nr | head -20"
+    },
+    {
+      "name": "文件类型",
+      "category": "文件",
+      "command": "file example.bin"
+    },
+    {
+      "name": "行数统计",
+      "category": "文件",
+      "command": "wc -l *.log"
+    },
+    {
+      "name": "校验和",
+      "category": "文件",
+      "command": "sha256sum example.iso"
+    },
+    {
+      "name": "目录树",
+      "category": "文件",
+      "command": "find . -maxdepth 2 -print | sort | head -100"
+    },
+    {
+      "name": "打开的文件",
+      "category": "文件",
+      "command": "lsof +D /var/log 2>/dev/null | head -30"
+    },
+    {
+      "name": "磁盘使用",
+      "category": "文件",
+      "command": "du -xh --max-depth=1 / 2>/dev/null | sort -h"
+    },
+    {
+      "name": "服务日志",
+      "category": "日志",
+      "command": "journalctl -u nginx --since \"1 hour ago\" --no-pager"
+    },
+    {
+      "name": "本次启动日志",
+      "category": "日志",
+      "command": "journalctl -b --no-pager | tail -200"
+    },
+    {
+      "name": "错误日志",
+      "category": "日志",
+      "command": "journalctl -p err -b --no-pager | tail -100"
+    },
+    {
+      "name": "日志中的错误",
+      "category": "日志",
+      "command": "grep -RIn \"ERROR\" /var/log 2>/dev/null | tail -50"
+    },
+    {
+      "name": "访问状态统计",
+      "category": "日志",
+      "command": "awk \"{print \\$9}\" /var/log/nginx/access.log | sort | uniq -c | sort -nr"
+    },
+    {
+      "name": "压缩日志",
+      "category": "日志",
+      "command": "zcat /var/log/syslog.1.gz 2>/dev/null | tail -100"
+    },
+    {
+      "name": "内核硬件错误",
+      "category": "日志",
+      "command": "journalctl -k -p warning -b --no-pager | tail -100"
+    },
+    {
+      "name": "日志占用",
+      "category": "日志",
+      "command": "journalctl --disk-usage"
+    },
+    {
+      "name": "CPU 前 20",
+      "category": "进程",
+      "command": "ps -eo pid,comm,%cpu --sort=-%cpu | head -20"
+    },
+    {
+      "name": "内存前 20",
+      "category": "进程",
+      "command": "ps -eo pid,comm,%mem --sort=-%mem | head -20"
+    },
+    {
+      "name": "进程树",
+      "category": "进程",
+      "command": "pstree -p | head -80"
+    },
+    {
+      "name": "进程端口",
+      "category": "进程",
+      "command": "lsof -i -P -n | head -40"
+    },
+    {
+      "name": "占用文件的进程",
+      "category": "进程",
+      "command": "fuser -v /var/log 2>&1 | head -20"
+    },
+    {
+      "name": "线程占用",
+      "category": "进程",
+      "command": "pidstat -u -p ALL 1 3"
+    },
+    {
+      "name": "按用户进程",
+      "category": "进程",
+      "command": "ps -eo user,pid,comm --sort=user"
+    },
+    {
+      "name": "可升级软件包",
+      "category": "包管理",
+      "command": "apt list --upgradable 2>/dev/null | head -40"
+    },
+    {
+      "name": "已安装包数量",
+      "category": "包管理",
+      "command": "dpkg -l | wc -l"
+    },
+    {
+      "name": "RPM 包数量",
+      "category": "包管理",
+      "command": "rpm -qa | wc -l"
+    },
+    {
+      "name": "DNF 更新检查",
+      "category": "包管理",
+      "command": "dnf check-update 2>/dev/null | head -40"
+    },
+    {
+      "name": "Snap 包",
+      "category": "包管理",
+      "command": "snap list"
+    },
+    {
+      "name": "Git 状态",
+      "category": "Git",
+      "command": "git status --short --branch"
+    },
+    {
+      "name": "Git 提交图",
+      "category": "Git",
+      "command": "git log --oneline --graph --decorate -20"
+    },
+    {
+      "name": "Git 分支",
+      "category": "Git",
+      "command": "git branch -vv"
+    },
+    {
+      "name": "Git 远程",
+      "category": "Git",
+      "command": "git remote -v"
+    },
+    {
+      "name": "Git 变更统计",
+      "category": "Git",
+      "command": "git diff --stat"
+    },
+    {
+      "name": "Git 暂存列表",
+      "category": "Git",
+      "command": "git stash list"
+    },
+    {
+      "name": "Git 近期提交",
+      "category": "Git",
+      "command": "git log --pretty=format:\"%h %ad %s\" --date=short -20"
+    },
+    {
+      "name": "PostgreSQL 就绪",
+      "category": "数据库",
+      "command": "pg_isready"
+    },
+    {
+      "name": "Redis 连通性",
+      "category": "数据库",
+      "command": "redis-cli ping"
+    },
+    {
+      "name": "MySQL 状态",
+      "category": "数据库",
+      "command": "mysqladmin status"
+    },
+    {
+      "name": "MongoDB 状态",
+      "category": "数据库",
+      "command": "mongosh --eval \"db.serverStatus().uptime\" --quiet"
+    },
+    {
+      "name": "失败的单元",
+      "category": "服务",
+      "command": "systemctl list-units --failed --no-pager"
+    },
+    {
+      "name": "定时器",
+      "category": "服务",
+      "command": "systemctl list-timers --no-pager"
+    },
+    {
+      "name": "服务状态",
+      "category": "服务",
+      "command": "systemctl status nginx --no-pager"
+    },
+    {
+      "name": "用户登录",
+      "category": "用户",
+      "command": "w"
+    },
+    {
+      "name": "当前用户",
+      "category": "用户",
+      "command": "id"
+    },
+    {
+      "name": "最近登录记录",
+      "category": "用户",
+      "command": "last -n 20"
+    },
+    {
+      "name": "压缩包内容",
+      "category": "备份",
+      "command": "tar -tzf backup.tar.gz | head -40"
+    },
+    {
+      "name": "同步预演",
+      "category": "备份",
+      "command": "rsync -avn --delete /src/ /backup/"
+    },
+    {
+      "name": "证书到期时间",
+      "category": "证书",
+      "command": "openssl x509 -enddate -noout -in cert.pem"
+    },
+    {
+      "name": "证书校验",
+      "category": "证书",
+      "command": "openssl verify -CAfile ca.pem cert.pem"
+    },
+    {
+      "name": "文本计数",
+      "category": "文本",
+      "command": "sort file.txt | uniq -c | sort -nr | head -20"
+    },
+    {
+      "name": "CSV 列",
+      "category": "文本",
+      "command": "awk -F, \"{print \\$1}\" data.csv | head -20"
+    },
+    {
+      "name": "JSON 摘要",
+      "category": "文本",
+      "command": "jq \". | keys\" data.json"
+    },
+    {
+      "name": "端口占用用户",
+      "category": "网络",
+      "command": "ss -ltnp"
+    },
+    {
+      "name": "启动耗时分析",
+      "category": "系统诊断",
+      "command": "systemd-analyze blame | head -20"
+    },
+    {
+      "name": "TCP 重传统计",
+      "category": "网络",
+      "command": "nstat -az TcpRetransSegs 2>/dev/null"
+    },
+    {
+      "name": "在线安全更新",
+      "category": "包管理",
+      "command": "apt list --upgradable 2>/dev/null | grep -i security | head -30"
+    },
+    {
+      "name": "Docker 悬空镜像",
+      "category": "容器",
+      "command": "docker images --filter dangling=true"
+    },
+    {
+      "name": "Kubernetes 命名空间",
+      "category": "容器",
+      "command": "kubectl get namespaces"
+    },
+    {
+      "name": "证书剩余天数",
+      "category": "证书",
+      "command": "openssl x509 -checkend 2592000 -noout -in cert.pem"
+    },
+    {
+      "name": "进程文件描述符",
+      "category": "进程",
+      "command": "ls /proc/PID/fd 2>/dev/null | wc -l"
+    },
+    {
+      "name": "今日错误数量",
+      "category": "日志",
+      "command": "journalctl -p err --since today --no-pager | wc -l"
+    },
+    {
+      "name": "最近 Git 标签",
+      "category": "Git",
+      "command": "git describe --tags --abbrev=0"
+    },
+    {
+      "name": "系统服务数量",
+      "category": "服务",
+      "command": "systemctl list-units --type=service --state=running --no-pager | wc -l"
+    }
+  ]
+}
