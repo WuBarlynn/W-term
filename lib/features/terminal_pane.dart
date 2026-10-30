@@ -5,6 +5,7 @@ import '../app/terminal_appearance.dart';
 import 'terminal_appearance_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'tmux_dialog.dart';
+import 'ai_assistant_dialog.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -304,6 +305,11 @@ class _TerminalPaneState extends State<TerminalPane> {
   Future<void> paneMenu(String value) async {
     if (value == 'reconnect') {
       widget.onReconnect?.call();
+    } else if (value == 'ai') {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AiAssistantDialog(session: widget.session),
+      );
     } else if (value == 'share-image') {
       await shareImage();
     } else if (value == 'tmux') {
