@@ -8,7 +8,7 @@
 - 范围：P1 连接闭环、MFA/代理/跳板/三类转发、P1.5-A/B 标签与分屏、P1.5-D 广播输入、P1.5-E 快捷键/终端选择器、P1.5-F 原位重连/布局恢复、macOS 关窗保活、MIT 协议。
 - Windows：`.github/workflows/windows.yml` 在 Windows runner 上构建 Release；使用 runner 自带 OpenSSL 并把 `libcrypto`/`libssl` DLL 放入产物；校验 exe 版本；产物以 Actions artifact 为准。macOS 本机不能直接编译 Windows。
 - 仍未完成/未验收：P1.5-C 的独立弹出/拖出窗口与跨窗口迁移（当前单 Flutter 引擎 + 单输出订阅架构无法安全迁移活动 SSH 会话）；P2 的真实 Apple 设备、Touch ID/Face ID、真实 GitHub 双设备、弱网/后台和四周日用验收；Windows 安装包/实际运行输入未人工验收。不得把本次构建称为已验收的日用 V1.0。
-- 发布证据：Flutter 203 项、Rust 118/19/7 项、Apple 双端签名/未签名构建；Windows CI 构建与版本校验结果见 Actions。产物版本号和路径见本节与第 10 节交接证据。
+- 发布证据：Flutter 203 项、Rust 118/19/7 项、Apple 双端签名/未签名构建；Windows CI 构建、版本校验、Rust 测试与 artifact 上传均通过。发布包位于 `build/release-1.0.0/`：`wterm-macos-1.0.0-53.zip`、`wterm-ios-1.0.0-53-unsigned.ipa`、`wterm-windows-1.0.0-53.zip`、`SHA256SUMS.txt`。
 
 ## 断线窗格手动重连（2026-10-30）
 

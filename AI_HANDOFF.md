@@ -323,36 +323,36 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 
 ## 10. 交接时的验证证据
 
-以下是**本轮 2026-10-30（0.1.50）实际执行结果**，日志位于本机 `build/`：
+以下是**本轮 2026-10-30（1.0.0）实际执行结果**，日志位于本机 `build/`：
 
 | 证据 | 留存结果 |
 | --- | --- |
-| `build/p150-tests-0.1.50.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；7 项真实桥接（转发×3、MFA×2、代理、三层跳板路线）通过 |
-| `build/flutter-tests-0.1.50.log` | 200 项 Flutter 全量测试通过 |
+| `build/p150-tests-0.1.50.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；7 项真实桥接（转发×3、MFA×2、代理、三层跳板路线）通过；1.0.0 未改 Rust 业务代码 |
+| `build/flutter-tests-0.1.51-layout.log` | 203 项 Flutter 全量测试通过（含布局恢复/离线占位会话） |
 | `build/vault-bridge-0.1.50.log` | 1 项真实保险库桥接通过 |
 | `build/clippy-0.1.50.log`、`build/fmt-0.1.50.log` | Rust 格式检查与 Clippy 通过 |
-| `build/macos-signing-0.1.50.log` | 自签名构建、严格签名验证通过 |
-| `build/ios-build-0.1.50.log` | iOS Release 与 IPA 打包完成 |
-| `.github/workflows/windows.yml` | Windows vendored OpenSSL 构建；macOS 主机不能直接验证，以 Windows CI 结果为准 |
+| `build/macos-signing-1.0.0.log` | macOS 自签名 Release 构建、严格签名验证通过 |
+| `build/ios-build-1.0.0.log` | iOS Release 与 IPA 打包完成 |
+| GitHub Actions `Windows preview` 41047714639 | `flutter build windows --release`、`verify-windows-version.ps1`、Windows Rust 测试和 artifact 上传全部通过 |
 
-2026-10-30 核对 Apple 产物版本均为 **0.1.50（51）**，当前存在：
+2026-10-30 核对三端版本均为 **1.0.0（53）**，当前存在：
 
 ```text
 build/macos-signed/Build/Products/Release/W Term.app
-build/ios/wterm-ios-0.1.50-51-unsigned.ipa
+build/ios/wterm-ios-1.0.0-53-unsigned.ipa
+build/windows-artifact-1.0.0/   (Windows CI artifact, includes wterm.exe, wterm_core.dll, libcrypto/libssl DLLs)
 ```
 
-macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库晚于 Rust 源码及与构建目录 SHA256 一致均已核对。**本轮没有在真机实际操作广播输入、快捷键或终端选择器**；Flutter 测试覆盖广播目标选择与布局逻辑，真实键盘/触控仍需签名设备复核。Windows 构建是否成功以 GitHub Actions 的 `Windows preview` 结果为准，不能从 macOS 本地构建推断。0.1.49 及更早日志仅作历史证据。
+macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库晚于 Rust 源码及与构建目录 SHA256 一致均已核对。Windows exe 的 FileVersion/ProductVersion 由 CI 的 `verify-windows-version.ps1` 校验为 `1.0.0 (53)`；macOS 本机不能直接运行 Windows 二进制，因此**未在 Windows 桌面实际启动/输入验收**。**本轮未在真机实际操作广播、快捷键、重连或布局恢复**；P1.5-C 独立弹出窗口仍未实现，P2 真机/四周日用验收仍未完成。0.1.51 及更早日志仅作历史证据。
 
 ## 11. 下一步如何推进
 
-### 首选任务：P1.5-C/D 弹窗、保活与广播
+### 仍未关闭：P1.5-C 独立弹出窗口与 P2 真机验收
 
-P1.5-A/B（会话/视图分离、标签、嵌套分屏、拖拽落点）已于 0.1.47 交付；下一步是 C/D，不要重做已有布局。
-
-1. **多窗口**：弹出/拖出标签或窗格到独立窗口；同一 `TerminalSession` 由明确 owner 协调，目标确认接管后再移除原视图，失败可回退。
-2. **收回与关闭**：收回主窗/指定组；关闭子窗明确“收回”或“断开”；主窗退出/锁库统一清理，不泄漏凭证或 relay。
-3. **广播输入**：默认关闭、明确目标（当前/组/指定/全部）、持续醒目标识、撰写栏预览、暂停/退出；原始键盘镜像与撰写发送分开授权，防双发/IME 误触；断线/关闭/撤权实时剔除。
+1. **独立弹出窗口/跨窗口迁移**：当前 Windows/macOS/iOS 客户端是单 Flutter 引擎；Rust `terminalOutput` 每连接只允许一个输出订阅，无法安全把活动 SSH 会话迁移到第二个引擎。需要先设计共享连接所有权、输出订阅交接（detach/re-attach 不触发 disconnect）和新窗口生命周期，再实现 macOS/iPad 多窗口。不要用重连冒充同一会话。
+2. **P2 Apple 真机/日用**：真实 SSH/GitHub 双设备、Touch ID/Face ID、输入/外接键盘、后台/弱网、文件授权、迁移/诊断、至少四周日用仍待验收；不能因 1.0.0 构建成功跳过。
+3. **Windows 验收**：在 Windows 10/11 实际启动 `wterm.exe`，验证 OpenSSL DLL 加载、保险库、SSH/MFA/代理/转发、SFTP、辅助键和输入法；当前只有 CI 构建与 Rust 测试证据。
+4. **发布审计**：1.0.0 是用户要求的三端开发构建，不是已验收的日用 V1.0；发布说明必须保留 P1.5-C 和 P2 未完成声明。
 4. **跨窗口**：不重复广播，目标 ACK 完成后再移除原视图；活跃任务提示与关闭确认。
 5. 完成后补 E（基础快捷键/每窗格查找/统一已开终端选择器）与 F（手动重连/描述性布局恢复），再做 P2 真机验收。
 
