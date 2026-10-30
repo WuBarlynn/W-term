@@ -326,12 +326,12 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 
 ## 10. 交接时的验证证据
 
-以下是**本轮 2026-10-30（1.0.2）实际执行结果**，日志位于本机 `build/`：
+以下是**本轮 2026-10-30（1.0.3）实际执行结果**，日志位于本机 `build/`：
 
 | 证据 | 留存结果 |
 | --- | --- |
 | `build/p102-tests.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；7 项真实桥接通过（含系统监控桥接） |
-| `build/flutter-tests-1.0.2.log` | 219 项 Flutter 全量测试通过（含 AI 助手/插件/导入/主题/片段/固定命令条） |
+| `build/flutter-tests-1.0.3b.log` | 221 项 Flutter 全量测试通过（含 AI 多环境/皮肤/更新/主题/插件/SFTP） |
 | `build/vault-bridge-1.0.1.log` | 1 项真实保险库桥接通过 |
 | `build/clippy-1.0.1.log`、`build/fmt-1.0.1.log`（1.0.2 未改 Rust 业务逻辑外的格式） | Rust 格式检查与 Clippy 通过 |
 | `build/macos-signing-1.0.2.log` | macOS 自签名 Release 构建、严格签名验证通过 |
@@ -339,13 +339,13 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 | `build/ios-build-1.0.2.log` | iOS Release 与 IPA 打包完成 |
 | GitHub Actions `Windows preview` 41076740086 | Windows Release、版本校验、启动冒烟、Inno Setup 安装包与 Rust 测试/artifact（以最终 CI 状态为准） |
 
-2026-10-30 核对三端版本均为 **1.0.2（55）**，当前存在：
+2026-10-30 核对三端版本均为 **1.0.3（56）**，当前存在：
 
 ```text
 build/macos-signed/Build/Products/Release/W Term.app
-build/release-1.0.2/wterm-macos-1.0.2-55.dmg
-build/release-1.0.2/wterm-ios-1.0.2-55-unsigned.ipa
-build/release-1.0.2/wterm-windows-1.0.2-55-setup.exe
+build/release-1.0.3/wterm-macos-1.0.3-56.dmg
+build/release-1.0.3/wterm-ios-1.0.3-56-unsigned.ipa
+build/release-1.0.3/wterm-windows-1.0.3-56-setup.exe
 ```
 
 macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库与构建目录 SHA256 一致均已核对；Windows exe 版本由 CI 脚本校验，安装包由 Inno Setup 构建，CI 还执行了启动进程的冒烟检查。**未在 Windows 桌面实际交互、未在 Apple 真机验证雅黑/图标/DMG/安装和所有新功能**。Cloud Term 公开指南的逐项缺口见 [CLOUDTERM_FEATURE_AUDIT.md](docs/CLOUDTERM_FEATURE_AUDIT.md)；AI、插件、内置皮肤、云账号/团队/Web、导入格式完整覆盖等仍未实现，不能把 1.0.1 当作 Cloud Term 全功能等价或 P2 验收完成。0.1.51 及更早日志仅作历史证据。
