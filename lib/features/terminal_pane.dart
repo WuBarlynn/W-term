@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/rendering.dart';
 import 'package:xterm/xterm.dart';
 
@@ -169,6 +170,19 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (validateSnippetCommand(command) != null) return;
     widget.session.terminal.paste(command);
     _focus();
+  }
+
+  Future<void> openSelectedLink() async {
+    final selection = controller.selection;
+    if (selection == null) return;
+    final value = widget.session.terminal.buffer.getText(selection).trim();
+    final uri = Uri.tryParse(value);
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请选中 http/https 链接')));
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> previewSelectedFile() async {
@@ -845,6 +859,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                       await lookupSelectedIp();
                     } else if (selected == 'preview-file') {
                       await previewSelectedFile();
+                    } else if (selected == 'open-link') {
+                      await openSelectedLink();
                     } else if (selected == 'pin') {
                       await pinSelection();
                     } else if (selected == 'plugins') {
