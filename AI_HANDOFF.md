@@ -333,7 +333,7 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 | `build/clippy-0.1.50.log`、`build/fmt-0.1.50.log` | Rust 格式检查与 Clippy 通过 |
 | `build/macos-signing-1.0.0.log` | macOS 自签名 Release 构建、严格签名验证通过 |
 | `build/ios-build-1.0.0.log` | iOS Release 与 IPA 打包完成 |
-| GitHub Actions `Windows preview` 41047714639 | `flutter build windows --release`、`verify-windows-version.ps1`、Windows Rust 测试和 artifact 上传全部通过 |
+| GitHub Actions `Windows preview` 41050390017 | `flutter build windows --release`、`verify-windows-version.ps1`、Windows Rust 测试和 artifact 上传全部通过 |
 
 2026-10-30 核对三端版本均为 **1.0.0（53）**，当前存在：
 
