@@ -4,7 +4,7 @@ import 'package:wterm/app/snippet_store.dart';
 
 void main() {
   test('official snippet catalog is unique and contains valid commands', () {
-    expect(snippetCatalog.length, greaterThanOrEqualTo(24));
+    expect(snippetCatalog.length, greaterThanOrEqualTo(100));
     expect(
       snippetCatalog.map((entry) => entry.name).toSet().length,
       snippetCatalog.length,

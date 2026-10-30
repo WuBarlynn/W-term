@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'host_csv.dart';
 import 'host_store.dart';
+import 'xlsx_import.dart';
 import 'zip_reader.dart';
 
 /// Imports the text formats that can be read without a platform SDK:
@@ -179,8 +180,14 @@ List<HostProfile> parseHostImportBytes(String fileName, Uint8List bytes) {
       bytes[1] == 0x4b &&
       bytes[2] == 0x03 &&
       bytes[3] == 0x04;
+  if (lower.endsWith('.xlsx')) return parseHostXlsx(fileName, bytes);
   if (lower.endsWith('.xts') || looksLikeZip) {
     final entries = readZipEntries(bytes);
+    if (entries.keys.any(
+      (name) => name.startsWith('xl/worksheets/') && name.endsWith('.xml'),
+    )) {
+      return parseHostXlsx(fileName, bytes);
+    }
     final hosts = <HostProfile>[];
     for (final entry in entries.entries) {
       if (!entry.key.toLowerCase().endsWith('.xsh')) continue;

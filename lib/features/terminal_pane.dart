@@ -619,6 +619,80 @@ class _TerminalPaneState extends State<TerminalPane> {
     _focus();
   }
 
+  Future<void> zmodemUpload() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ZMODEM 发送文件'),
+        content: const Text(
+          '将在终端执行 rz，随后弹出本地文件选择并发送到远端。\n'
+          '远端需要安装 lrzsz（rz/sz）；大文件传输期间请勿在终端输入。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('开始'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    _sendInput('rz\n');
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已发送 rz；等待远端握手后选择本地文件')));
+    }
+  }
+
+  Future<void> zmodemDownload() async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ZMODEM 接收文件'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '远端文件路径',
+            helperText: '将执行 sz 路径，随后选择本地保存位置',
+            hintText: '/var/log/app.log',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('接收'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
+    final path = value?.trim() ?? '';
+    if (path.isEmpty) return;
+    if (RegExp(r'[\x00-\x1f]').hasMatch(path)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('路径包含不允许的控制字符')));
+      }
+      return;
+    }
+    final quoted = path.replaceAll("'", "'\\''");
+    _sendInput("sz '$quoted'\n");
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已发送 sz；远端握手后选择本地保存位置')));
+    }
+  }
+
   Future<void> paneMenu(String value) async {
     if (value == 'reconnect') {
       widget.onReconnect?.call();
@@ -663,6 +737,10 @@ class _TerminalPaneState extends State<TerminalPane> {
       await searchHistory();
     } else if (value == 'snippets') {
       await openSnippets();
+    } else if (value == 'zmodem-upload') {
+      await zmodemUpload();
+    } else if (value == 'zmodem-download') {
+      await zmodemDownload();
     }
   }
 
@@ -801,6 +879,17 @@ class _TerminalPaneState extends State<TerminalPane> {
                   const PopupMenuItem(value: 'snippets', child: Text('命令片段')),
                 const PopupMenuItem(value: 'theme', child: Text('终端外观')),
                 const PopupMenuItem(value: 'search', child: Text('搜索终端历史')),
+                const PopupMenuDivider(),
+              ],
+              if (!ended) ...[
+                const PopupMenuItem(
+                  value: 'zmodem-upload',
+                  child: Text('ZMODEM 发送文件…'),
+                ),
+                const PopupMenuItem(
+                  value: 'zmodem-download',
+                  child: Text('ZMODEM 接收文件…'),
+                ),
                 const PopupMenuDivider(),
               ],
               const PopupMenuItem(value: 'horizontal', child: Text('水平分屏')),

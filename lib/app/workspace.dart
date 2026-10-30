@@ -32,6 +32,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:xterm/zmodem.dart';
 
 import '../features/connect_dialog.dart';
 import '../features/files_pane.dart';
@@ -579,6 +582,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           _terminalEnded(connectedId);
         },
         onActivity: () => taskMonitor.activity(connectedId),
+        onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
+        onZmodemRequest: _requestZmodemFiles,
         onCommand: (command) {
           unawaited(
             commandHistory.record(
@@ -678,6 +683,111 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         _sessionById(tab.activeSessionId) ??
         _sessionById(firstSession(tab.root) ?? '');
     return active?.host ?? '会话';
+  }
+
+  Future<void> _handleZmodemOffer(ZModemOffer offer) async {
+    if (!mounted) {
+      offer.skip();
+      return;
+    }
+    final info = offer.info;
+    final rawName = info.pathname.split(RegExp(r'[/\\]')).last.trim();
+    final name = rawName.isEmpty || rawName == '.' || rawName == '..'
+        ? 'zmodem-file'
+        : rawName;
+    final size = info.length;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('接收 ZMODEM 文件'),
+        content: Text(
+          '远端请求发送文件：\n\n$name'
+          '${size == null ? '' : '\n${_formatZmodemSize(size)}'}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('跳过'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('接收'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) {
+      offer.skip();
+      return;
+    }
+    try {
+      String? path;
+      if (Platform.isIOS) {
+        final directory = await getTemporaryDirectory();
+        path =
+            '${directory.path}/wterm-zmodem-${DateTime.now().microsecondsSinceEpoch}-$name';
+      } else {
+        final location = await getSaveLocation(suggestedName: name);
+        path = location?.path;
+      }
+      if (path == null) {
+        offer.skip();
+        return;
+      }
+      final file = File(path);
+      await file.parent.create(recursive: true);
+      final sink = file.openWrite();
+      try {
+        await for (final chunk in offer.accept(0)) {
+          sink.add(chunk);
+        }
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
+      if (!mounted) return;
+      if (Platform.isIOS) {
+        final box = context.findRenderObject() as RenderBox;
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(path)],
+            sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ZMODEM 文件已保存：$path')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ZMODEM 接收失败：${userFacingError(e)}')),
+        );
+      }
+    }
+  }
+
+  String _formatZmodemSize(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
+    }
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(1)} KiB';
+    return '$bytes B';
+  }
+
+  Future<Iterable<ZModemOffer>> _requestZmodemFiles() async {
+    final files = await openFiles();
+    final offers = <ZModemOffer>[];
+    for (final file in files) {
+      final length = await file.length();
+      offers.add(
+        ZModemCallbackOffer(
+          ZModemFileInfo(pathname: file.name, length: length),
+          onAccept: (offset) => file.openRead(offset),
+        ),
+      );
+    }
+    return offers;
   }
 
   void _taskCompleted() {

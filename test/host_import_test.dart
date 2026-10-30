@@ -64,6 +64,31 @@ void main() {
     expect(hosts.single.port, 2222);
   });
 
+  test('imports Excel xlsx host lists', () {
+    final bytes = base64Decode(
+      'UEsDBBQAAAAIAG0QX11hGDksbAAAAIkAAAAPAAAAeGwvd29ya2Jvb2sueG1sNY1BDsIwDAS/EvkBuHDoASU5wzNM'
+      'awhqHUexJXg+VUVPq51ZaeNH+/JQXcJX1moJinu7ItpUWMhO2rhu5qldyLfaX2itM81WmF1WvAzDiELvCjnuzP4Z'
+      'KgknuKm5QdjRfU5wBswRjyUe9/kHUEsDBBQAAAAIAG0QX12RZGYWywAAAGABAAAUAAAAeGwvc2hhcmVkU3RyaW5n'
+      'cy54bWxtkEFKBDEQRa8Sam+ndTGoJJmF4HoWeoDQXXYHOlUxVZHxHu5degfPI3gNW0SEHpfvfT4fvtsf82KesEpi'
+      '8nDe9WCQBh4TTR7u727PLsGIRhrjwoQenlFgH5yImrVJ4mFWLdfWyjBjjtJxQVqTB6456op1slIqxlFmRM2Lvej7'
+      'nc0xEZiBG6mHKzCN0mPDm19eB1JwGihmdFaDs9/842YW3brC9cQ1wfpff6rcylZ+vrx+vL9tLR5jLgt2A+dtVJlP'
+      'Fg+Vxz9n14/CF1BLAwQUAAAACABtEF9dSTvRXdcAAADeAQAAGAAAAHhsL3dvcmtzaGVldHMvc2hlZXQxLnhtbF2R'
+      '3W7DIAxGXwX5fnXCuq6agKo/2xNsD4AS2kQLEAFK17cv66bIgSvbh086ssXuxw5sMiH23kmoVxUw4xrf9u4i4evz'
+      '42kLLCbtWj14ZyTcTISdElcfvmNnTGI576KELqXxDTE2nbE6rvxoXCZnH6xOuQ0XjGMwun2E7IC8qjZode9Aicfs'
+      'pJNWIvgrC9kjT5vfYl8DSxJi7idVCZyUwOafHSirl+xIGV+yE2XPS/ZO2XpmmL1mOT7LcfL5pZCjbFPI8T+t/Aoz'
+      'GnotzCjbFmZIVojzbdQdUEsBAhQDFAAAAAgAbRBfXWEYOSxsAAAAiQAAAA8AAAAAAAAAAAAAAIABAAAAAHhsL3dv'
+      'cmtib29rLnhtbFBLAQIUAxQAAAAIAG0QX12RZGYWywAAAGABAAAUAAAAAAAAAAAAAACAAZkAAAB4bC9zaGFyZWRT'
+      'dHJpbmdzLnhtbFBLAQIUAxQAAAAIAG0QX11JO9Fd1wAAAN4BAAAYAAAAAAAAAAAAAACAAZYBAAB4bC93b3Jrc2hl'
+      'ZXRzL3NoZWV0MS54bWxQSwUGAAAAAAMAAwDFAAAAowIAAAAA',
+    );
+    final hosts = parseHostImportBytes('hosts.xlsx', Uint8List.fromList(bytes));
+    expect(hosts.single.name, '生产');
+    expect(hosts.single.host, 'example.com');
+    expect(hosts.single.port, 2222);
+    expect(hosts.single.username, 'root');
+    expect(hosts.single.group, 'Prod');
+  });
+
   test('imports SecureCRT INI sessions', () {
     final hosts = parseHostImport(
       'SecureCRT.ini',

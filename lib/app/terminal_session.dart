@@ -16,11 +16,16 @@ class TerminalSession extends ChangeNotifier {
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
   final VoidCallback? onActivity;
+  final void Function(ZModemOffer offer)? onZmodemOffer;
+  final Future<Iterable<ZModemOffer>> Function()? onZmodemRequest;
   final CommandLineTracker _commandTracker = CommandLineTracker();
-  final StreamController<List<int>> _bytes = StreamController<List<int>>(
+  final StreamController<Uint8List> _wire = StreamController<Uint8List>(
     sync: true,
   );
-  StreamSubscription<String>? _decoded;
+  final StreamController<List<int>> _zmodemInput = StreamController<List<int>>(
+    sync: true,
+  );
+  ZModemMux? _zmodem;
   StreamSubscription<Uint8List>? _output;
   Future<void> _writes = Future.value();
   Timer? _resizeTimer;
@@ -38,11 +43,32 @@ class TerminalSession extends ChangeNotifier {
     required this.onEnded,
     this.onCommand,
     this.onActivity,
+    this.onZmodemOffer,
+    this.onZmodemRequest,
     this.hostId = '',
   }) : _offline = false {
-    _decoded = utf8.decoder
-        .bind(_bytes.stream)
-        .listen(terminal.write, onError: (_) {});
+    final mux = ZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
+      ..onTerminalInput = terminal.write
+      ..onFileOffer = (offer) {
+        final handler = onZmodemOffer;
+        if (handler == null) {
+          offer.skip();
+        } else {
+          handler(offer);
+        }
+      }
+      ..onFileRequest = onZmodemRequest;
+    _zmodem = mux;
+    _zmodemInput.stream.listen(
+      (bytes) => unawaited(
+        native
+            .writeTerminal(connectionId: connectionId, bytes: bytes)
+            .catchError((Object error) {
+              _finish(userFacingError(error));
+            }),
+      ),
+      onError: (Object error) => _finish(userFacingError(error)),
+    );
     terminal.onOutput = send;
     terminal.onResize = _resize;
     terminal.onPrivateOSC = (code, args) {
@@ -59,7 +85,7 @@ class TerminalSession extends ChangeNotifier {
           (data) {
             if (_closed) return;
             onActivity?.call();
-            _bytes.add(data);
+            _wire.add(data);
             unawaited(
               native
                   .acknowledgeOutput(connectionId: connectionId)
@@ -79,6 +105,8 @@ class TerminalSession extends ChangeNotifier {
     required this.onEnded,
     this.onCommand,
     this.onActivity,
+    this.onZmodemOffer,
+    this.onZmodemRequest,
     this.hostId = '',
   }) : connectionId =
            'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
@@ -155,8 +183,12 @@ class TerminalSession extends ChangeNotifier {
     _output = null;
     await output?.cancel();
     if (!_offline) {
-      await _decoded?.cancel();
-      await _bytes.close();
+      _zmodem
+        ?..onFileOffer = null
+        ..onFileRequest = null;
+      _zmodem = null;
+      await _zmodemInput.close();
+      await _wire.close();
       await native
           .disconnect(connectionId: connectionId)
           .catchError((Object _) {});

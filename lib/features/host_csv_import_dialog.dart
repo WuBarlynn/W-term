@@ -96,7 +96,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
             children: [
               const Expanded(
                 child: Text(
-                  '支持 CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts；也可粘贴 CSV',
+                  '支持 CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts、Excel .xlsx；也可粘贴 CSV',
                   style: TextStyle(fontSize: 12),
                 ),
               ),
