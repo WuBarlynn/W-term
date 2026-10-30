@@ -1,6 +1,6 @@
 # Cloud Term 对标与 W Term 完整功能计划
 
-更新：2026-10-24（交付更新：2026-10-30）。基线：W Term **0.1.48+49**，Flutter + Rust，macOS/iOS 开发预览。P1-A/B/C 与 P1.5-A/B 已交付，见 [SSH_ROUTES.md](SSH_ROUTES.md)、[SSH_PROXY.md](SSH_PROXY.md)、[SSH_FORWARDING.md](SSH_FORWARDING.md)、[WORKSPACE_TABS.md](WORKSPACE_TABS.md)；0.1.48 补齐标签独立关闭、侧栏/文件面板调宽折叠、启动自动生物识别与 iOS 遮罩清理；下一批为 P1.5-C/D 弹窗/保活/广播。
+更新：2026-10-30（公开使用指南全量对照见 [CLOUDTERM_FEATURE_AUDIT.md](CLOUDTERM_FEATURE_AUDIT.md)）。基线：W Term **0.1.48+49**，Flutter + Rust，macOS/iOS 开发预览。P1-A/B/C 与 P1.5-A/B 已交付，见 [SSH_ROUTES.md](SSH_ROUTES.md)、[SSH_PROXY.md](SSH_PROXY.md)、[SSH_FORWARDING.md](SSH_FORWARDING.md)、[WORKSPACE_TABS.md](WORKSPACE_TABS.md)；0.1.48 补齐标签独立关闭、侧栏/文件面板调宽折叠、启动自动生物识别与 iOS 遮罩清理；下一批为 P1.5-C/D 弹窗/保活/广播。
 
 这是未来开发计划，不是新增功能的交付公告。本轮根据交接文档和 `https://www.cloudterm.cn/guide.html` 的公开可爬取内容补充既有计划。保留既有“非彩蛋能力尽量对标”的长期方向，但**对标收录不等于每项立即开发、自动取得第三方素材许可或批准上线商业服务**。AI、插件、运维监控、其他协议、云账号、组织协作和 Web 继续列为后续方向，不全部挤入 Apple V1.0；账号/组织/托管 Web 开工前需单独确定服务模式与运营范围。
 

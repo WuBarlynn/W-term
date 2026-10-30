@@ -1,6 +1,15 @@
 # 开发与验证记录
 
-更新日期：2026-10-30。当前版本：1.0.0 (53) 三端开发预览。本轮将版本号提升到 1.0.0，产出 macOS/iOS/Windows 构建；**仍不是已通过 P2 真机日用验收的最终版**，独立弹出窗口尚未实现。
+更新日期：2026-10-30。当前版本：1.0.1 (54) 三端开发预览。新增 Windows 微软雅黑、三端圆角图标、Windows 安装程序、macOS DMG 和 Cloud Term 全量功能对照审计；**仍不是已通过 P2 真机日用验收的最终版**，独立弹出窗口尚未交付。
+
+## 1.0.1 Windows 字体、安装包、DMG 与图标（2026-10-30）
+
+- Windows 界面主题与终端文字统一使用 Microsoft YaHei（终端回退 Cascadia Mono/Consolas/monospace）；Apple 保持 Menlo。
+- 新应用图标：深青渐变圆角方形 + 终端提示符 + 安全节点；已生成 iOS/macOS 全尺寸 PNG 和 Windows 256 ICO。
+- Windows 安装程序：新增 `installer/wterm.iss`（Inno Setup，按用户安装到 `%LOCALAPPDATA%`，含开始菜单/可选桌面快捷方式），CI 构建安装包并校验 exe 版本。
+- macOS DMG：新增 `scripts/package-macos-dmg.sh`，把自签名 App、Applications 链接和 LICENSE 打成 UDZO DMG，可用同一签名身份签署 DMG。
+- 新增 [CLOUDTERM_FEATURE_AUDIT.md](CLOUDTERM_FEATURE_AUDIT.md)，按公开 Cloud Term 指南逐项标注已有/部分/缺失；排除自定义皮肤和彩蛋，但列出其余全部差距。
+- 验证：macOS 1.0.1 自签名与 DMG 构建成功；iOS 1.0.1 IPA 构建成功；Windows CI 正在构建安装包。真实 Windows 输入、安装和雅黑显示仍需人工验收。
 
 ## 1.0.0 三端构建（2026-10-30）
 
