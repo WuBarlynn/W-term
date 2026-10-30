@@ -104,6 +104,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
     unawaited(_restoreLayout());
+    unawaited(
+      Future<void>.delayed(const Duration(seconds: 6), _autoCheckUpdates),
+    );
   }
 
   @override
@@ -1085,6 +1088,24 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     } else if (action == 'sessions') {
       unawaited(showSessionPicker());
     }
+  }
+
+  Future<void> _autoCheckUpdates() async {
+    if (!mounted) return;
+    final info = await checkForUpdate();
+    if (!mounted || info == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('发现 W Term 新版本 ${info.version}'),
+        action: SnackBarAction(
+          label: '查看',
+          onPressed: () => launchUrl(
+            Uri.parse(info.url),
+            mode: LaunchMode.externalApplication,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _checkUpdates() async {
