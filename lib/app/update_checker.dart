@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
 const appVersion = '1.0.7';
 const appBuild = '60';
 
@@ -18,6 +20,13 @@ class UpdateInfo {
     required this.notes,
     this.assets = const [],
   });
+
+  UpdateAsset? get checksumAsset {
+    for (final asset in assets) {
+      if (asset.name.toLowerCase() == 'sha256sums.txt') return asset;
+    }
+    return null;
+  }
 
   UpdateAsset? assetFor(String platform) {
     final lower = platform.toLowerCase();
@@ -101,5 +110,43 @@ Future<File> downloadUpdateAsset(UpdateAsset asset) async {
     throw StateError('更新下载重定向过多');
   } finally {
     client.close(force: true);
+  }
+}
+
+/// Reads a SHA256SUMS line for [fileName]. Missing or malformed entries return
+/// null so callers can refuse to launch an unverified installer.
+String? parseUpdateChecksum(String content, String fileName) {
+  final target = fileName.split(RegExp(r'[/\\]')).last;
+  for (final line in const LineSplitter().convert(content)) {
+    final match = RegExp(r'^([0-9a-fA-F]{64})\s+\*?(.+)$')
+        .firstMatch(line.trim());
+    if (match == null) continue;
+    final listed = match.group(2)!.split(RegExp(r'[/\\]')).last;
+    if (listed == target) return match.group(1)!.toLowerCase();
+  }
+  return null;
+}
+
+Future<bool> verifyUpdateDownload(File file, UpdateInfo info) async {
+  final checksum = info.checksumAsset;
+  if (checksum == null) return false;
+  File? checksumFile;
+  try {
+    checksumFile = await downloadUpdateAsset(checksum);
+    final expected = parseUpdateChecksum(
+      await checksumFile.readAsString(),
+      file.uri.pathSegments.last,
+    );
+    if (expected == null) return false;
+    final actual = (await sha256.bind(file.openRead()).first).toString();
+    return actual.toLowerCase() == expected;
+  } catch (_) {
+    return false;
+  } finally {
+    if (checksumFile != null) {
+      final parent = checksumFile.parent;
+      await checksumFile.delete().catchError((Object _) => checksumFile!);
+      await parent.delete(recursive: true).catchError((Object _) => parent);
+    }
   }
 }

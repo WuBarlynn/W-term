@@ -27,6 +27,9 @@ void main() {
     expect(resolveRemotePath('a\nb.txt', '/tmp'), isNull);
     expect(isImagePath('/tmp/a.webp'), isTrue);
     expect(isImagePath('/tmp/a.log'), isFalse);
+    expect(isSystemPreviewPath('/tmp/a.pdf'), isTrue);
+    expect(isSystemPreviewPath('/tmp/a.MP4'), isTrue);
+    expect(isSystemPreviewPath('/tmp/a.txt'), isFalse);
   });
 
   test('plugin switches persist', () async {

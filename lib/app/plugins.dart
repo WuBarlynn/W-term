@@ -131,6 +131,27 @@ Future<IpLookupResult> lookupIp(String ip) async {
   }
 }
 
+bool isSystemPreviewPath(String path) {
+  final lower = path.toLowerCase();
+  return const [
+    '.pdf',
+    '.mp4',
+    '.mov',
+    '.m4v',
+    '.webm',
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.flac',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+  ].any(lower.endsWith);
+}
+
 bool isImagePath(String path) {
   final lower = path.toLowerCase().split('?').first;
   return const [

@@ -285,6 +285,35 @@ class _TerminalPaneState extends State<TerminalPane> {
       return;
     }
     try {
+      if (isSystemPreviewPath(path)) {
+        final extension = path.contains('.')
+            ? path.substring(path.lastIndexOf('.'))
+            : '';
+        final file = File(
+          '${(await getTemporaryDirectory()).path}/wterm-preview-${DateTime.now().microsecondsSinceEpoch}$extension',
+        );
+        await native.downloadFile(
+          connectionId: widget.session.connectionId,
+          remotePath: path,
+          localPath: file.path,
+        );
+        if (!mounted) return;
+        if (Platform.isIOS) {
+          final box = context.findRenderObject() as RenderBox;
+          await SharePlus.instance.share(
+            ShareParams(
+              files: [XFile(file.path)],
+              fileNameOverrides: [path.split('/').last],
+              sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+            ),
+          );
+        } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+          await Process.run(Platform.isWindows ? 'explorer' : 'open', [
+            file.path,
+          ]);
+        }
+        return;
+      }
       if (isImagePath(path)) {
         final file = File(
           '${(await getTemporaryDirectory()).path}/wterm-preview-${DateTime.now().microsecondsSinceEpoch}${path.substring(path.lastIndexOf("."))}',

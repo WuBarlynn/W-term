@@ -28,6 +28,28 @@ void main() {
     expect(info.assetFor('ios'), isNull);
   });
 
+  test('checksum asset and SHA256SUMS parsing are strict', () {
+    const info = UpdateInfo(
+      version: 'v1.0.8',
+      url: 'https://example.com',
+      notes: '',
+      assets: [
+        UpdateAsset('a.dmg', 'https://example.com/a.dmg'),
+        UpdateAsset('SHA256SUMS.txt', 'https://example.com/SHA256SUMS.txt'),
+      ],
+    );
+    expect(info.checksumAsset?.name, 'SHA256SUMS.txt');
+    const digest =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    final content =
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  other.zip\n'
+        '$digest  a.dmg\n';
+    expect(parseUpdateChecksum(content, 'a.dmg'), digest);
+    expect(parseUpdateChecksum(content, 'missing.dmg'), isNull);
+    expect(parseUpdateChecksum('not a checksum', 'a.dmg'), isNull);
+    expect(parseUpdateChecksum('abc  a.dmg', 'a.dmg'), isNull);
+  });
+
   test('build-time version constant matches pubspec', () {
     final lines = File('pubspec.yaml').readAsLinesSync();
     final version = lines

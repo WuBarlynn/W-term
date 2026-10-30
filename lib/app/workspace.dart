@@ -1307,7 +1307,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       message('正在下载 ${asset.name}…');
       try {
         final file = await downloadUpdateAsset(asset);
+        final verified = await verifyUpdateDownload(file, info);
         if (!mounted) return;
+        if (!verified) {
+          message('安装包 SHA256 校验失败或缺少校验文件，未打开。请前往发布页手动下载。');
+          return;
+        }
         if (Platform.isMacOS) {
           await Process.run('open', [file.path]);
         } else if (Platform.isWindows) {
