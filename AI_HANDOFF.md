@@ -2,8 +2,8 @@
 
 > 面向接手本项目的 AI 或开发者。先读本文，再按任务读取对应源码。
 >
-> 原完整交接核对日期：**2026-10-15（Asia/Shanghai）**；规划补充日期：**2026-10-24**；功能交付更新：**2026-10-30**。当前应用版本：**0.1.50+51**。
-> 最近一轮更新为 2026-10-30：广播输入、基础快捷键、已打开终端选择器与 Windows SQLCipher 构建修复。此前同轮已完成整标签拖动分屏、标签右键/长按菜单、双/四宫格、标签关闭隔离、面板折叠/调宽、自动生物识别与 iOS 遮罩修复。P1.5-F 手动重连/布局恢复与 macOS 关窗保活已实现；独立弹出窗口仍受单 Flutter 引擎架构限制。测试与构建证据见第 10 节。
+> 原完整交接核对日期：**2026-10-15（Asia/Shanghai）**；规划补充日期：**2026-10-24**；功能交付更新：**2026-10-30**。当前应用版本：**1.0.0+53**。
+> 最近一轮更新为 2026-10-30：广播输入、基础快捷键、已打开终端选择器与 Windows SQLCipher 构建修复。此前同轮已完成整标签拖动分屏、标签右键/长按菜单、双/四宫格、标签关闭隔离、面板折叠/调宽、自动生物识别与 iOS 遮罩修复。P1.5-F 手动重连/布局恢复与 macOS 关窗保活已实现；1.0.0 已产出三端构建。独立弹出窗口仍受单 Flutter 引擎架构限制，P2 真机/日用验收未完成。测试与构建证据见第 10 节。
 
 ## 1. 一分钟了解现状
 
@@ -304,6 +304,8 @@ flutter test --no-pub \
 bash scripts/build-macos-signed.sh
 bash scripts/package-ios-unsigned.sh
 ```
+
+Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`flutter build windows --release`；`.github/workflows/windows.yml` 会构建并用 `scripts/verify-windows-version.ps1` 校验 exe 的 FileVersion/ProductVersion 与 `pubspec.yaml` 一致。macOS 不能直接产出 Windows 二进制。
 
 - macOS：`build/macos-signed/Build/Products/Release/W Term.app`。后续构建会覆盖同一路径。
 - iOS：`build/ios/wterm-ios-<版本>-<构建号>-unsigned.ipa`。需要用户签名才能安装，不能称作已经可直接安装的签名版。
