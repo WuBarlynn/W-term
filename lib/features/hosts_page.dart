@@ -10,6 +10,7 @@ import '../app/proxy_store.dart';
 import '../src/rust/api/proxy.dart' show ProxyProfile;
 import 'host_editor.dart';
 import 'openssh_import_dialog.dart';
+import 'host_csv_import_dialog.dart';
 
 class HostsPage extends StatefulWidget {
   final HostStore store;
@@ -61,6 +62,19 @@ class HostsPageState extends State<HostsPage> {
       if (mounted) setState(() => error = '无法读取主机配置：${userFacingError(e)}');
     } finally {
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> importCsv() async {
+    final imported = await showDialog<List<HostProfile>>(
+      context: context,
+      builder: (_) => const HostCsvImportDialog(),
+    );
+    if (imported == null || imported.isEmpty || !mounted) return;
+    await persist([...hosts, ...imported]);
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('已导入 ${imported.length} 台主机')));
     }
   }
 
@@ -717,6 +731,11 @@ class HostsPageState extends State<HostsPage> {
                   '主机',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
+              ),
+              IconButton(
+                tooltip: '批量导入 CSV',
+                icon: const Icon(Icons.upload_file_outlined, size: 18),
+                onPressed: ready ? importCsv : null,
               ),
               IconButton(
                 tooltip: '导入 OpenSSH 配置',
