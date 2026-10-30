@@ -42,7 +42,8 @@ class DetachedTerminalPage extends StatefulWidget {
   State<DetachedTerminalPage> createState() => _DetachedTerminalPageState();
 }
 
-class _DetachedTerminalPageState extends State<DetachedTerminalPage> {
+class _DetachedTerminalPageState extends State<DetachedTerminalPage>
+    with WindowListener {
   static const _window = MethodChannel('dev.wterm/detached-window');
   late final TerminalSession session;
   bool closing = false;
@@ -50,6 +51,7 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage> {
   @override
   void initState() {
     super.initState();
+    if (Platform.isWindows) windowManager.addListener(this);
     session = TerminalSession.attach(
       connectionId: widget.payload['connectionId']!,
       host: widget.payload['host'] ?? '',
@@ -63,8 +65,14 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage> {
 
   @override
   void dispose() {
+    if (Platform.isWindows) windowManager.removeListener(this);
     session.dispose();
     super.dispose();
+  }
+
+  @override
+  void onWindowClose() {
+    unawaited(session.close());
   }
 
   Future<void> close() async {
