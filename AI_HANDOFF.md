@@ -339,7 +339,7 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 | `build/macos-signing-1.0.5.log` | macOS 自签名 Release 构建、严格签名验证通过 |
 | `build/macos-dmg-1.0.5.log` | macOS UDZO DMG 打包完成 |
 | `build/ios-build-1.0.5.log` | iOS Release 与 IPA 打包完成 |
-| GitHub Actions `Windows preview` 41093440123 | Windows Release、版本校验、启动冒烟、Inno Setup 安装包与 Rust 测试/artifact 全部通过 |
+| GitHub Actions `Windows preview` 41095977720 | Windows Release、版本校验、启动冒烟、Inno Setup 安装包与 Rust 测试/artifact 全部通过 |
 
 2026-10-30 核对三端版本均为 **1.0.5（58）**，当前存在：
 
