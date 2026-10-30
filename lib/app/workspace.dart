@@ -93,7 +93,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
-  Timer? _layoutSaveTimer;
+  Timer? _layoutSaveTimer, _updateTimer;
   bool _restoredLayout = false;
   String status = '';
   String? pending;
@@ -104,15 +104,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
     unawaited(_restoreLayout());
-    unawaited(
-      Future<void>.delayed(const Duration(seconds: 6), _autoCheckUpdates),
-    );
+    _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _layoutSaveTimer?.cancel();
+    _updateTimer?.cancel();
     unawaited(_saveLayout());
     attempt++;
     final operation = activeOperationId;

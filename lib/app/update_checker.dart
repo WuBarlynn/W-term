@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-const appVersion = '1.0.2';
-const appBuild = '55';
+const appVersion = '1.0.3';
+const appBuild = '56';
 
 class UpdateInfo {
   final String version, url, notes;
