@@ -275,6 +275,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           startupCommand: profile?.startupCommand ?? '',
           environment: profile?.environment ?? const [],
           wiki: profile?.wiki ?? '',
+          icon: profile?.icon ?? '',
         );
         final saved = await credentials.saveHost(
           host,

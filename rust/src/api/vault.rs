@@ -238,6 +238,8 @@ pub(crate) struct Host {
     pub(crate) environment: Vec<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub(crate) wiki: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(crate) icon: String,
 }
 pub(crate) const MAX_JUMP_HOSTS: usize = 4;
 
@@ -305,6 +307,10 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
             ensure!(
                 h.environment.len() <= 64,
                 "环境变量最多 64 项"
+            );
+            ensure!(
+                h.icon.len() <= 64,
+                "连接图标标识过长"
             );
             ensure!(
                 h.wiki.len() <= 64 * 1024 && !h.wiki.contains('\0'),

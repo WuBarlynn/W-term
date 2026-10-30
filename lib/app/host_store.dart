@@ -12,6 +12,7 @@ class HostProfile {
   final String startupCommand;
   final List<String> environment;
   final String wiki;
+  final String icon;
   HostProfile({
     required this.id,
     required this.name,
@@ -26,6 +27,7 @@ class HostProfile {
     this.startupCommand = '',
     List<String> environment = const [],
     this.wiki = '',
+    this.icon = '',
   }) : tags = List.unmodifiable(tags),
        jumpHostIds = List.unmodifiable(jumpHostIds),
        environment = List.unmodifiable(environment) {
@@ -59,6 +61,7 @@ class HostProfile {
     startupCommand: v['startupCommand'] as String? ?? '',
     environment: List<String>.from(v['environment'] as List? ?? const []),
     wiki: v['wiki'] as String? ?? '',
+    icon: v['icon'] as String? ?? '',
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -74,6 +77,7 @@ class HostProfile {
     if (startupCommand.isNotEmpty) 'startupCommand': startupCommand,
     if (environment.isNotEmpty) 'environment': environment,
     if (wiki.isNotEmpty) 'wiki': wiki,
+    if (icon.isNotEmpty) 'icon': icon,
   };
   HostProfile toggleFavorite() => HostProfile(
     id: id,
@@ -89,6 +93,7 @@ class HostProfile {
     startupCommand: startupCommand,
     environment: environment,
     wiki: wiki,
+    icon: icon,
   );
   HostProfile withWiki(String value) => HostProfile(
     id: id,
@@ -104,6 +109,7 @@ class HostProfile {
     startupCommand: startupCommand,
     environment: environment,
     wiki: value,
+    icon: icon,
   );
   bool matches(String query) => [
     name,

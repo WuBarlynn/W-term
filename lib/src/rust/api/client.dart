@@ -50,6 +50,17 @@ Stream<Uint8List> terminalOutput({required String connectionId}) => RustLib
     .api
     .crateApiClientTerminalOutput(connectionId: connectionId);
 
+/// Runs one non-interactive command over the existing authenticated session.
+/// Output is bounded and the command has a hard timeout; callers must build
+/// the shell command themselves and never pass credentials in it.
+Future<String> runCommand({
+  required String connectionId,
+  required String command,
+}) => RustLib.instance.api.crateApiClientRunCommand(
+  connectionId: connectionId,
+  command: command,
+);
+
 Future<void> acknowledgeOutput({required String connectionId}) => RustLib
     .instance
     .api

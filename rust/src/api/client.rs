@@ -1,5 +1,6 @@
 use crate::{frb_generated::StreamSink, session};
 use anyhow::{bail, Context, Result};
+use russh::ChannelMsg;
 use russh_sftp::protocol::OpenFlags;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -95,6 +96,39 @@ pub async fn terminal_output(connection_id: String, sink: StreamSink<Vec<u8>>) -
     }
     session::disconnect(&connection_id).await
 }
+/// Runs one non-interactive command over the existing authenticated session.
+/// Output is bounded and the command has a hard timeout; callers must build
+/// the shell command themselves and never pass credentials in it.
+pub async fn run_command(connection_id: String, command: String) -> Result<String> {
+    if command.trim().is_empty() || command.len() > 16 * 1024 {
+        bail!("Command is empty or too large");
+    }
+    let live = session::live(&connection_id).await?;
+    let mut channel = tokio::time::timeout(Duration::from_secs(15), live.handle.channel_open_session())
+        .await
+        .context("Command channel timeout")??;
+    channel.exec(true, command.as_bytes()).await?;
+    let mut output = Vec::new();
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            match channel.wait().await {
+                Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                    if output.len() + data.len() > 1024 * 1024 {
+                        bail!("Command output exceeds 1 MiB");
+                    }
+                    output.extend_from_slice(&data);
+                }
+                Some(ChannelMsg::Close) | Some(ChannelMsg::Eof) | None => break,
+                _ => {}
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .await
+    .context("Command timed out")??;
+    Ok(String::from_utf8_lossy(&output).into_owned())
+}
+
 pub async fn acknowledge_output(connection_id: String) -> Result<()> {
     let live = session::live(&connection_id).await?;
     if live.ack.available_permits() == 0 {

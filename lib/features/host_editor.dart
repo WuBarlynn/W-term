@@ -44,6 +44,7 @@ class _HostEditorState extends State<HostEditor> {
   late List<String> jumpHostIds = [...?widget.profile?.jumpHostIds];
   late String proxyBinding = widget.proxyBinding;
   bool staleProxy = false;
+  late String icon = widget.profile?.icon ?? '';
   late String mode = widget.profile?.identityId.isNotEmpty == true
       ? 'saved'
       : widget.credentials != null
@@ -205,6 +206,7 @@ class _HostEditorState extends State<HostEditor> {
             .where((line) => line.isNotEmpty && !line.startsWith('#'))
             .toList(),
         wiki: widget.profile?.wiki ?? '',
+        icon: icon,
       );
     } on FormatException catch (e) {
       setState(() => error = e.message);
@@ -337,6 +339,25 @@ class _HostEditorState extends State<HostEditor> {
                     ),
                   ),
                 const Divider(height: 24),
+                DropdownButtonFormField<String>(
+                  initialValue: icon,
+                  decoration: const InputDecoration(labelText: '连接图标'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('默认服务器')),
+                    DropdownMenuItem(value: 'terminal', child: Text('终端')),
+                    DropdownMenuItem(value: 'database', child: Text('数据库')),
+                    DropdownMenuItem(value: 'cloud', child: Text('云主机')),
+                    DropdownMenuItem(value: 'code', child: Text('开发')),
+                    DropdownMenuItem(value: 'globe', child: Text('网络')),
+                    DropdownMenuItem(value: 'security', child: Text('安全')),
+                    DropdownMenuItem(value: 'web', child: Text('网站')),
+                    DropdownMenuItem(value: 'rocket', child: Text('构建')),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (value) => setState(() => icon = value ?? ''),
+                ),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: startup,
                   enabled: !busy,

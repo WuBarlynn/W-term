@@ -48,13 +48,18 @@ void main() {
       username: 'alice',
       startupCommand: 'cd /srv/app',
       environment: ['APP_ENV=prod', 'TOKEN=a b'],
+      icon: 'database',
+      wiki: '# Runbook',
     );
     final restored = HostProfile.fromJson(host.toJson());
     expect(restored.startupCommand, 'cd /srv/app');
     expect(restored.environment, ['APP_ENV=prod', 'TOKEN=a b']);
     expect(restored.toJson()['environment'], ['APP_ENV=prod', 'TOKEN=a b']);
     expect(restored.toJson().containsKey('identityId'), isFalse);
-    expect(restored.withWiki('# Runbook').wiki, '# Runbook');
+    expect(restored.icon, 'database');
+    expect(restored.wiki, '# Runbook');
+    expect(restored.withWiki('# Runbook 2').wiki, '# Runbook 2');
+    expect(restored.withWiki('# Runbook 2').icon, 'database');
     expect(restored.withWiki('# Runbook').startupCommand, 'cd /srv/app');
   });
   test('malformed and future data are not silently treated as empty', () async {

@@ -426,6 +426,18 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
+  IconData hostIcon(String icon) => switch (icon) {
+    'terminal' => Icons.terminal,
+    'database' => Icons.storage_outlined,
+    'cloud' => Icons.cloud_outlined,
+    'code' => Icons.code,
+    'globe' => Icons.public,
+    'security' => Icons.security,
+    'web' => Icons.language,
+    'rocket' => Icons.rocket_launch_outlined,
+    _ => Icons.dns_outlined,
+  };
+
   Widget hostTile(HostProfile h, int depth) => MouseRegion(
     onEnter: (_) => setState(() => hoveredHostId = h.id),
     onExit: (_) {
@@ -461,7 +473,7 @@ class HostsPageState extends State<HostsPage> {
                 minLeadingWidth: 16,
                 horizontalTitleGap: 8,
                 leading: Icon(
-                  h.favorite ? Icons.star_rounded : Icons.dns_outlined,
+                  h.favorite ? Icons.star_rounded : hostIcon(h.icon),
                   size: 16,
                   color: h.favorite
                       ? Theme.of(context).colorScheme.primary
