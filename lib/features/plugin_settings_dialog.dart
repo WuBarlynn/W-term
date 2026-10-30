@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app/desktop_hotkey.dart';
 import '../app/errors.dart';
 import '../app/plugins.dart';
 
@@ -16,7 +15,6 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool preview = pluginSettings.filePreview;
   late bool completion = pluginSettings.commandCompletion;
   late bool notifications = pluginSettings.taskNotifications;
-  late bool hotkey = pluginSettings.desktopHotkey;
   bool saving = false;
   String? error;
 
@@ -32,9 +30,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         preview: preview,
         completion: completion,
         notifications: notifications,
-        hotkey: hotkey,
       );
-      await desktopHotkey.setup(hotkey);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -86,17 +82,6 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
                 : (value) => setState(() => notifications = value),
             title: const Text('任务完成通知'),
             subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
-          ),
-          SwitchListTile(
-            value: hotkey,
-            onChanged: saving
-                ? null
-                : (value) => setState(() => hotkey = value),
-            title: const Text('全局快捷键'),
-            subtitle: Text(
-              '${desktopHotkey.supported ? desktopHotkey.label : '当前平台不支持'} · '
-              '显示并聚焦 W Term 主窗口',
-            ),
           ),
           const Align(
             alignment: Alignment.centerLeft,

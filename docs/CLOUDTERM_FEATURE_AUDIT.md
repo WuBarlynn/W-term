@@ -72,7 +72,7 @@
 - [~] 启动静默检查/手动检查 GitHub Release；下载后校验 SHA256SUMS 再打开，失败拒绝；缺自动安装/重启与 iOS 更新流程
 - [ ] Web 端
 - [ ] Windows x86_64 苹果芯片双架构发布（当前 macOS arm64、Windows x64）
-- [~] 桌面托盘/菜单栏、`wterm://connect` 深链接、可选全局快捷键已实现；本地 Shell、输入法自动切换仍缺
+- [~] 桌面托盘/菜单栏、`wterm://connect` 深链接已实现；全局快捷键、本地 Shell、输入法自动切换仍缺
 
 ## 同步、账号与协作
 

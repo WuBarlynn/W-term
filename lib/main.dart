@@ -11,7 +11,6 @@ import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
 import 'app/deep_links.dart';
-import 'app/desktop_hotkey.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
@@ -64,7 +63,6 @@ Future<void> main(List<String> args) async {
       unawaited(deepLinkService.start());
       if (!Platform.isAndroid && !Platform.isIOS) {
         unawaited(desktopTray.setup());
-        unawaited(desktopHotkey.setup(pluginSettings.desktopHotkey));
       }
     }
   } catch (error) {

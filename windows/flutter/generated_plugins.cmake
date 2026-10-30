@@ -8,7 +8,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_multi_window
   file_selector_windows
   flutter_secure_storage_windows
-  hotkey_manager_windows
   screen_retriever_windows
   share_plus
   tray_manager
