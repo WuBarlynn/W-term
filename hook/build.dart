@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_rust_bridge_hooks/flutter_rust_bridge_hooks.dart';
 
 import 'rust_inputs.dart';
@@ -5,7 +7,22 @@ import 'rust_inputs.dart';
 void main(List<String> args) async {
   await build(args, (input, output) async {
     output.dependencies.addAll(rustBuildInputs(input.packageRoot));
-    await const FlutterRustBridgeNativeAssetsBuilder(cratePath: 'rust')
-        .run(input: input, output: output);
+    final opensslDir =
+        Platform.environment['OPENSSL_DIR'] ??
+        (Platform.isWindows ? r'C:\Program Files\OpenSSL' : null);
+    final opensslLib =
+        Platform.environment['OPENSSL_LIB_DIR'] ??
+        (Platform.isWindows ? r'C:\Program Files\OpenSSL\lib\VC\x64\MD' : null);
+    final opensslInclude =
+        Platform.environment['OPENSSL_INCLUDE_DIR'] ??
+        (Platform.isWindows ? r'C:\Program Files\OpenSSL\include' : null);
+    await FlutterRustBridgeNativeAssetsBuilder(
+      cratePath: 'rust',
+      extraCargoEnvironmentVariables: {
+        if (opensslDir != null) 'OPENSSL_DIR': opensslDir,
+        if (opensslLib != null) 'OPENSSL_LIB_DIR': opensslLib,
+        if (opensslInclude != null) 'OPENSSL_INCLUDE_DIR': opensslInclude,
+      },
+    ).run(input: input, output: output);
   });
 }

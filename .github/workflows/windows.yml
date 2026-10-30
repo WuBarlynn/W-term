@@ -27,6 +27,11 @@ jobs:
           toolchain: '1.98.1'
           components: rustfmt, clippy
       - run: flutter pub get --enforce-lockfile
+      - shell: pwsh
+        run: |
+          Write-Host "OPENSSL_DIR=$env:OPENSSL_DIR"
+          Get-Item "$env:OPENSSL_INCLUDE_DIR\openssl\ssl.h", "$env:OPENSSL_LIB_DIR\libcrypto.lib" -ErrorAction Stop |
+            Select-Object FullName
       - run: flutter build windows --release --verbose
       - shell: pwsh
         run: |
