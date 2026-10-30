@@ -15,7 +15,7 @@
 - [ ] 连接图标/在线图标搜索
 - [~] 临时终端（快速连接表单；无独立“临时终端”入口）
 - [~] 启动命令、环境变量（已实现单行启动命令与 `KEY=VALUE` 环境导出；尚未使用 SSH env 静默请求）
-- [~] CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts、Excel .xlsx 已支持；逐行密码导入尚未实现
+- [x] CSV/TSV（含密码列导入加密身份）、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts、Excel .xlsx
 - [~] 侧边栏 Shift/Ctrl 多选、批量收藏/删除已实现；批量打开未接入
 
 ## 终端工作区
@@ -72,7 +72,7 @@
 - [~] 启动静默检查/手动检查 GitHub Release；下载后校验 SHA256SUMS 再打开，失败拒绝；缺自动安装/重启与 iOS 更新流程
 - [ ] Web 端
 - [ ] Windows x86_64 苹果芯片双架构发布（当前 macOS arm64、Windows x64）
-- [ ] 桌面端托盘/全局快捷键/本地终端（按桌面平台能力）
+- [~] 桌面托盘/菜单栏入口（显示、新建连接、退出）已实现；全局快捷键和本地终端仍缺
 
 ## 同步、账号与协作
 
