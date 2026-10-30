@@ -22,6 +22,7 @@ import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
 import 'task_notifications.dart';
+import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
 
 import 'dart:async';
@@ -109,6 +110,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
     taskMonitor.addListener(_taskCompleted);
+    trayConnectRequests.addListener(_trayConnectRequested);
     unawaited(_restoreLayout());
     _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
   }
@@ -118,6 +120,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     taskMonitor.removeListener(_taskCompleted);
     taskMonitor.cancelAll();
+    trayConnectRequests.removeListener(_trayConnectRequested);
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     unawaited(_saveLayout());
@@ -789,6 +792,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
     }
     return offers;
+  }
+
+  void _trayConnectRequested() {
+    if (!mounted || connecting) return;
+    unawaited(connect());
   }
 
   void _taskCompleted() {

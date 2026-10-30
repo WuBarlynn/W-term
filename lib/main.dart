@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -9,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
+import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
 import 'app/plugins.dart';
@@ -56,6 +58,9 @@ Future<void> main(List<String> args) async {
           ? const WTermApp()
           : DetachedTerminalApp(payload: detached),
     );
+    if (detached == null && !Platform.isAndroid && !Platform.isIOS) {
+      unawaited(desktopTray.setup());
+    }
   } catch (error) {
     runApp(
       MaterialApp(
