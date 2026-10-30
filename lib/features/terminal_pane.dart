@@ -1,6 +1,7 @@
 import '../app/snippet_store.dart';
 import '../app/command_completion.dart';
 import '../app/keyword_highlights.dart';
+import '../app/shell_integration.dart';
 import 'keyword_highlight_dialog.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
@@ -836,6 +837,37 @@ class _TerminalPaneState extends State<TerminalPane> {
         context: context,
         builder: (_) => const KeywordHighlightDialog(),
       );
+    } else if (value == 'shell-integration') {
+      await shellIntegration();
+    }
+  }
+
+  Future<void> shellIntegration() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('启用目录上报'),
+        content: const Text(
+          '将向当前 shell 注入 OSC 7 提示符钩子，让文件面板跟随终端目录。'
+          '仅支持 bash/zsh，且只对当前会话生效；不会修改 .bashrc/.zshrc。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('启用'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    _sendInput('$shellDirectoryIntegrationCommand\n');
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已发送目录上报设置；文件面板可开启跟随')));
     }
   }
 

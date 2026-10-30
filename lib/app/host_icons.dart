@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'online_icons.dart';
+
 class HostIconOption {
   final String key, name, keywords;
   final IconData icon;
@@ -98,12 +100,7 @@ const hostIconCatalog = <HostIconOption>[
   HostIconOption('dns', 'DNS', 'dns domain 域名 解析', Icons.travel_explore),
   HostIconOption('proxy', '代理', 'proxy gateway 代理 网关', Icons.swap_horiz),
   HostIconOption('vpn', 'VPN', 'vpn tunnel 隧道', Icons.vpn_lock_outlined),
-  HostIconOption(
-    'firewall',
-    '防火墙',
-    'firewall 防火墙',
-    Icons.shield_outlined,
-  ),
+  HostIconOption('firewall', '防火墙', 'firewall 防火墙', Icons.shield_outlined),
   HostIconOption('key', '密钥', 'key ssh 密钥 凭证', Icons.key_outlined),
   HostIconOption('lock', '加密', 'lock encrypt 加密 锁', Icons.lock_outline),
   HostIconOption(
@@ -145,6 +142,21 @@ const hostIconCatalog = <HostIconOption>[
   HostIconOption('folder', '目录', 'folder 目录 文件夹', Icons.folder_outlined),
   HostIconOption('star', '重点', 'star favorite 重点 收藏', Icons.star_outline),
 ];
+
+Widget hostIconWidget(String icon, {double size = 18}) {
+  final url = onlineIconUrlFromStored(icon);
+  if (url == null) return Icon(hostIconFor(icon), size: size);
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(size * 0.22),
+    child: Image.network(
+      url.toString(),
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => Icon(hostIconFor(''), size: size),
+    ),
+  );
+}
 
 IconData hostIconFor(String key) {
   for (final option in hostIconCatalog) {

@@ -582,13 +582,13 @@ class HostsPageState extends State<HostsPage> {
                 ),
                 minLeadingWidth: 16,
                 horizontalTitleGap: 8,
-                leading: Icon(
-                  h.favorite ? Icons.star_rounded : hostIcon(h.icon),
-                  size: 16,
-                  color: h.favorite
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
+                leading: h.favorite
+                    ? Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : hostIconWidget(h.icon, size: 16),
                 title: Text(
                   h.name,
                   maxLines: 1,

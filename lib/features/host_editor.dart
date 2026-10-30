@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/host_store.dart';
 import '../app/host_icons.dart';
+import '../app/online_icons.dart';
 import '../app/identity_store.dart';
 import '../app/errors.dart';
 import '../app/proxy_store.dart';
@@ -358,7 +359,7 @@ class _HostEditorState extends State<HostEditor> {
                     ),
                     child: Row(
                       children: [
-                        Icon(hostIconFor(icon), size: 20),
+                        hostIconWidget(icon, size: 20),
                         const SizedBox(width: 10),
                         Text(
                           hostIconOption(icon)?.name ?? '默认服务器',
@@ -654,11 +655,30 @@ class _HostIconPickerDialog extends StatefulWidget {
 class _HostIconPickerDialogState extends State<_HostIconPickerDialog> {
   final search = TextEditingController();
   late List<HostIconOption> options = searchHostIcons('');
+  List<OnlineIcon> online = const [];
+  bool showOnline = false, onlineLoading = false;
+  String? onlineError;
 
   @override
   void dispose() {
     search.dispose();
     super.dispose();
+  }
+
+  Future<void> searchOnline() async {
+    setState(() {
+      onlineLoading = true;
+      onlineError = null;
+      showOnline = true;
+    });
+    try {
+      final result = await searchOnlineIcons(search.text);
+      if (mounted) setState(() => online = result);
+    } catch (e) {
+      if (mounted) setState(() => onlineError = '$e');
+    } finally {
+      if (mounted) setState(() => onlineLoading = false);
+    }
   }
 
   @override
@@ -677,12 +697,90 @@ class _HostIconPickerDialogState extends State<_HostIconPickerDialog> {
                 prefixIcon: Icon(Icons.search, size: 18),
                 hintText: '搜索图标名称或关键词，例如 数据库、docker、云',
               ),
-              onChanged: (value) =>
-                  setState(() => options = searchHostIcons(value)),
+              onChanged: (value) => setState(() {
+                options = searchHostIcons(value);
+                showOnline = false;
+              }),
             ),
-            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '内置图标；在线图标来自 Iconify，需要网络',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: onlineLoading ? null : searchOnline,
+                  icon: onlineLoading
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.public, size: 16),
+                  label: const Text('在线搜索'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Expanded(
-              child: options.isEmpty
+              child: showOnline
+                  ? onlineLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : onlineError != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  onlineError!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                const SizedBox(height: 8),
+                                OutlinedButton(
+                                  onPressed: searchOnline,
+                                  child: const Text('重试'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : online.isEmpty
+                        ? const Center(child: Text('没有匹配的在线图标'))
+                        : GridView.builder(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 5,
+                                  mainAxisExtent: 72,
+                                ),
+                            itemCount: online.length,
+                            itemBuilder: (context, index) {
+                              final icon = online[index];
+                              return Tooltip(
+                                message: icon.name,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => Navigator.pop(
+                                    context,
+                                    onlineIconFromSearchResult(icon.name),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Image.network(
+                                      icon.png.toString(),
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, _, _) => const Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                  : options.isEmpty
                   ? const Center(child: Text('没有匹配的图标'))
                   : GridView.builder(
                       gridDelegate:
