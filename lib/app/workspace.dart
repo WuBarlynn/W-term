@@ -2414,6 +2414,10 @@ class _TabViewState extends State<_TabView> {
           onSplitBack: widget.onSplitBack,
           onClosePane: widget.onClosePane,
           onDropTab: widget.onDropTab,
+          onOpenFiles: () => setState(() {
+            files = true;
+            openedFiles = true;
+          }),
           onLayoutChanged: () {
             if (mounted) setState(() {});
           },
@@ -2523,6 +2527,7 @@ class _PaneTree extends StatelessWidget {
     SplitEdge edge,
   )
   onDropTab;
+  final VoidCallback? onOpenFiles;
   final VoidCallback onLayoutChanged;
   const _PaneTree({
     required this.node,
@@ -2539,6 +2544,7 @@ class _PaneTree extends StatelessWidget {
     required this.onSplitBack,
     required this.onClosePane,
     required this.onDropTab,
+    this.onOpenFiles,
     required this.onLayoutChanged,
   });
 
@@ -2574,6 +2580,7 @@ class _PaneTree extends StatelessWidget {
       onBroadcastChanged: onBroadcastChanged,
       onShortcut: onShortcut,
       onReconnect: () => onReconnect(session.id),
+      onOpenFiles: onOpenFiles,
       onActivate: () => onActivate(session.id),
       onSplitHorizontal: () => onSplit(session.id, Axis.horizontal),
       onSplitVertical: () => onSplit(session.id, Axis.vertical),
@@ -2657,6 +2664,7 @@ class _PaneTree extends StatelessWidget {
             onSplitBack: onSplitBack,
             onClosePane: onClosePane,
             onDropTab: onDropTab,
+            onOpenFiles: onOpenFiles,
             onLayoutChanged: onLayoutChanged,
           ),
         );
@@ -2677,6 +2685,7 @@ class _PaneTree extends StatelessWidget {
             onSplitBack: onSplitBack,
             onClosePane: onClosePane,
             onDropTab: onDropTab,
+            onOpenFiles: onOpenFiles,
             onLayoutChanged: onLayoutChanged,
           ),
         );

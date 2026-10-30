@@ -27,6 +27,7 @@ class TerminalPane extends StatefulWidget {
   final ValueChanged<BroadcastScope>? onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
   final VoidCallback? onReconnect;
+  final VoidCallback? onOpenFiles;
   final VoidCallback onActivate;
   final VoidCallback? onSplitHorizontal;
   final VoidCallback? onSplitVertical;
@@ -42,6 +43,7 @@ class TerminalPane extends StatefulWidget {
     this.onBroadcastChanged,
     this.onShortcut,
     this.onReconnect,
+    this.onOpenFiles,
     required this.onActivate,
     this.onSplitHorizontal,
     this.onSplitVertical,
@@ -154,6 +156,15 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (validateSnippetCommand(command) != null) return;
     widget.session.terminal.paste(command);
     _focus();
+  }
+
+  Future<void> _copyAll() async {
+    final buffer = StringBuffer();
+    final lines = widget.session.terminal.buffer.lines;
+    for (var i = 0; i < lines.length; i++) {
+      buffer.writeln(lines[i].getText());
+    }
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
   }
 
   Future<void> copy() async {
@@ -532,15 +543,29 @@ class _TerminalPaneState extends State<TerminalPane> {
                       details.globalPosition.dx,
                       details.globalPosition.dy,
                     ),
-                    items: const [
-                      PopupMenuItem(value: 'copy', child: Text('复制')),
-                      PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                    items: [
+                      const PopupMenuItem(value: 'copy', child: Text('复制')),
+                      const PopupMenuItem(
+                        value: 'copy-all',
+                        child: Text('全选并复制'),
+                      ),
+                      if (!ended)
+                        const PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                      if (widget.onOpenFiles != null)
+                        const PopupMenuItem(
+                          value: 'files',
+                          child: Text('打开文件面板'),
+                        ),
                     ],
                   );
                   if (selected == 'copy') {
                     await copy();
+                  } else if (selected == 'copy-all') {
+                    await _copyAll();
                   } else if (selected == 'paste') {
                     await paste();
+                  } else if (selected == 'files') {
+                    widget.onOpenFiles?.call();
                   }
                 },
               ),
