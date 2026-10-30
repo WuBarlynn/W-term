@@ -687,8 +687,9 @@ fn read_private_key(db: &Connection, id: &str) -> Result<russh::keys::PrivateKey
             },
         )
         .map_err(|_| anyhow!("私钥身份不存在"))?;
+    let (key_text, _) = crate::session::split_key_material(&private_key)?;
     let key = russh::keys::decode_secret_key(
-        &private_key,
+        key_text,
         if passphrase.is_empty() {
             None
         } else {

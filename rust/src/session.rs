@@ -345,6 +345,26 @@ pub(crate) async fn authenticate_jump(
     .await
 }
 
+/// Separates an OpenSSH private key from an optional certificate appended in
+/// the same encrypted credential. Returns the key text and certificate PEM.
+pub(crate) fn split_key_material(material: &str) -> Result<(&str, Option<&str>)> {
+    const BEGIN: &str = "-----BEGIN OPENSSH CERTIFICATE-----";
+    const END: &str = "-----END OPENSSH CERTIFICATE-----";
+    let Some(start) = material.find(BEGIN) else {
+        return Ok((material.trim(), None));
+    };
+    let rest = &material[start..];
+    let Some(offset) = rest.find(END) else {
+        bail!("SSH 证书不完整");
+    };
+    let end = start + offset + END.len();
+    let key = material[..start].trim();
+    if key.is_empty() {
+        bail!("SSH 证书缺少私钥");
+    }
+    Ok((key, Some(&material[start..end])))
+}
+
 async fn authenticate_inner(
     id: &str,
     approved: &str,
@@ -388,8 +408,9 @@ async fn authenticate_inner(
                     .await
                     .map_err(anyhow::Error::from)
             } else {
+                let (key_text, certificate) = split_key_material(private_key.as_str())?;
                 let key = russh::keys::decode_secret_key(
-                    private_key.as_str(),
+                    key_text,
                     if passphrase.is_empty() {
                         None
                     } else {
@@ -397,14 +418,26 @@ async fn authenticate_inner(
                     },
                 )
                 .context("Cannot decrypt or parse private key")?;
-                let hash = handle.best_supported_rsa_hash().await?.flatten();
-                handle
-                    .authenticate_publickey(
-                        &username,
-                        PrivateKeyWithHashAlg::new(Arc::new(key), hash),
-                    )
-                    .await
-                    .map_err(anyhow::Error::from)
+                if let Some(certificate_text) = certificate {
+                    let certificate = russh::keys::Certificate::from_openssh(certificate_text)
+                        .context("Cannot parse SSH certificate")?;
+                    if certificate.public_key() != key.public_key().key_data() {
+                        bail!("SSH 证书与私钥不匹配");
+                    }
+                    handle
+                        .authenticate_openssh_cert(&username, Arc::new(key), certificate)
+                        .await
+                        .map_err(anyhow::Error::from)
+                } else {
+                    let hash = handle.best_supported_rsa_hash().await?.flatten();
+                    handle
+                        .authenticate_publickey(
+                            &username,
+                            PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                        )
+                        .await
+                        .map_err(anyhow::Error::from)
+                }
             }
         })
         .await
@@ -742,6 +775,19 @@ mod tests {
         .await
         .is_err());
     }
+    #[test]
+    fn splits_openssh_certificate_from_private_key() {
+        let key = "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----";
+        let cert = "-----BEGIN OPENSSH CERTIFICATE-----\nxyz\n-----END OPENSSH CERTIFICATE-----";
+        let material = format!("{key}\n{cert}\n");
+        let (split_key, split_cert) = split_key_material(&material).unwrap();
+        assert_eq!(split_key, key);
+        assert_eq!(split_cert, Some(cert));
+        let (plain, none) = split_key_material(key).unwrap();
+        assert_eq!(plain, key);
+        assert!(none.is_none());
+    }
+
     #[tokio::test]
     #[ignore = "Run scripts/test-core.sh to start the loopback fixture"]
     async fn fixture_encrypted_private_key_and_terminal() {

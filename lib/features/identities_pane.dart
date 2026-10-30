@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:file_selector/file_selector.dart';
 
 import '../app/identity_store.dart';
+import '../app/ssh_key_material.dart';
 import '../app/errors.dart';
 
 class IdentitiesPane extends StatefulWidget {
@@ -352,6 +353,7 @@ class _IdentityEditorState extends State<IdentityEditor> {
       passphrase = TextEditingController();
   late String kind = widget.identity?.kind ?? 'key';
   late bool replace = widget.identity == null;
+  String certificate = '', certificateName = '';
   String? error;
   @override
   void dispose() {
@@ -360,6 +362,28 @@ class _IdentityEditorState extends State<IdentityEditor> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> importCertificate() async {
+    try {
+      final file = await openFile();
+      if (file == null) return;
+      if (await file.length() > 32768) {
+        throw const FormatException('证书不能超过 32 KiB');
+      }
+      final value = await file.readAsString();
+      final issue = sshCertificateError(value);
+      if (issue != null) throw FormatException(issue);
+      if (mounted) {
+        setState(() {
+          certificate = value.trim();
+          certificateName = file.name;
+          error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    }
   }
 
   Future<void> importKey() async {
@@ -387,7 +411,9 @@ class _IdentityEditorState extends State<IdentityEditor> {
         kind: kind,
         replaceSecret: replace,
         password: replace && kind == 'password' ? password.text : '',
-        privateKey: replace && kind == 'key' ? keyText.text : '',
+        privateKey: replace && kind == 'key'
+            ? keyWithSshCertificate(keyText.text, certificate)
+            : '',
         passphrase: replace && kind == 'key' ? passphrase.text : '',
       ),
     );
@@ -469,6 +495,34 @@ class _IdentityEditorState extends State<IdentityEditor> {
                     validator: (v) =>
                         v == null || v.isEmpty ? '请输入或导入私钥' : null,
                   ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: importCertificate,
+                    icon: const Icon(Icons.verified_outlined),
+                    label: Text(
+                      certificateName.isEmpty
+                          ? '导入 OpenSSH 证书（可选）'
+                          : certificateName,
+                    ),
+                  ),
+                  if (certificate.isNotEmpty)
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '证书将与私钥一起加密保存',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() {
+                            certificate = '';
+                            certificateName = '';
+                          }),
+                          child: const Text('移除证书'),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: passphrase,

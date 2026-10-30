@@ -1,4 +1,5 @@
 import '../app/errors.dart';
+import '../app/ssh_key_material.dart';
 import '../app/host_store.dart';
 
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ class _ConnectDialogState extends State<ConnectDialog> {
   late final username = TextEditingController(text: widget.profile?.username);
   final password = TextEditingController();
   final passphrase = TextEditingController();
-  String key = '', keyName = '';
+  String key = '', keyName = '', certificate = '', certificateName = '';
   bool useKey = false;
   String? error;
   @override
@@ -54,6 +55,7 @@ class _ConnectDialogState extends State<ConnectDialog> {
       c.dispose();
     }
     key = '';
+    certificate = '';
     super.dispose();
   }
 
@@ -76,6 +78,28 @@ class _ConnectDialogState extends State<ConnectDialog> {
     }
   }
 
+  Future<void> importCertificate() async {
+    try {
+      final file = await openFile();
+      if (file == null) return;
+      if (await file.length() > 32768) {
+        throw const FormatException('证书不能超过 32 KiB');
+      }
+      final value = await file.readAsString();
+      final issue = sshCertificateError(value);
+      if (issue != null) throw FormatException(issue);
+      if (mounted) {
+        setState(() {
+          certificate = value.trim();
+          certificateName = file.name;
+          error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    }
+  }
+
   void submit() {
     if (!form.currentState!.validate()) return;
     if (useKey && key.isEmpty) {
@@ -89,7 +113,7 @@ class _ConnectDialogState extends State<ConnectDialog> {
         port: int.parse(port.text),
         username: username.text.trim(),
         password: useKey ? '' : password.text,
-        privateKey: useKey ? key : '',
+        privateKey: useKey ? keyWithSshCertificate(key, certificate) : '',
         passphrase: useKey ? passphrase.text : '',
       ),
     );
@@ -181,6 +205,33 @@ class _ConnectDialogState extends State<ConnectDialog> {
                   icon: const Icon(Icons.upload_file),
                   label: Text(keyName.isEmpty ? '选择私钥文件' : keyName),
                 ),
+                OutlinedButton.icon(
+                  onPressed: importCertificate,
+                  icon: const Icon(Icons.verified_outlined),
+                  label: Text(
+                    certificateName.isEmpty
+                        ? '导入 OpenSSH 证书（可选）'
+                        : certificateName,
+                  ),
+                ),
+                if (certificate.isNotEmpty)
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '连接后证书随私钥使用，不单独保存',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() {
+                          certificate = '';
+                          certificateName = '';
+                        }),
+                        child: const Text('移除'),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: passphrase,
