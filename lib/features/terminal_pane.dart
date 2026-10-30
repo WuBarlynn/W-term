@@ -23,6 +23,7 @@ import 'package:xterm/xterm.dart';
 import '../app/terminal_session.dart';
 import '../app/pinned_commands.dart';
 import '../app/plugins.dart';
+import '../src/rust/api/client.dart' as native;
 import '../app/errors.dart';
 import '../app/workspace_layout.dart';
 
@@ -446,6 +447,8 @@ class _TerminalPaneState extends State<TerminalPane> {
               ),
             ),
           ),
+          if (!compact && !ended && widget.active)
+            _LatencyBadge(connectionId: widget.session.connectionId),
           if (ended && widget.onReconnect != null)
             IconButton(
               tooltip: '重新连接',
@@ -850,4 +853,72 @@ class _TerminalPaneState extends State<TerminalPane> {
       ),
     ),
   );
+}
+
+class _LatencyBadge extends StatefulWidget {
+  final String connectionId;
+  const _LatencyBadge({required this.connectionId});
+  @override
+  State<_LatencyBadge> createState() => _LatencyBadgeState();
+}
+
+class _LatencyBadgeState extends State<_LatencyBadge> {
+  Timer? timer;
+  int? millis;
+
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(seconds: 10), (_) => check());
+    Future<void>.delayed(const Duration(seconds: 2), check);
+  }
+
+  Future<void> check() async {
+    final watch = Stopwatch()..start();
+    try {
+      await native.runCommand(
+        connectionId: widget.connectionId,
+        command: 'true',
+      );
+      watch.stop();
+      if (mounted) setState(() => millis = watch.elapsedMilliseconds);
+    } catch (_) {
+      if (mounted) setState(() => millis = null);
+    }
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = millis;
+    final color = value == null
+        ? Colors.grey
+        : value < 100
+        ? const Color(0xff71cba2)
+        : value < 300
+        ? const Color(0xffffc66d)
+        : const Color(0xffff8a80);
+    return Tooltip(
+      message: value == null ? 'SSH 延迟未知' : 'SSH 命令往返延迟 $value ms',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.network_check, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              value == null ? '--' : '$value ms',
+              style: TextStyle(color: color, fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
