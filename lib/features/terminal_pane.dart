@@ -496,8 +496,14 @@ class _TerminalPaneState extends State<TerminalPane> {
                 padding: const EdgeInsets.all(12),
                 textStyle: TerminalStyle(
                   fontSize: terminalAppearance.fontSize.toDouble(),
-                  fontFamily: 'Menlo',
-                  fontFamilyFallback: ['monospace'],
+                  fontFamily:
+                      Theme.of(context).platform == TargetPlatform.windows
+                      ? 'Microsoft YaHei'
+                      : 'Menlo',
+                  fontFamilyFallback:
+                      Theme.of(context).platform == TargetPlatform.windows
+                      ? const ['Cascadia Mono', 'Consolas', 'monospace']
+                      : const ['monospace'],
                 ),
                 onSecondaryTapDown: (details, _) async {
                   final selected = await showMenu<String>(

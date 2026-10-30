@@ -55,6 +55,18 @@ jobs:
           }
           Write-Host "wterm.exe started successfully (PID $($p.Id))"
           Stop-Process -Id $p.Id -Force
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $version = (Select-String -Path pubspec.yaml '^version:\s*(.+)$').Matches[0].Groups[1].Value.Trim()
+          $parts = $version.Split('+')
+          $short = $parts[0]
+          $build = if ($parts.Length -gt 1) { $parts[1] } else { '0' }
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+          & $iscc "/DAppVersion=$short" "/DAppBuild=$build" installer\wterm.iss
+          Get-ChildItem build\windows\installer
       - name: Upload native asset logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -69,4 +81,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: wterm-windows-release
-          path: build/windows/x64/runner/Release/
+          path: |
+            build/windows/x64/runner/Release/
+            build/windows/installer/*.exe

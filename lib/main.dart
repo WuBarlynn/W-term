@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'src/rust/frb_generated.dart';
@@ -32,6 +33,7 @@ class WTermApp extends StatelessWidget {
   final Widget? home;
   const WTermApp({super.key, this.home});
   ThemeData theme(Brightness brightness) {
+    final windows = defaultTargetPlatform == TargetPlatform.windows;
     final scheme = ColorScheme.fromSeed(
       seedColor: const Color(0xff167768),
       brightness: brightness,
@@ -40,6 +42,7 @@ class WTermApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: scheme,
       brightness: brightness,
+      fontFamily: windows ? 'Microsoft YaHei' : null,
       scaffoldBackgroundColor: brightness == Brightness.light
           ? const Color(0xfffafbfc)
           : const Color(0xff171c22),
