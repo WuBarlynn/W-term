@@ -778,6 +778,12 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   Future<void> paneMenu(String value) async {
+    if (widget.session.isLocal &&
+        const {'ai', 'tmux', 'monitor'}.contains(value)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('本地终端不支持该远程功能')));
+      return;
+    }
     if (value == 'reconnect') {
       widget.onReconnect?.call();
     } else if (value == 'ai') {

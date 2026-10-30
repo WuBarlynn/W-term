@@ -323,6 +323,55 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> openLocalTerminal() async {
+    if (!(Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      message('本地终端仅支持桌面平台。');
+      return;
+    }
+    final username = Platform.isWindows
+        ? (Platform.environment['USERNAME'] ?? 'local')
+        : (Platform.environment['USER'] ?? 'local');
+    late final TerminalSession terminal;
+    terminal = TerminalSession.local(
+      host: 'localhost',
+      username: username,
+      onEnded: () => _terminalEnded(terminal.connectionId),
+      onActivity: () => taskMonitor.activity(terminal.connectionId),
+      onCommand: (command) {
+        unawaited(
+          commandHistory.record(
+            command: command,
+            host: 'localhost',
+            username: username,
+          ),
+        );
+        taskMonitor.commandSubmitted(
+          terminal.connectionId,
+          command,
+          title: '$username@localhost',
+        );
+      },
+    );
+    final session = _Session(
+      terminal.connectionId,
+      'localhost',
+      username,
+      '',
+      terminal,
+    );
+    setState(() {
+      sessions.add(session);
+      tabs.add(
+        WorkspaceTab(
+          id: HostProfile.newId(),
+          root: SessionPane(session.id),
+          activeSessionId: session.id,
+        ),
+      );
+      selected = tabs.length - 1;
+    });
+  }
+
   Future<void> connect([HostProfile? profile, _Session? replace]) async {
     if (connecting) return;
     final currentAttempt = ++attempt;
@@ -1108,7 +1157,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
 
   void _reconnectById(String id) {
     final session = _sessionById(id);
-    if (session != null) unawaited(_reconnect(session));
+    if (session == null) return;
+    if (session.terminal.isLocal) {
+      message('本地终端不支持重连，请新建本地终端。');
+      return;
+    }
+    unawaited(_reconnect(session));
   }
 
   static String _shellQuote(String value) =>
@@ -2172,6 +2226,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         await _checkUpdates();
       case 'temporary':
         await connect();
+      case 'local-terminal':
+        await openLocalTerminal();
       case 'lock':
         widget.onLock?.call();
       case 'focus':
@@ -2196,6 +2252,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       popupItem('vault', Icons.security_outlined, '保险库与备份'),
     popupItem('known', Icons.verified_user_outlined, '服务器指纹'),
     popupItem('temporary', Icons.bolt, '临时终端'),
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+      popupItem('local-terminal', Icons.computer, '本地终端'),
     if (widget.onLock != null) popupItem('lock', Icons.lock_outline, '锁定保险库'),
   ];
 
@@ -2970,17 +3028,18 @@ class _TabViewState extends State<_TabView> {
                             ),
                           ),
                   ),
-                  TextButton.icon(
-                    onPressed: () => setState(() {
-                      files = !files;
-                      openedFiles = true;
-                    }),
-                    icon: Icon(
-                      files ? Icons.terminal : Icons.folder_outlined,
-                      size: 17,
+                  if (!active.terminal.isLocal)
+                    TextButton.icon(
+                      onPressed: () => setState(() {
+                        files = !files;
+                        openedFiles = true;
+                      }),
+                      icon: Icon(
+                        files ? Icons.terminal : Icons.folder_outlined,
+                        size: 17,
+                      ),
+                      label: Text(files ? '终端' : '文件'),
                     ),
-                    label: Text(files ? '终端' : '文件'),
-                  ),
                 ],
               ),
             ),
@@ -2997,7 +3056,7 @@ class _TabViewState extends State<_TabView> {
                       ],
                     ),
                   ),
-                  if (openedFiles && split) ...[
+                  if (!active.terminal.isLocal && openedFiles && split) ...[
                     if (files) _fileResizeHandle(),
                     if (files)
                       SizedBox(width: filePaneWidth, child: filesPane)

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_pty/flutter_pty.dart';
 import 'package:xterm/xterm.dart';
 
 import '../src/rust/api/client.dart' as native;
@@ -30,6 +32,9 @@ class TerminalSession extends ChangeNotifier {
   Future<void> _writes = Future.value();
   Timer? _resizeTimer;
   bool _ended = false, _closed = false, _handedOff = false, _handingOff = false;
+  bool _local = false;
+  Pty? _pty;
+  StreamSubscription<String>? _localOutput;
   final bool _offline;
   String? _error;
   int? _lastColumns, _lastRows;
@@ -67,6 +72,61 @@ class TerminalSession extends ChangeNotifier {
     if (snapshot.isNotEmpty) terminal.write(snapshot);
     _startLive();
   }
+
+  /// A desktop local shell backed by a real PTY; it never touches Rust/SSH.
+  TerminalSession.local({
+    required this.host,
+    required this.username,
+    required this.onEnded,
+    this.onCommand,
+    this.onActivity,
+    this.onZmodemOffer,
+    this.onZmodemRequest,
+    this.hostId = '',
+  }) : connectionId =
+           'local-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
+       _offline = false {
+    _local = true;
+    terminal.onOutput = send;
+    terminal.onResize = _resize;
+    unawaited(_startLocalPty());
+  }
+
+  Future<void> _startLocalPty() async {
+    if (_closed) return;
+    final executable = Platform.isWindows
+        ? (Platform.environment['COMSPEC'] ?? 'cmd.exe')
+        : (Platform.environment['SHELL'] ?? '/bin/zsh');
+    try {
+      final pty = Pty.start(
+        executable,
+        arguments: Platform.isWindows ? const [] : const ['-l'],
+        rows: 24,
+        columns: 80,
+        environment: const {'TERM': 'xterm-256color'},
+      );
+      if (_closed) {
+        pty.kill();
+        return;
+      }
+      _pty = pty;
+      _localOutput = utf8.decoder
+          .bind(pty.output)
+          .listen(
+            (text) {
+              onActivity?.call();
+              terminal.write(text);
+            },
+            onError: (Object error) => _finish(userFacingError(error)),
+            onDone: () => _finish(null),
+          );
+      unawaited(pty.exitCode.then((_) => _finish(null)));
+    } catch (e) {
+      _finish(userFacingError(e));
+    }
+  }
+
+  bool get isLocal => _local;
 
   void _startLive() {
     final mux = ZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
@@ -162,7 +222,7 @@ class TerminalSession extends ChangeNotifier {
   /// Hands the Rust output receiver to another engine without disconnecting.
   /// Returns the scrollback snapshot for the new view.
   Future<String> detachForHandoff() async {
-    if (_handedOff || _closed || _offline) {
+    if (_handedOff || _closed || _offline || _local) {
       throw StateError('该会话不能转移到新窗口');
     }
     final snapshot = _bufferText();
@@ -202,6 +262,10 @@ class TerminalSession extends ChangeNotifier {
         onCommand?.call(command);
       }
     }
+    if (_local) {
+      _pty?.write(Uint8List.fromList(utf8.encode(text)));
+      return;
+    }
     _writes = _writes
         .then(
           (_) => native.writeTerminal(
@@ -223,6 +287,10 @@ class TerminalSession extends ChangeNotifier {
       if (_ended || _closed) return;
       final c = _lastColumns, r = _lastRows;
       if (c == null || r == null) return;
+      if (_local) {
+        _pty?.resize(r, c);
+        return;
+      }
       unawaited(
         native
             .resizeTerminal(connectionId: connectionId, columns: c, rows: r)
@@ -250,7 +318,16 @@ class TerminalSession extends ChangeNotifier {
       _ended = true;
       terminal.write('\r\n\x1b[90m连接已结束\x1b[0m\r\n');
     }
-    if (!_offline) {
+    if (_local) {
+      _resizeTimer?.cancel();
+      terminal.onOutput = null;
+      terminal.onResize = null;
+      terminal.onPrivateOSC = null;
+      _pty?.kill();
+      _pty = null;
+      await _localOutput?.cancel();
+      _localOutput = null;
+    } else if (!_offline) {
       // Disconnect first: it closes the Rust output/ack channels, which lets a
       // pending terminalOutput stream subscription cancel instead of waiting
       // for its 60-second acknowledgement timeout.
