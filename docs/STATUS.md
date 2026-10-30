@@ -7,7 +7,7 @@
 - Windows 检查更新后可“下载并安装”：确认后校验 SHA256，启动 Inno Setup `/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS`，应用退出并由安装器重启；macOS 仍下载并打开 DMG，iOS 仍不提供自动安装。
 - 可选自动加密同步（默认关闭，设置菜单切换）：配置并初始化 GitHub 同步后最多每 15 分钟运行一次；存在待处理批次、未保存令牌或未初始化时跳过。
 - 自动同步发现冲突只提示并提供“审阅”，绝不自动选择本机/远端版本；同步失败显示错误。
-- 验证：Flutter 全量 262 项通过（`build/flutter-tests-1.0.18.log`）；macOS/Windows 构建与 CI 结果见发布证据；Windows 静默安装与自动同步未在真实 Windows/GitHub 环境执行。
+- 验证：Flutter 全量 263 项通过（`build/flutter-tests-1.0.18.log`）；macOS/Windows 构建与 CI 结果见发布证据；Windows 静默安装与自动同步未在真实 Windows/GitHub 环境执行。
 
 ## 1.0.17 桌面本地 Shell（2026-10-30）
 
