@@ -23,7 +23,6 @@ jobs:
           toolchain: '1.98.1'
           components: rustfmt, clippy
       - run: flutter pub get --enforce-lockfile
-      - run: cargo test --manifest-path rust/Cargo.toml --locked
       - run: flutter build windows --release --verbose
       - shell: pwsh
         run: ./scripts/verify-windows-version.ps1
@@ -37,6 +36,7 @@ jobs:
             .dart_tool/hooks_runner/**/stderr.txt
             build/native_assets/**
           if-no-files-found: ignore
+      - run: cargo test --manifest-path rust/Cargo.toml --locked
       - uses: actions/upload-artifact@v4
         with:
           name: wterm-windows-release
