@@ -158,6 +158,51 @@ class _TerminalPaneState extends State<TerminalPane> {
     _focus();
   }
 
+  Future<void> formatJson() async {
+    final selection = controller.selection;
+    if (selection == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先在终端中选中 JSON')));
+      return;
+    }
+    final raw = widget.session.terminal.buffer.getText(selection);
+    String formatted;
+    try {
+      formatted = const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
+    } on FormatException {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('选中的内容不是有效 JSON')));
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('JSON 格式化'),
+        content: SizedBox(
+          width: 640,
+          height: 460,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              formatted,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: formatted)),
+            child: const Text('复制'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _copyAll() async {
     final buffer = StringBuffer();
     final lines = widget.session.terminal.buffer.lines;
@@ -556,6 +601,10 @@ class _TerminalPaneState extends State<TerminalPane> {
                           value: 'files',
                           child: Text('打开文件面板'),
                         ),
+                      const PopupMenuItem(
+                        value: 'json',
+                        child: Text('格式化选中 JSON'),
+                      ),
                     ],
                   );
                   if (selected == 'copy') {
@@ -566,6 +615,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                     await paste();
                   } else if (selected == 'files') {
                     widget.onOpenFiles?.call();
+                  } else if (selected == 'json') {
+                    await formatJson();
                   }
                 },
               ),
