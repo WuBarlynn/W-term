@@ -15,7 +15,6 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const WTermApp(home: Workspace()));
       expect(find.text('你的服务器，触手可及。'), findsOneWidget);
-      expect(find.text('服务器指纹'), findsOneWidget);
       await tester.tap(find.text('连接服务器'));
       await tester.pumpAndSettle();
       expect(find.text('新建 SSH 连接'), findsOneWidget);

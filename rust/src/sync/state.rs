@@ -45,27 +45,45 @@ impl Policy {
             if record.key.kind != Kind::Host {
                 continue;
             }
-            let Some(id) = record
-                .value
-                .as_ref()
-                .and_then(|v| v.get("identityId"))
-                .and_then(Value::as_str)
-                .filter(|id| !id.is_empty())
-            else {
+            let Some(value) = record.value.as_ref() else {
                 continue;
             };
-            let identity = Key {
-                kind: Kind::Identity,
-                id: id.into(),
-            };
-            edges
-                .entry(record.key.clone())
-                .or_default()
-                .insert(identity.clone());
-            edges
-                .entry(identity)
-                .or_default()
-                .insert(record.key.clone());
+            let identity = value
+                .get("identityId")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty());
+            if let Some(id) = identity {
+                let identity = Key {
+                    kind: Kind::Identity,
+                    id: id.into(),
+                };
+                edges
+                    .entry(record.key.clone())
+                    .or_default()
+                    .insert(identity.clone());
+                edges
+                    .entry(identity)
+                    .or_default()
+                    .insert(record.key.clone());
+            }
+            for id in value
+                .get("jumpHostIds")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter(|id| !id.is_empty())
+            {
+                let jump = Key {
+                    kind: Kind::Host,
+                    id: id.into(),
+                };
+                edges
+                    .entry(record.key.clone())
+                    .or_default()
+                    .insert(jump.clone());
+                edges.entry(jump).or_default().insert(record.key.clone());
+            }
         }
         let mut excluded = self.local_only.clone();
         let mut queue: std::collections::VecDeque<_> = excluded.iter().cloned().collect();
@@ -481,6 +499,10 @@ fn prepare_inner(
         review::resolve(&mut plan, choices, &state.device)?;
     }
     if !plan.is_resolved() {
+        ensure!(
+            !plan.conflicts().is_empty(),
+            "同步数据包含缺失的跳板主机引用，已阻止写入"
+        );
         review::save(
             &tx,
             generation,
@@ -503,11 +525,17 @@ fn prepare_inner(
     );
     combined.records.sort_by(|a, b| a.key.cmp(&b.key));
     let missing_identities = vault::missing_identities(&combined);
+    let missing_jump_hosts = vault::missing_jump_hosts(&combined);
+    ensure!(
+        missing_jump_hosts.is_empty(),
+        "同步数据包含缺失的跳板主机引用，已阻止写入"
+    );
     let local_plan = MergePlan {
         merged: combined,
         expected_local: full,
         conflicts: vec![],
         missing_identities,
+        missing_jump_hosts,
     };
     vault::apply_in_transaction(&tx, &local_plan)?;
     let pending = PendingUpload {

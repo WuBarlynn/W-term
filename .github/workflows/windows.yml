@@ -1,0 +1,31 @@
+name: Windows preview
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.98.1'
+          components: rustfmt, clippy
+      - run: flutter pub get --enforce-lockfile
+      - run: cargo test --manifest-path rust/Cargo.toml --locked
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wterm-windows-release
+          path: build/windows/x64/runner/Release/

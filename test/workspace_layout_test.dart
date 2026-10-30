@@ -4,6 +4,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wterm/app/host_store.dart';
 import 'package:wterm/app/workspace.dart';
 import 'package:wterm/app/snippet_store.dart';
+import 'package:wterm/app/identity_store.dart';
+import 'package:wterm/app/sync_store.dart';
+import 'package:wterm/app/proxy_store.dart';
+import 'package:wterm/src/rust/api/proxy.dart';
+import 'package:wterm/features/proxy_dialog.dart';
+
+class FullSidebarStore extends OfflineSnippetStore
+    implements
+        IdentityStore,
+        SyncStore,
+        VaultMaintenance,
+        ConnectionProxyStore {
+  @override
+  Future<ProxySettings> proxySettings() async => const ProxySettings(
+    mode: 'direct',
+    host: '',
+    port: 1080,
+    authenticate: false,
+    username: '',
+    passwordSaved: false,
+  );
+  @override
+  Future<List<ProxyProfile>> proxyProfiles() async => [];
+  @override
+  Future<String> hostProxyBinding(String hostId) async => '';
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class OfflineSnippetStore extends KeychainHostStore implements SnippetStore {
   @override
@@ -18,6 +46,30 @@ class OfflineSnippetStore extends KeychainHostStore implements SnippetStore {
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  testWidgets(
+    'full sidebar remains scrollable in landscape and opens proxy settings',
+    (tester) async {
+      tester.view.physicalSize = const Size(844, 390);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Workspace(hostStore: FullSidebarStore(), onLock: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byTooltip('设置与工具'));
+      await tester.tap(find.byTooltip('设置与工具'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('连接代理'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProxyDialog), findsOneWidget);
+      expect(find.text('直接连接'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   for (final width in [390.0, 1000.0]) {
     testWidgets('offline snippet sidebar works at width $width', (
       tester,
@@ -34,6 +86,9 @@ void main() {
         await tester.tap(find.byTooltip('主机管理'));
         await tester.pumpAndSettle();
       }
+      await tester.ensureVisible(find.byTooltip('设置与工具'));
+      await tester.tap(find.byTooltip('设置与工具'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('命令片段'));
       await tester.pumpAndSettle();
       expect(find.text('Offline command'), findsOneWidget);
@@ -136,4 +191,32 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('desktop sidebar collapses to a rail and expands', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = KeychainHostStore();
+    await store.write([
+      HostProfile(
+        id: 'a',
+        name: 'API Server',
+        host: 'example.com',
+        username: 'alice',
+      ),
+    ]);
+    await tester.pumpWidget(MaterialApp(home: Workspace(hostStore: store)));
+    await tester.pumpAndSettle();
+    expect(find.text('API Server'), findsOneWidget);
+    await tester.tap(find.byTooltip('收起主机列表'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Server'), findsNothing);
+    expect(find.byTooltip('展开主机列表'), findsOneWidget);
+    await tester.tap(find.byTooltip('展开主机列表'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Server'), findsOneWidget);
+  });
 }

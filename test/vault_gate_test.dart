@@ -148,7 +148,7 @@ void main() {
       expect(find.text('Private host'), findsOneWidget);
       expect(service.vault.folders, ['Work']);
       expect((await old.read()).length, 1);
-      await tester.tap(find.text('锁定保险库'));
+      await tester.tap(find.byTooltip('锁定保险库'));
       await tester.pumpAndSettle();
       expect(service.vault.locked, isTrue);
       expect(find.text('Private host'), findsNothing);
@@ -224,36 +224,34 @@ void main() {
       expect(service.vault.locked, isTrue);
     },
   );
-  testWidgets(
-    'biometric unlock bypasses password form and does not repeat on resume',
-    (tester) async {
-      final service = FakeService()..hasVault = true;
-      final quick = FakeQuickUnlock();
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData(platform: TargetPlatform.iOS),
-          home: VaultGate(service: service, quickUnlock: quick),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('使用 Face ID 解锁'));
-      await tester.pumpAndSettle();
-      expect(service.modes, [false]);
-      expect(quick.reads, 1);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      await tester.pump();
-      expect(vaultPrivacy.value, isTrue);
-      expect(service.vault.locked, isFalse);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(quick.reads, 1);
-      expect(vaultPrivacy.value, isFalse);
-    },
-  );
+  testWidgets('biometric unlock is automatic and does not repeat on resume', (
+    tester,
+  ) async {
+    final service = FakeService()..hasVault = true;
+    final quick = FakeQuickUnlock();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: VaultGate(service: service, quickUnlock: quick),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(service.modes, [false]);
+    expect(quick.reads, 1);
+    expect(find.text('解锁保险库'), findsNothing);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(vaultPrivacy.value, isTrue);
+    expect(service.vault.locked, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(quick.reads, 1);
+    expect(vaultPrivacy.value, isFalse);
+  });
   testWidgets('cancelled biometrics retains master password fallback', (
     tester,
   ) async {

@@ -37,10 +37,10 @@ class FilesPane extends StatefulWidget {
     this.dropActive = true,
   });
   @override
-  State<FilesPane> createState() => _FilesPaneState();
+  State<FilesPane> createState() => FilesPaneState();
 }
 
-class _FilesPaneState extends State<FilesPane> {
+class FilesPaneState extends State<FilesPane> {
   native.DirectoryListing? listing;
   String? error;
   bool busy = false, dragging = false;
@@ -70,6 +70,8 @@ class _FilesPaneState extends State<FilesPane> {
     search.dispose();
     super.dispose();
   }
+
+  Future<void> refresh() => load(listing?.path ?? '.');
 
   Future<void> load(String target, {int? historyIndex}) async {
     if (busy) return;

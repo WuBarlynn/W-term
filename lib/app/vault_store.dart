@@ -5,10 +5,15 @@ import 'package:path_provider/path_provider.dart';
 
 import '../src/rust/api/vault.dart' as native;
 import 'host_store.dart';
+import 'forward_store.dart';
 import 'quick_unlock.dart';
 import 'identity_store.dart';
 import 'snippet_store.dart';
 import 'sync_store.dart';
+import 'proxy_store.dart';
+import '../src/rust/api/client.dart' show ServerIdentity;
+import '../src/rust/api/forward.dart' as forward_native;
+import '../src/rust/api/proxy.dart' as proxy_native;
 import '../src/rust/api/sync.dart' as sync_native;
 
 abstract interface class VaultService {
@@ -51,7 +56,9 @@ class NativeVaultSession
         KeyStore,
         PrivateKeyExportStore,
         SnippetStore,
-        SyncStore {
+        SyncStore,
+        ConnectionProxyStore,
+        ForwardRuleStore {
   final String _token;
   final QuickUnlock _quick;
   @override
@@ -61,6 +68,125 @@ class NativeVaultSession
     this.legacyImported, {
     QuickUnlock? quickUnlock,
   }) : _quick = quickUnlock ?? QuickUnlock();
+  @override
+  Future<List<forward_native.ForwardRule>> forwardRules(String hostId) =>
+      forward_native.forwardRules(token: _token, hostId: hostId);
+  @override
+  Future<forward_native.ForwardRule> saveForwardRule(
+    forward_native.ForwardRule rule,
+  ) => forward_native.forwardSaveRule(token: _token, rule: rule);
+  @override
+  Future<void> deleteForwardRule(String id) =>
+      forward_native.forwardDeleteRule(token: _token, id: id);
+  @override
+  Future<proxy_native.ProxySettings> proxySettings() =>
+      proxy_native.proxySettings(token: _token);
+  @override
+  Future<void> saveProxySettings(
+    proxy_native.ProxySettings settings,
+    String password,
+  ) => proxy_native.proxySaveSettings(
+    token: _token,
+    settings: settings,
+    password: password,
+  );
+  @override
+  Future<List<proxy_native.ProxyProfile>> proxyProfiles() =>
+      proxy_native.proxyProfiles(token: _token);
+  @override
+  Future<String> saveProxyProfile(
+    proxy_native.ProxyProfileInput profile,
+    String password,
+  ) => proxy_native.proxySaveProfile(
+    token: _token,
+    profile: profile,
+    password: password,
+  );
+  @override
+  Future<void> deleteProxyProfile(String id) =>
+      proxy_native.proxyDeleteProfile(token: _token, id: id);
+  @override
+  Future<String> hostProxyBinding(String hostId) =>
+      proxy_native.proxyHostBinding(token: _token, hostId: hostId);
+  @override
+  Future<void> setHostProxyBinding(String hostId, String binding) =>
+      proxy_native.proxySetHostBinding(
+        token: _token,
+        hostId: hostId,
+        binding: binding,
+      );
+  @override
+  Future<proxy_native.ProxyTestResult> testProxyGlobal(
+    String targetHost,
+    int targetPort,
+  ) => proxy_native.proxyTestGlobal(
+    token: _token,
+    targetHost: targetHost,
+    targetPort: targetPort,
+  );
+  @override
+  Future<proxy_native.ProxyTestResult> testProxyProfile(
+    String id,
+    String targetHost,
+    int targetPort,
+  ) => proxy_native.proxyTestProfile(
+    token: _token,
+    id: id,
+    targetHost: targetHost,
+    targetPort: targetPort,
+  );
+  @override
+  Future<proxy_native.ProxyTestResult> testProxyDraft(
+    proxy_native.ProxyDraft draft,
+    String password,
+    String targetHost,
+    int targetPort,
+  ) => proxy_native.proxyTestDraft(
+    draft: draft,
+    password: password,
+    targetHost: targetHost,
+    targetPort: targetPort,
+  );
+  @override
+  Future<ServerIdentity> probeWithHostProxy(
+    String hostId,
+    String host,
+    int port, {
+    String operationId = '',
+  }) => proxy_native.probeServerWithHostProxy(
+    token: _token,
+    operationId: operationId,
+    hostId: hostId,
+    host: host,
+    port: port,
+  );
+  @override
+  Future<ServerIdentity> probeWithProxy(
+    String host,
+    int port, {
+    String operationId = '',
+  }) => proxy_native.probeServerWithProxy(
+    token: _token,
+    operationId: operationId,
+    host: host,
+    port: port,
+  );
+  @override
+  Future<ServerIdentity> probeThrough(
+    String parentConnectionId,
+    String host,
+    int port, {
+    String operationId = '',
+  }) => proxy_native.probeServerThrough(
+    token: _token,
+    operationId: operationId,
+    parentConnectionId: parentConnectionId,
+    host: host,
+    port: port,
+  );
+  @override
+  Future<void> cancelProbe(String operationId) =>
+      proxy_native.cancelProbe(operationId: operationId);
   @override
   Future<List<HostProfile>> read() async =>
       (jsonDecode(await native.vaultRead(token: _token, kind: 'hosts')) as List)
@@ -317,6 +443,17 @@ class NativeVaultSession
     String connectionId,
     String fingerprint,
   ) => native.vaultAuthenticateIdentity(
+    token: _token,
+    identityId: identityId,
+    connectionId: connectionId,
+    approvedFingerprint: fingerprint,
+  );
+  @override
+  Future<String> authenticateJumpIdentity(
+    String identityId,
+    String connectionId,
+    String fingerprint,
+  ) => native.vaultAuthenticateJumpIdentity(
     token: _token,
     identityId: identityId,
     connectionId: connectionId,

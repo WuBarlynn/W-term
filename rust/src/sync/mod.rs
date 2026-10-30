@@ -178,11 +178,17 @@ pub struct MissingIdentity {
     pub host_id: String,
     pub identity_id: String,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MissingJumpHost {
+    pub host_id: String,
+    pub jump_host_id: String,
+}
 pub struct MergePlan {
     merged: Snapshot,
     expected_local: Snapshot,
     conflicts: Vec<Conflict>,
     missing_identities: Vec<MissingIdentity>,
+    missing_jump_hosts: Vec<MissingJumpHost>,
 }
 impl MergePlan {
     pub fn conflicts(&self) -> &[Conflict] {
@@ -191,8 +197,13 @@ impl MergePlan {
     pub fn missing_identities(&self) -> &[MissingIdentity] {
         &self.missing_identities
     }
+    pub fn missing_jump_hosts(&self) -> &[MissingJumpHost] {
+        &self.missing_jump_hosts
+    }
     pub fn is_resolved(&self) -> bool {
-        self.conflicts.is_empty() && self.missing_identities.is_empty()
+        self.conflicts.is_empty()
+            && self.missing_identities.is_empty()
+            && self.missing_jump_hosts.is_empty()
     }
     /// Unresolved plans cannot produce a publishable snapshot.
     pub fn snapshot(&self) -> Result<&Snapshot> {
@@ -269,11 +280,13 @@ pub fn merge(base: &Snapshot, local: &Snapshot, remote: &Snapshot) -> Result<Mer
     };
     merged.validate()?;
     let missing_identities = vault::missing_identities(&merged);
+    let missing_jump_hosts = vault::missing_jump_hosts(&merged);
     Ok(MergePlan {
         merged,
         expected_local: local.clone(),
         conflicts,
         missing_identities,
+        missing_jump_hosts,
     })
 }
 

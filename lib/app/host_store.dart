@@ -8,6 +8,7 @@ class HostProfile {
   final int port;
   final List<String> tags;
   final bool favorite;
+  final List<String> jumpHostIds;
   HostProfile({
     required this.id,
     required this.name,
@@ -18,11 +19,19 @@ class HostProfile {
     this.identityId = '',
     List<String> tags = const [],
     this.favorite = false,
-  }) : tags = List.unmodifiable(tags) {
+    List<String> jumpHostIds = const [],
+  }) : tags = List.unmodifiable(tags),
+       jumpHostIds = List.unmodifiable(jumpHostIds) {
     if ([id, name, host, username].any((s) => s.trim().isEmpty) ||
         port < 1 ||
         port > 65535) {
       throw const FormatException('主机配置无效');
+    }
+    if (jumpHostIds.length > 4 ||
+        jumpHostIds.any((id) => id.trim().isEmpty) ||
+        jumpHostIds.toSet().length != jumpHostIds.length ||
+        jumpHostIds.contains(id)) {
+      throw const FormatException('跳板路线无效');
     }
   }
   static String newId() => List.generate(
@@ -39,6 +48,7 @@ class HostProfile {
     tags: List<String>.from(v['tags'] as List),
     favorite: v['favorite'] as bool,
     identityId: v['identityId'] as String? ?? '',
+    jumpHostIds: List<String>.from(v['jumpHostIds'] as List? ?? const []),
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -50,6 +60,7 @@ class HostProfile {
     'tags': tags,
     'favorite': favorite,
     if (identityId.isNotEmpty) 'identityId': identityId,
+    if (jumpHostIds.isNotEmpty) 'jumpHostIds': jumpHostIds,
   };
   HostProfile toggleFavorite() => HostProfile(
     id: id,
@@ -61,6 +72,7 @@ class HostProfile {
     tags: tags,
     favorite: !favorite,
     identityId: identityId,
+    jumpHostIds: jumpHostIds,
   );
   bool matches(String query) => [
     name,

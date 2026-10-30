@@ -1,6 +1,5 @@
 import '../app/snippet_store.dart';
 import 'snippets_dialog.dart';
-import '../app/errors.dart';
 import 'terminal_search.dart';
 import '../app/terminal_appearance.dart';
 import 'terminal_appearance_dialog.dart';
@@ -12,95 +11,70 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
-import '../src/rust/api/client.dart' as native;
+import '../app/terminal_session.dart';
 
+/// A view over a [TerminalSession]. Multiple panes never own the SSH session;
+/// disposing or moving this widget never disconnects the connection.
 class TerminalPane extends StatefulWidget {
-  final String connectionId;
+  final TerminalSession session;
   final SnippetStore? snippets;
-  final VoidCallback onDisconnected;
+  final bool active;
+  final VoidCallback onActivate;
+  final VoidCallback? onSplitHorizontal;
+  final VoidCallback? onSplitVertical;
+  final VoidCallback? onSplitBack;
+  final VoidCallback? onClosePane;
   const TerminalPane({
     super.key,
-    required this.connectionId,
+    required this.session,
     this.snippets,
-    required this.onDisconnected,
+    required this.active,
+    required this.onActivate,
+    this.onSplitHorizontal,
+    this.onSplitVertical,
+    this.onSplitBack,
+    this.onClosePane,
   });
   @override
   State<TerminalPane> createState() => _TerminalPaneState();
 }
 
 class _TerminalPaneState extends State<TerminalPane> {
-  final terminal = Terminal(maxLines: 5000);
   final controller = TerminalController();
   final focus = FocusNode();
-  final bytes = StreamController<List<int>>(sync: true);
-  StreamSubscription? output, decoded;
-  Future<void> writes = Future.value();
-  bool ended = false;
-  Timer? resizeTimer;
+  bool _wasActive = false;
   @override
   void initState() {
     super.initState();
     terminalAppearance.addListener(appearanceChanged);
-    // Decoder retains partial UTF-8 sequences across SSH packets.
-    decoded = utf8.decoder
-        .bind(bytes.stream)
-        .listen(terminal.write, onError: (_) {});
-    terminal.onOutput = send;
-    terminal.onResize = (cols, rows, pw, ph) {
-      resizeTimer?.cancel();
-      resizeTimer = Timer(const Duration(milliseconds: 80), () {
-        if (!ended) {
-          unawaited(
-            native
-                .resizeTerminal(
-                  connectionId: widget.connectionId,
-                  columns: cols,
-                  rows: rows,
-                )
-                .catchError((Object _) {}),
-          );
-        }
-      });
-    };
-    output = native
-        .terminalOutput(connectionId: widget.connectionId)
-        .listen(
-          (data) {
-            bytes.add(data);
-            unawaited(
-              native
-                  .acknowledgeOutput(connectionId: widget.connectionId)
-                  .catchError((Object _) {}),
-            );
-          },
-          onError: (Object error) {
-            finish(userFacingError(error));
-          },
-          onDone: () => finish(null),
-        );
+    widget.session.addListener(sessionChanged);
+    _wasActive = widget.active;
+    if (widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
+    }
   }
 
-  void finish(String? error) {
-    if (!mounted || ended) return;
-    setState(() => ended = true);
-    terminal.write(
-      '\r\n\x1b[90m${error == null ? '连接已结束' : '连接中断：$error'}\x1b[0m\r\n',
-    );
-    widget.onDisconnected();
+  @override
+  void didUpdateWidget(covariant TerminalPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) {
+      oldWidget.session.removeListener(sessionChanged);
+      widget.session.addListener(sessionChanged);
+    }
+    if (widget.active && !_wasActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
+    }
+    _wasActive = widget.active;
   }
 
-  void send(String text) {
-    if (ended) return;
-    writes = writes
-        .then(
-          (_) => native.writeTerminal(
-            connectionId: widget.connectionId,
-            bytes: utf8.encode(text),
-          ),
-        )
-        .catchError((Object error) {
-          finish(userFacingError(error));
-        });
+  void _focus() {
+    if (mounted && widget.active) focus.requestFocus();
+  }
+
+  bool get ended => widget.session.ended;
+
+  void sessionChanged() {
+    if (mounted) setState(() {});
   }
 
   void appearanceChanged() {
@@ -112,7 +86,7 @@ class _TerminalPaneState extends State<TerminalPane> {
       context: context,
       builder: (_) => TerminalAppearanceDialog(store: terminalAppearance),
     );
-    if (mounted) focus.requestFocus();
+    if (mounted) _focus();
   }
 
   Future<void> searchHistory() async {
@@ -121,6 +95,7 @@ class _TerminalPaneState extends State<TerminalPane> {
       builder: (_) => TerminalSearch(
         snapshot: () {
           final lines = <String>[];
+          final terminal = widget.session.terminal;
           for (var i = 0; i < terminal.buffer.lines.length; i++) {
             final line = terminal.buffer.lines[i];
             if (line.isWrapped && lines.isNotEmpty) {
@@ -133,7 +108,7 @@ class _TerminalPaneState extends State<TerminalPane> {
         },
       ),
     );
-    if (mounted) focus.requestFocus();
+    if (mounted) _focus();
   }
 
   Future<void> openSnippets() async {
@@ -145,15 +120,15 @@ class _TerminalPaneState extends State<TerminalPane> {
     );
     if (!mounted || ended || command == null) return;
     if (validateSnippetCommand(command) != null) return;
-    terminal.paste(command);
-    focus.requestFocus();
+    widget.session.terminal.paste(command);
+    _focus();
   }
 
   Future<void> copy() async {
     final selection = controller.selection;
     if (selection != null) {
       await Clipboard.setData(
-        ClipboardData(text: terminal.buffer.getText(selection)),
+        ClipboardData(text: widget.session.terminal.buffer.getText(selection)),
       );
     }
   }
@@ -193,51 +168,51 @@ class _TerminalPaneState extends State<TerminalPane> {
       );
       if (ok != true) return;
     }
-    terminal.paste(text);
-    focus.requestFocus();
+    widget.session.terminal.paste(text);
+    _focus();
   }
 
-  @override
-  void dispose() {
-    ended = true;
-    terminalAppearance.removeListener(appearanceChanged);
-    resizeTimer?.cancel();
-    output?.cancel();
-    decoded?.cancel();
-    bytes.close();
-    terminal.onOutput = null;
-    terminal.onResize = null;
-    focus.dispose();
-    controller.dispose();
-    unawaited(
-      native
-          .disconnect(connectionId: widget.connectionId)
-          .catchError((Object _) {}),
-    );
-    super.dispose();
+  Future<void> paneMenu(String value) async {
+    if (value == 'horizontal') {
+      widget.onSplitHorizontal?.call();
+    } else if (value == 'vertical') {
+      widget.onSplitVertical?.call();
+    } else if (value == 'splitback') {
+      widget.onSplitBack?.call();
+    } else if (value == 'close') {
+      widget.onClosePane?.call();
+    } else if (value == 'copy') {
+      await copy();
+    } else if (value == 'paste') {
+      await paste();
+    } else if (value == 'theme') {
+      await editAppearance();
+    } else if (value == 'search') {
+      await searchHistory();
+    } else if (value == 'snippets') {
+      await openSnippets();
+    }
   }
 
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Container(
-        color: const Color(0xff161c24),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            Icon(
-              ended ? Icons.circle_outlined : Icons.circle,
-              color: ended ? Colors.grey : const Color(0xff71cba2),
-              size: 8,
+  Widget _toolbar() => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 520;
+      return Row(
+        children: [
+          Icon(
+            ended ? Icons.circle_outlined : Icons.circle,
+            color: ended ? Colors.grey : const Color(0xff71cba2),
+            size: 8,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              ended ? '已断开 · ${widget.session.title}' : widget.session.title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xffa5adba), fontSize: 12),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                ended ? '已断开' : 'SSH · xterm-256color',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xffa5adba), fontSize: 12),
-              ),
-            ),
+          ),
+          if (!compact) ...[
             if (widget.snippets != null)
               IconButton(
                 tooltip: '命令片段',
@@ -281,106 +256,167 @@ class _TerminalPaneState extends State<TerminalPane> {
               ),
             ),
           ],
-        ),
-      ),
-      Expanded(
-        child: ColoredBox(
-          color: TerminalAppearance.themeFor(terminalAppearance.palette)
-              .background,
-          child: TerminalView(
-            deleteDetection:
-                Theme.of(context).platform == TargetPlatform.iOS ||
-                Theme.of(context).platform == TargetPlatform.android,
-            terminal,
-            theme: TerminalAppearance.themeFor(terminalAppearance.palette),
-            controller: controller,
-            focusNode: focus,
-            onKeyEvent: (_, event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.keyF &&
-                  (HardwareKeyboard.instance.isMetaPressed ||
-                      (HardwareKeyboard.instance.isControlPressed &&
-                          HardwareKeyboard.instance.isShiftPressed))) {
-                unawaited(searchHistory());
-                return KeyEventResult.handled;
-              }
-              if (event is KeyDownEvent &&
-                  HardwareKeyboard.instance.isMetaPressed) {
-                if (event.logicalKey == LogicalKeyboardKey.keyV) {
-                  unawaited(paste());
-                  return KeyEventResult.handled;
-                }
-                if (event.logicalKey == LogicalKeyboardKey.keyC) {
-                  unawaited(copy());
-                  return KeyEventResult.handled;
-                }
-              }
-              return KeyEventResult.ignored;
-            },
-            autofocus: true,
-            readOnly: ended,
-            padding: const EdgeInsets.all(12),
-            textStyle: TerminalStyle(
-              fontSize: terminalAppearance.fontSize.toDouble(),
-              fontFamily: 'Menlo',
-              fontFamilyFallback: ['monospace'],
+          PopupMenuButton<String>(
+            tooltip: '窗格操作',
+            icon: const Icon(
+              Icons.more_vert,
+              color: Color(0xffa5adba),
+              size: 17,
             ),
-            onSecondaryTapDown: (details, _) async {
-              final selected = await showMenu<String>(
-                context: context,
-                position: RelativeRect.fromLTRB(
-                  details.globalPosition.dx,
-                  details.globalPosition.dy,
-                  details.globalPosition.dx,
-                  details.globalPosition.dy,
-                ),
-                items: const [
-                  PopupMenuItem(value: 'copy', child: Text('复制')),
-                  PopupMenuItem(value: 'paste', child: Text('粘贴')),
-                ],
-              );
-              if (selected == 'copy') {
-                await copy();
-              } else if (selected == 'paste') {
-                await paste();
-              }
-            },
-          ),
-        ),
-      ),
-      if (MediaQuery.sizeOf(context).width < 900)
-        Container(
-          color: const Color(0xff161c24),
-          height: 46,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (final key in const [
-                ('Esc', '\x1b'),
-                ('Tab', '\t'),
-                ('Ctrl-C', '\x03'),
-                ('Ctrl-D', '\x04'),
-                ('Ctrl-L', '\x0c'),
-                ('↑', '\x1b[A'),
-                ('↓', '\x1b[B'),
-                ('←', '\x1b[D'),
-                ('→', '\x1b[C'),
-              ])
-                TextButton(
-                  onPressed: ended
-                      ? null
-                      : () {
-                          send(key.$2);
-                          focus.requestFocus();
-                        },
-                  child: Text(
-                    key.$1,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ),
+            onSelected: paneMenu,
+            itemBuilder: (_) => [
+              if (compact) ...[
+                const PopupMenuItem(value: 'copy', child: Text('复制选中内容')),
+                if (!ended)
+                  const PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                if (widget.snippets != null && !ended)
+                  const PopupMenuItem(value: 'snippets', child: Text('命令片段')),
+                const PopupMenuItem(value: 'theme', child: Text('终端外观')),
+                const PopupMenuItem(value: 'search', child: Text('搜索终端历史')),
+                const PopupMenuDivider(),
+              ],
+              const PopupMenuItem(value: 'horizontal', child: Text('水平分屏')),
+              const PopupMenuItem(value: 'vertical', child: Text('垂直分屏')),
+              if (widget.onSplitBack != null)
+                const PopupMenuItem(value: 'splitback', child: Text('拆回标签')),
+              const PopupMenuItem(value: 'close', child: Text('关闭窗格')),
             ],
           ),
+        ],
+      );
+    },
+  );
+
+  @override
+  void dispose() {
+    terminalAppearance.removeListener(appearanceChanged);
+    widget.session.removeListener(sessionChanged);
+    focus.dispose();
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (_) => widget.onActivate(),
+    child: Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: widget.active
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          ),
         ),
-    ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            color: const Color(0xff161c24),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: _toolbar(),
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: TerminalAppearance.themeFor(terminalAppearance.palette)
+                  .background,
+              child: TerminalView(
+                deleteDetection:
+                    Theme.of(context).platform == TargetPlatform.iOS ||
+                    Theme.of(context).platform == TargetPlatform.android,
+                widget.session.terminal,
+                theme: TerminalAppearance.themeFor(terminalAppearance.palette),
+                controller: controller,
+                focusNode: focus,
+                onKeyEvent: (_, event) {
+                  if (event is KeyDownEvent &&
+                      event.logicalKey == LogicalKeyboardKey.keyF &&
+                      (HardwareKeyboard.instance.isMetaPressed ||
+                          (HardwareKeyboard.instance.isControlPressed &&
+                              HardwareKeyboard.instance.isShiftPressed))) {
+                    unawaited(searchHistory());
+                    return KeyEventResult.handled;
+                  }
+                  if (event is KeyDownEvent &&
+                      HardwareKeyboard.instance.isMetaPressed) {
+                    if (event.logicalKey == LogicalKeyboardKey.keyV) {
+                      unawaited(paste());
+                      return KeyEventResult.handled;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.keyC) {
+                      unawaited(copy());
+                      return KeyEventResult.handled;
+                    }
+                  }
+                  return KeyEventResult.ignored;
+                },
+                autofocus: false,
+                readOnly: ended,
+                padding: const EdgeInsets.all(12),
+                textStyle: TerminalStyle(
+                  fontSize: terminalAppearance.fontSize.toDouble(),
+                  fontFamily: 'Menlo',
+                  fontFamilyFallback: ['monospace'],
+                ),
+                onSecondaryTapDown: (details, _) async {
+                  final selected = await showMenu<String>(
+                    context: context,
+                    position: RelativeRect.fromLTRB(
+                      details.globalPosition.dx,
+                      details.globalPosition.dy,
+                      details.globalPosition.dx,
+                      details.globalPosition.dy,
+                    ),
+                    items: const [
+                      PopupMenuItem(value: 'copy', child: Text('复制')),
+                      PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                    ],
+                  );
+                  if (selected == 'copy') {
+                    await copy();
+                  } else if (selected == 'paste') {
+                    await paste();
+                  }
+                },
+              ),
+            ),
+          ),
+          if (MediaQuery.sizeOf(context).width < 900)
+            Container(
+              color: const Color(0xff161c24),
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final key in const [
+                    ('Esc', '\x1b'),
+                    ('Tab', '\t'),
+                    ('Ctrl-C', '\x03'),
+                    ('Ctrl-D', '\x04'),
+                    ('Ctrl-L', '\x0c'),
+                    ('↑', '\x1b[A'),
+                    ('↓', '\x1b[B'),
+                    ('←', '\x1b[D'),
+                    ('→', '\x1b[C'),
+                  ])
+                    TextButton(
+                      onPressed: ended
+                          ? null
+                          : () {
+                              widget.session.send(key.$2);
+                              _focus();
+                            },
+                      child: Text(
+                        key.$1,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    ),
   );
 }

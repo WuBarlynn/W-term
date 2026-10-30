@@ -83,6 +83,13 @@ pub(super) fn include_dependencies(
         .filter(|r| r.key.kind == Kind::Identity && r.value.is_some())
         .map(|r| r.key.clone())
         .collect();
+    let live_hosts: BTreeSet<_> = plan
+        .merged
+        .records
+        .iter()
+        .filter(|r| r.key.kind == Kind::Host && r.value.is_some())
+        .map(|r| r.key.clone())
+        .collect();
     let identity_ref = |row: &Record| {
         row.value
             .as_ref()
@@ -94,7 +101,23 @@ pub(super) fn include_dependencies(
                 id: id.into(),
             })
     };
+    let jump_refs = |row: &Record| -> Vec<Key> {
+        row.value
+            .as_ref()
+            .and_then(|v| v.get("jumpHostIds"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|id| !id.is_empty())
+            .map(|id| Key {
+                kind: Kind::Host,
+                id: id.into(),
+            })
+            .collect()
+    };
     let mut dependents = BTreeMap::<Key, BTreeSet<Key>>::new();
+    let mut host_dependents = BTreeMap::<Key, BTreeSet<Key>>::new();
     for row in plan
         .merged
         .records
@@ -103,6 +126,12 @@ pub(super) fn include_dependencies(
     {
         if let Some(id) = identity_ref(row) {
             dependents.entry(id).or_default().insert(row.key.clone());
+        }
+        for jump in jump_refs(row) {
+            host_dependents
+                .entry(jump)
+                .or_default()
+                .insert(row.key.clone());
         }
     }
     let mut known: BTreeSet<_> = plan.conflicts.iter().map(|c| c.key.clone()).collect();
@@ -113,6 +142,23 @@ pub(super) fn include_dependencies(
             id: missing.identity_id.clone(),
         };
         // Both live alternatives will repair an omitted conflicting identity.
+        if known.contains(&id)
+            && payload(l.get(&id).copied()).is_some()
+            && payload(r.get(&id).copied()).is_some()
+        {
+            continue;
+        }
+        queue.push_back(id);
+        queue.push_back(Key {
+            kind: Kind::Host,
+            id: missing.host_id.clone(),
+        });
+    }
+    for missing in &plan.missing_jump_hosts {
+        let id = Key {
+            kind: Kind::Host,
+            id: missing.jump_host_id.clone(),
+        };
         if known.contains(&id)
             && payload(l.get(&id).copied()).is_some()
             && payload(r.get(&id).copied()).is_some()
@@ -145,6 +191,11 @@ pub(super) fn include_dependencies(
                         queue.push_back(id);
                     }
                 }
+                for jump in jump_refs(row) {
+                    if !live_hosts.contains(&jump) {
+                        queue.push_back(jump);
+                    }
+                }
             }
         }
         if key.kind == Kind::Identity
@@ -154,10 +205,18 @@ pub(super) fn include_dependencies(
                 queue.extend(hosts.iter().cloned());
             }
         }
+        if key.kind == Kind::Host
+            && (payload(l.get(&key).copied()).is_none() || payload(r.get(&key).copied()).is_none())
+        {
+            if let Some(hosts) = host_dependents.get(&key) {
+                queue.extend(hosts.iter().cloned());
+            }
+        }
     }
     plan.merged.records.retain(|r| !known.contains(&r.key));
     plan.conflicts.sort_by(|a, b| a.key.cmp(&b.key));
     plan.missing_identities = vault::missing_identities(&plan.merged);
+    plan.missing_jump_hosts = vault::missing_jump_hosts(&plan.merged);
 }
 
 pub(super) fn resolve(
@@ -211,9 +270,14 @@ pub(super) fn resolve(
     plan.merged.records.sort_by(|a, b| a.key.cmp(&b.key));
     plan.merged.validate()?;
     plan.missing_identities = vault::missing_identities(&plan.merged);
+    plan.missing_jump_hosts = vault::missing_jump_hosts(&plan.merged);
     ensure!(
         plan.missing_identities.is_empty(),
         "所选主机引用了已删除的身份。请同时保留该身份，或选择不引用它的主机版本"
+    );
+    ensure!(
+        plan.missing_jump_hosts.is_empty(),
+        "所选主机引用了已删除或未同步的跳板主机。请同时保留该跳板主机，或选择不使用它的主机版本"
     );
     plan.conflicts.clear();
     Ok(())

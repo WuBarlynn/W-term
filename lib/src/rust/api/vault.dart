@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `cancel_sync`, `check_kind`, `imported`, `key_database_mode`, `key_database`, `lease`, `open_database`, `put_record`, `read_private_key`, `read_record`, `registry`, `save_identity`, `validate_references`, `validate`, `with_vault`, `within_folder`
+// These functions are ignored because they are not marked as `pub`: `cancel_sync`, `check_kind`, `identity_secrets`, `imported`, `key_database_mode`, `key_database`, `lease`, `open_database`, `put_record`, `read_private_key`, `read_record`, `registry`, `save_identity`, `validate_host_routes`, `validate_references`, `validate`, `with_vault`, `within_folder`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Host`, `OpenVault`, `Secrets`, `SensitiveInput`, `Snippet`, `VaultLease`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref_mut`, `deref`, `drop`, `drop`
 
@@ -123,6 +123,19 @@ Future<String> vaultAuthenticateIdentity({
   required String connectionId,
   required String approvedFingerprint,
 }) => RustLib.instance.api.crateApiVaultVaultAuthenticateIdentity(
+  token: token,
+  identityId: identityId,
+  connectionId: connectionId,
+  approvedFingerprint: approvedFingerprint,
+);
+
+/// Authenticates an intermediate route hop without opening a terminal.
+Future<String> vaultAuthenticateJumpIdentity({
+  required String token,
+  required String identityId,
+  required String connectionId,
+  required String approvedFingerprint,
+}) => RustLib.instance.api.crateApiVaultVaultAuthenticateJumpIdentity(
   token: token,
   identityId: identityId,
   connectionId: connectionId,

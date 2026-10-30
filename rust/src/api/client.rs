@@ -54,6 +54,24 @@ pub async fn authenticate(
     )
     .await
 }
+pub async fn authenticate_jump(
+    connection_id: String,
+    approved_fingerprint: String,
+    username: String,
+    password: String,
+    private_key: String,
+    passphrase: String,
+) -> Result<()> {
+    session::authenticate_jump(
+        &connection_id,
+        &approved_fingerprint,
+        username,
+        password,
+        private_key,
+        passphrase,
+    )
+    .await
+}
 pub async fn terminal_output(connection_id: String, sink: StreamSink<Vec<u8>>) -> Result<()> {
     let live = session::live(&connection_id).await?;
     let mut rx = live
@@ -581,4 +599,27 @@ mod upload_tests {
         assert_eq!(numbered_upload_path("/.env", 1), "/.env (1)");
         assert_eq!(numbered_upload_path("file", 1), "file (1)");
     }
+}
+
+#[derive(Clone)]
+pub struct AuthPrompt {
+    pub label: String,
+    pub echo: bool,
+}
+#[derive(Clone)]
+pub struct AuthChallenge {
+    pub id: String,
+    pub name: String,
+    pub instructions: String,
+    pub prompts: Vec<AuthPrompt>,
+}
+pub async fn auth_challenge(connection_id: String) -> Result<Option<AuthChallenge>> {
+    Ok(session::interactive::challenge(&connection_id).await)
+}
+pub async fn answer_auth_challenge(
+    connection_id: String,
+    challenge_id: String,
+    answers: Vec<String>,
+) -> Result<()> {
+    session::interactive::respond(&connection_id, &challenge_id, answers).await
 }

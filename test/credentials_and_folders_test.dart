@@ -95,6 +95,13 @@ class MemoryLibrary
     String connectionId,
     String fingerprint,
   ) async => saved.firstWhere((i) => i.id == identityId).username;
+
+  @override
+  Future<String> authenticateJumpIdentity(
+    String identityId,
+    String connectionId,
+    String fingerprint,
+  ) async => saved.firstWhere((i) => i.id == identityId).username;
 }
 
 void main() {
@@ -332,6 +339,48 @@ void main() {
     expect(color('a'), Colors.transparent);
     expect(color('b'), isNot(Colors.transparent));
     expect(connections, 0);
+  });
+  testWidgets('interactive-only identity saves no secrets', (tester) async {
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    IdentityDraft? captured;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                captured = await showDialog<IdentityDraft>(
+                  context: context,
+                  builder: (_) => const IdentityEditor(),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('仅交互式'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '身份名称'),
+      'MFA only',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '用户名'),
+      'mfa-user',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(captured?.kind, 'interactive');
+    expect(captured?.password, isEmpty);
+    expect(captured?.privateKey, isEmpty);
+    expect(captured?.passphrase, isEmpty);
   });
   testWidgets(
     'identity editor preserves saved secrets unless replacement is selected',

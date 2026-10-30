@@ -5,6 +5,7 @@
 
 import 'api/client.dart';
 import 'api/forward.dart';
+import 'api/proxy.dart';
 import 'api/sync.dart';
 import 'api/vault.dart';
 
@@ -39,10 +40,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AuthChallenge dco_decode_auth_challenge(dynamic raw);
+
+  @protected
+  AuthPrompt dco_decode_auth_prompt(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  AuthChallenge dco_decode_box_autoadd_auth_challenge(dynamic raw);
+
+  @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw);
+
+  @protected
+  ForwardRule dco_decode_box_autoadd_forward_rule(dynamic raw);
+
+  @protected
   IdentityInput dco_decode_box_autoadd_identity_input(dynamic raw);
+
+  @protected
+  ProxyDraft dco_decode_box_autoadd_proxy_draft(dynamic raw);
+
+  @protected
+  ProxyProfileInput dco_decode_box_autoadd_proxy_profile_input(dynamic raw);
+
+  @protected
+  ProxySettings dco_decode_box_autoadd_proxy_settings(dynamic raw);
 
   @protected
   RemoteTextSnapshot dco_decode_box_autoadd_remote_text_snapshot(dynamic raw);
@@ -57,6 +82,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DirectoryListing dco_decode_directory_listing(dynamic raw);
 
   @protected
+  ForwardInfo dco_decode_forward_info(dynamic raw);
+
+  @protected
+  ForwardRule dco_decode_forward_rule(dynamic raw);
+
+  @protected
   IdentityInput dco_decode_identity_input(dynamic raw);
 
   @protected
@@ -64,6 +95,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AuthPrompt> dco_decode_list_auth_prompt(dynamic raw);
+
+  @protected
+  List<ForwardInfo> dco_decode_list_forward_info(dynamic raw);
+
+  @protected
+  List<ForwardRule> dco_decode_list_forward_rule(dynamic raw);
 
   @protected
   List<IdentitySummary> dco_decode_list_identity_summary(dynamic raw);
@@ -76,6 +116,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<ProxyProfile> dco_decode_list_proxy_profile(dynamic raw);
 
   @protected
   List<RemoteEntry> dco_decode_list_remote_entry(dynamic raw);
@@ -99,6 +142,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  AuthChallenge? dco_decode_opt_box_autoadd_auth_challenge(dynamic raw);
+
+  @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
   IdentityInput? dco_decode_opt_box_autoadd_identity_input(dynamic raw);
 
   @protected
@@ -111,6 +160,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<SyncScopeKey>? dco_decode_opt_list_sync_scope_key(dynamic raw);
+
+  @protected
+  ProxyDraft dco_decode_proxy_draft(dynamic raw);
+
+  @protected
+  ProxyProfile dco_decode_proxy_profile(dynamic raw);
+
+  @protected
+  ProxyProfileInput dco_decode_proxy_profile_input(dynamic raw);
+
+  @protected
+  ProxySettings dco_decode_proxy_settings(dynamic raw);
+
+  @protected
+  ProxyTestResult dco_decode_proxy_test_result(dynamic raw);
 
   @protected
   RemoteEntry dco_decode_remote_entry(dynamic raw);
@@ -184,10 +248,40 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AuthChallenge sse_decode_auth_challenge(SseDeserializer deserializer);
+
+  @protected
+  AuthPrompt sse_decode_auth_prompt(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  AuthChallenge sse_decode_box_autoadd_auth_challenge(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  ForwardRule sse_decode_box_autoadd_forward_rule(SseDeserializer deserializer);
+
+  @protected
   IdentityInput sse_decode_box_autoadd_identity_input(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ProxyDraft sse_decode_box_autoadd_proxy_draft(SseDeserializer deserializer);
+
+  @protected
+  ProxyProfileInput sse_decode_box_autoadd_proxy_profile_input(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ProxySettings sse_decode_box_autoadd_proxy_settings(
     SseDeserializer deserializer,
   );
 
@@ -208,6 +302,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DirectoryListing sse_decode_directory_listing(SseDeserializer deserializer);
 
   @protected
+  ForwardInfo sse_decode_forward_info(SseDeserializer deserializer);
+
+  @protected
+  ForwardRule sse_decode_forward_rule(SseDeserializer deserializer);
+
+  @protected
   IdentityInput sse_decode_identity_input(SseDeserializer deserializer);
 
   @protected
@@ -215,6 +315,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AuthPrompt> sse_decode_list_auth_prompt(SseDeserializer deserializer);
+
+  @protected
+  List<ForwardInfo> sse_decode_list_forward_info(SseDeserializer deserializer);
+
+  @protected
+  List<ForwardRule> sse_decode_list_forward_rule(SseDeserializer deserializer);
 
   @protected
   List<IdentitySummary> sse_decode_list_identity_summary(
@@ -231,6 +340,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<ProxyProfile> sse_decode_list_proxy_profile(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<RemoteEntry> sse_decode_list_remote_entry(SseDeserializer deserializer);
@@ -262,6 +376,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  AuthChallenge? sse_decode_opt_box_autoadd_auth_challenge(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
   IdentityInput? sse_decode_opt_box_autoadd_identity_input(
     SseDeserializer deserializer,
   );
@@ -278,6 +400,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SyncScopeKey>? sse_decode_opt_list_sync_scope_key(
     SseDeserializer deserializer,
   );
+
+  @protected
+  ProxyDraft sse_decode_proxy_draft(SseDeserializer deserializer);
+
+  @protected
+  ProxyProfile sse_decode_proxy_profile(SseDeserializer deserializer);
+
+  @protected
+  ProxyProfileInput sse_decode_proxy_profile_input(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ProxySettings sse_decode_proxy_settings(SseDeserializer deserializer);
+
+  @protected
+  ProxyTestResult sse_decode_proxy_test_result(SseDeserializer deserializer);
 
   @protected
   RemoteEntry sse_decode_remote_entry(SseDeserializer deserializer);
@@ -368,11 +507,50 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_auth_challenge(AuthChallenge self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_auth_prompt(AuthPrompt self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_auth_challenge(
+    AuthChallenge self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_forward_rule(
+    ForwardRule self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_identity_input(
     IdentityInput self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_proxy_draft(
+    ProxyDraft self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_proxy_profile_input(
+    ProxyProfileInput self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_proxy_settings(
+    ProxySettings self,
     SseSerializer serializer,
   );
 
@@ -398,6 +576,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_forward_info(ForwardInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_forward_rule(ForwardRule self, SseSerializer serializer);
+
+  @protected
   void sse_encode_identity_input(IdentityInput self, SseSerializer serializer);
 
   @protected
@@ -408,6 +592,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_auth_prompt(
+    List<AuthPrompt> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_forward_info(
+    List<ForwardInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_forward_rule(
+    List<ForwardRule> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_identity_summary(
@@ -427,6 +629,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_proxy_profile(
+    List<ProxyProfile> self,
     SseSerializer serializer,
   );
 
@@ -467,6 +675,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_auth_challenge(
+    AuthChallenge? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_identity_input(
     IdentityInput? self,
     SseSerializer serializer,
@@ -484,6 +701,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_list_sync_scope_key(
     List<SyncScopeKey>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_proxy_draft(ProxyDraft self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_proxy_profile(ProxyProfile self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_proxy_profile_input(
+    ProxyProfileInput self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_proxy_settings(ProxySettings self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_proxy_test_result(
+    ProxyTestResult self,
     SseSerializer serializer,
   );
 

@@ -41,6 +41,13 @@ abstract interface class IdentityStore {
     String connectionId,
     String fingerprint,
   );
+
+  /// Authenticates an intermediate hop without opening a terminal.
+  Future<String> authenticateJumpIdentity(
+    String identityId,
+    String connectionId,
+    String fingerprint,
+  );
 }
 
 abstract interface class FolderTreeStore {

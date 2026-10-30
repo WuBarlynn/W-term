@@ -276,12 +276,20 @@ class _IdentitiesPaneState extends State<IdentitiesPane> {
                     ListTile(
                       dense: true,
                       leading: Icon(
-                        i.kind == 'key' ? Icons.key_outlined : Icons.password,
+                        i.kind == 'key'
+                            ? Icons.key_outlined
+                            : i.kind == 'interactive'
+                            ? Icons.question_answer_outlined
+                            : Icons.password,
                         size: 18,
                       ),
                       title: Text(i.name, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
-                        '${i.username} · ${i.kind == 'key' ? '私钥' : '密码'}',
+                        '${i.username} · ${i.kind == 'key'
+                            ? '私钥'
+                            : i.kind == 'interactive'
+                            ? '仅交互式'
+                            : '密码'}',
                       ),
                       trailing: PopupMenuButton<String>(
                         enabled: !busy,
@@ -425,6 +433,7 @@ class _IdentityEditorState extends State<IdentityEditor> {
                   segments: const [
                     ButtonSegment(value: 'password', label: Text('密码')),
                     ButtonSegment(value: 'key', label: Text('私钥')),
+                    ButtonSegment(value: 'interactive', label: Text('仅交互式')),
                   ],
                   selected: {kind},
                   onSelectionChanged: (v) => setState(() => kind = v.first),
@@ -438,6 +447,11 @@ class _IdentityEditorState extends State<IdentityEditor> {
                     enableSuggestions: false,
                     decoration: const InputDecoration(labelText: '保存的密码'),
                     validator: (v) => v == null || v.isEmpty ? '请输入密码' : null,
+                  )
+                else if (kind == 'interactive')
+                  const Text(
+                    '不保存密码或私钥。每次连接（包括跳板）由服务器在打开终端前询问，回答不会进入保险库、同步或自动重放。',
+                    style: TextStyle(fontSize: 12),
                   )
                 else ...[
                   OutlinedButton.icon(

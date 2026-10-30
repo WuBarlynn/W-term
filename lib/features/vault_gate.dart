@@ -56,6 +56,7 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
   late final quick = widget.quickUnlock ?? QuickUnlock();
   String? biometricType;
   bool quickEnabled = false, enrollQuick = false;
+  bool autoBiometricAttempted = false, biometricInFlight = false;
   final form = GlobalKey<FormState>();
   final password = TextEditingController(),
       confirmation = TextEditingController();
@@ -103,6 +104,13 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
           loading = false;
           error = null;
         });
+        if (found && enabled && type != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || autoBiometricAttempted) return;
+            autoBiometricAttempted = true;
+            unawaited(biometricUnlock());
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -117,21 +125,24 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (Theme.of(context).platform != TargetPlatform.iOS) return;
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.resumed) {
       if (mounted) {
-        setState(() {
-          hidden = true;
-          vaultPrivacy.value = true;
-        });
-      }
-    } else if (state == AppLifecycleState.resumed && mounted) {
-      setState(() {
-        hidden = false;
+        setState(() => hidden = false);
         vaultPrivacy.value = false;
-      });
+      }
+      return;
     }
+    if (state != AppLifecycleState.inactive &&
+        state != AppLifecycleState.hidden &&
+        state != AppLifecycleState.paused) {
+      return;
+    }
+    // The lock screen is already private, and the biometric system sheet
+    // triggers inactive; covering it caused a lingering lock overlay after
+    // unlocking. Only cover an actually unlocked workspace.
+    if (!mounted || session == null || biometricInFlight) return;
+    setState(() => hidden = true);
+    vaultPrivacy.value = true;
   }
 
   Future<void> unlock() {
@@ -186,11 +197,15 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
         await opened.lock();
         return;
       }
-      setState(() {
-        session = opened;
-        openingSession = null;
-        exists = true;
-      });
+      if (mounted) {
+        hidden = false;
+        vaultPrivacy.value = false;
+        setState(() {
+          session = opened;
+          openingSession = null;
+          exists = true;
+        });
+      }
       if (quickWarning != null) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(quickWarning)));
@@ -219,11 +234,16 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> biometricUnlock() {
-    if (busy || !exists || !quickEnabled) return Future.value();
+  Future<void> biometricUnlock() async {
+    if (busy || !exists || !quickEnabled) return;
+    biometricInFlight = true;
     final operation = performUnlock(biometric: true);
     pendingUnlock = operation;
-    return operation;
+    try {
+      await operation;
+    } finally {
+      biometricInFlight = false;
+    }
   }
 
   Future<void> lock() async {
@@ -235,6 +255,8 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
     // Remove dialogs and dispose Workspace so its SSH sessions are closed.
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
+      hidden = false;
+      vaultPrivacy.value = false;
       setState(() {
         session = null;
         busy = true;

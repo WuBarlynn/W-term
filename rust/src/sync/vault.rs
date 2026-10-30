@@ -45,6 +45,10 @@ fn identity(value: &Value) -> Result<Identity> {
             item.password.is_empty() && !item.private_key.is_empty(),
             "同步密钥身份无效"
         ),
+        "interactive" => ensure!(
+            item.password.is_empty() && item.private_key.is_empty() && item.passphrase.is_empty(),
+            "同步交互式身份不能包含凭证"
+        ),
         _ => anyhow::bail!("同步身份类型无效"),
     }
     Ok(item)
@@ -249,6 +253,38 @@ pub(super) fn missing_identities(snapshot: &Snapshot) -> Vec<MissingIdentity> {
             })
         })
         .collect()
+}
+
+/// Dangling jump references must block publishing: a route cannot silently
+/// fall back to a direct connection on another device.
+pub(crate) fn missing_jump_hosts(snapshot: &Snapshot) -> Vec<MissingJumpHost> {
+    let hosts: BTreeSet<_> = snapshot
+        .records
+        .iter()
+        .filter(|r| r.key.kind == Kind::Host && r.value.is_some())
+        .map(|r| r.key.id.as_str())
+        .collect();
+    let mut missing = Vec::new();
+    for record in snapshot.records.iter().filter(|r| r.key.kind == Kind::Host) {
+        let Some(value) = &record.value else {
+            continue;
+        };
+        for jump in value
+            .get("jumpHostIds")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+        {
+            if !jump.is_empty() && !hosts.contains(jump) {
+                missing.push(MissingJumpHost {
+                    host_id: record.key.id.clone(),
+                    jump_host_id: jump.into(),
+                });
+            }
+        }
+    }
+    missing
 }
 
 /// Atomically writes only a conflict-free plan. A fresh local edit invalidates it.

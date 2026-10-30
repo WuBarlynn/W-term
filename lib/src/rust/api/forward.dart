@@ -7,7 +7,56 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`
+// These functions are ignored because they are not marked as `pub`: `from_info`, `read_timeout`, `remove_remote_target`, `socks5_connect`, `socks5_handshake`, `socks5_reply`, `start_listener`, `start_remote`, `valid_host`, `validate_listen`, `validate_target`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+
+Future<List<ForwardRule>> forwardRules({
+  required String token,
+  required String hostId,
+}) => RustLib.instance.api.crateApiForwardForwardRules(
+  token: token,
+  hostId: hostId,
+);
+
+Future<ForwardRule> forwardSaveRule({
+  required String token,
+  required ForwardRule rule,
+}) => RustLib.instance.api.crateApiForwardForwardSaveRule(
+  token: token,
+  rule: rule,
+);
+
+Future<void> forwardDeleteRule({required String token, required String id}) =>
+    RustLib.instance.api.crateApiForwardForwardDeleteRule(token: token, id: id);
+
+Future<ForwardInfo> startForward({
+  required String connectionId,
+  required String kind,
+  required String listenHost,
+  required int listenPort,
+  required String targetHost,
+  required int targetPort,
+}) => RustLib.instance.api.crateApiForwardStartForward(
+  connectionId: connectionId,
+  kind: kind,
+  listenHost: listenHost,
+  listenPort: listenPort,
+  targetHost: targetHost,
+  targetPort: targetPort,
+);
+
+Future<List<ForwardInfo>> listForwards({required String connectionId}) =>
+    RustLib.instance.api.crateApiForwardListForwards(
+      connectionId: connectionId,
+    );
+
+Future<void> stopForward({
+  required String connectionId,
+  required String forwardId,
+}) => RustLib.instance.api.crateApiForwardStopForward(
+  connectionId: connectionId,
+  forwardId: forwardId,
+);
 
 Future<LocalForward> startLocalForward({
   required String connectionId,
@@ -33,6 +82,106 @@ Future<void> stopLocalForward({
   connectionId: connectionId,
   forwardId: forwardId,
 );
+
+class ForwardInfo {
+  final String id;
+
+  /// local, remote, or dynamic
+  final String kind;
+  final String listenHost;
+  final int listenPort;
+  final String targetHost;
+  final int targetPort;
+  final String? lastError;
+
+  /// True when the listening socket is on the SSH server.
+  final bool listenRemote;
+
+  const ForwardInfo({
+    required this.id,
+    required this.kind,
+    required this.listenHost,
+    required this.listenPort,
+    required this.targetHost,
+    required this.targetPort,
+    this.lastError,
+    required this.listenRemote,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      kind.hashCode ^
+      listenHost.hashCode ^
+      listenPort.hashCode ^
+      targetHost.hashCode ^
+      targetPort.hashCode ^
+      lastError.hashCode ^
+      listenRemote.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ForwardInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          kind == other.kind &&
+          listenHost == other.listenHost &&
+          listenPort == other.listenPort &&
+          targetHost == other.targetHost &&
+          targetPort == other.targetPort &&
+          lastError == other.lastError &&
+          listenRemote == other.listenRemote;
+}
+
+class ForwardRule {
+  final String id;
+  final String hostId;
+  final String name;
+
+  /// local, remote, or dynamic
+  final String kind;
+  final String listenHost;
+  final int listenPort;
+  final String targetHost;
+  final int targetPort;
+
+  const ForwardRule({
+    required this.id,
+    required this.hostId,
+    required this.name,
+    required this.kind,
+    required this.listenHost,
+    required this.listenPort,
+    required this.targetHost,
+    required this.targetPort,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      hostId.hashCode ^
+      name.hashCode ^
+      kind.hashCode ^
+      listenHost.hashCode ^
+      listenPort.hashCode ^
+      targetHost.hashCode ^
+      targetPort.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ForwardRule &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          hostId == other.hostId &&
+          name == other.name &&
+          kind == other.kind &&
+          listenHost == other.listenHost &&
+          listenPort == other.listenPort &&
+          targetHost == other.targetHost &&
+          targetPort == other.targetPort;
+}
 
 class LocalForward {
   final String id;

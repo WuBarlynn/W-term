@@ -219,17 +219,48 @@ pub fn vault_read(token: String, kind: String) -> Result<String> {
 }
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Host {
-    id: String,
-    name: String,
-    host: String,
-    username: String,
-    port: u16,
-    group: String,
-    tags: Vec<String>,
-    favorite: bool,
+pub(crate) struct Host {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) host: String,
+    pub(crate) username: String,
+    pub(crate) port: u16,
+    pub(crate) group: String,
+    pub(crate) tags: Vec<String>,
+    pub(crate) favorite: bool,
     #[serde(default, rename = "identityId")]
-    identity_id: String,
+    pub(crate) identity_id: String,
+    #[serde(default, rename = "jumpHostIds", skip_serializing_if = "Vec::is_empty")]
+    pub(crate) jump_host_ids: Vec<String>,
+}
+pub(crate) const MAX_JUMP_HOSTS: usize = 4;
+
+/// Checks that every jump reference exists and the whole saved host graph is
+/// acyclic and bounded. Called only with the complete host collection.
+pub(crate) fn validate_host_routes(hosts: &[Host]) -> Result<()> {
+    let by_id: HashMap<&str, &Host> = hosts.iter().map(|h| (h.id.as_str(), h)).collect();
+    fn visit<'a>(
+        id: &'a str,
+        by_id: &HashMap<&'a str, &'a Host>,
+        stack: &mut Vec<&'a str>,
+        depth: usize,
+    ) -> Result<()> {
+        ensure!(depth <= MAX_JUMP_HOSTS, "跳板路线最多 4 台跳板主机");
+        ensure!(!stack.contains(&id), "跳板路线存在循环引用");
+        let host = by_id
+            .get(id)
+            .context("跳板主机不存在或已被删除，请重新编辑路线")?;
+        stack.push(id);
+        for jump in &host.jump_host_ids {
+            visit(jump, by_id, stack, depth + 1)?;
+        }
+        stack.pop();
+        Ok(())
+    }
+    for host in hosts {
+        visit(&host.id, &by_id, &mut Vec::new(), 0)?;
+    }
+    Ok(())
 }
 #[flutter_rust_bridge::frb(ignore)]
 pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
@@ -247,7 +278,10 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
                     .all(|s| !s.trim().is_empty() && s.len() <= 4096),
                 "主机字段无效"
             );
-            ensure!(h.port > 0 && ids.insert(h.id), "端口无效或主机 ID 重复");
+            ensure!(
+                h.port > 0 && ids.insert(h.id.clone()),
+                "端口无效或主机 ID 重复"
+            );
             ensure!(
                 h.group.len() <= 4096
                     && h.tags.len() <= 100
@@ -255,6 +289,19 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
                 "分类或标签过长"
             );
             let _ = h.favorite;
+            ensure!(
+                h.jump_host_ids.len() <= MAX_JUMP_HOSTS,
+                "每台主机最多 4 台跳板主机"
+            );
+            let mut jumps = HashSet::new();
+            for jump in &h.jump_host_ids {
+                ensure!(
+                    !jump.trim().is_empty() && jump.len() <= 4096,
+                    "跳板主机引用无效"
+                );
+                ensure!(jump != &h.id, "主机不能把自己设为跳板");
+                ensure!(jumps.insert(jump), "跳板主机重复");
+            }
         }
     } else if kind == "snippets" {
         let entries: Vec<Snippet> = serde_json::from_str(json)?;
@@ -331,7 +378,9 @@ pub fn vault_write(token: String, kind: String, json: String) -> Result<()> {
     with_vault(&token, |db| {
         ensure!(imported(db)?, "请先完成旧配置迁移");
         if kind == "hosts" {
-            validate_references(db, &serde_json::from_str::<Vec<Host>>(&json)?)?;
+            let hosts: Vec<Host> = serde_json::from_str(&json)?;
+            validate_references(db, &hosts)?;
+            validate_host_routes(&hosts)?;
         }
         db.execute("INSERT INTO records(kind,value) VALUES (?1,?2) ON CONFLICT(kind) DO UPDATE SET value=excluded.value", params![kind, json])?;
         Ok(())
@@ -351,6 +400,8 @@ fn imported(db: &Connection) -> Result<bool> {
 pub fn vault_import_legacy(token: String, hosts_json: String, folders_json: String) -> Result<()> {
     validate("hosts", &hosts_json)?;
     validate("folders", &folders_json)?;
+    let hosts: Vec<Host> = serde_json::from_str(&hosts_json)?;
+    validate_host_routes(&hosts)?;
     with_vault(&token, |db| {
         let tx = db.transaction()?;
         if imported(&tx)? {
@@ -449,7 +500,7 @@ fn save_identity(db: &Connection, mut input: SensitiveInput) -> Result<String> {
         "请输入身份名称和用户名"
     );
     ensure!(
-        matches!(input.kind.as_str(), "password" | "key"),
+        matches!(input.kind.as_str(), "password" | "key" | "interactive"),
         "身份类型无效"
     );
     let id = if input.id.is_empty() {
@@ -485,6 +536,13 @@ fn save_identity(db: &Connection, mut input: SensitiveInput) -> Result<String> {
             },
         )
         .map_err(|_| anyhow!("私钥无法解析，请检查文件和口令"))?;
+    } else if input.kind == "interactive" {
+        ensure!(
+            secrets.password.is_empty()
+                && secrets.private_key.is_empty()
+                && secrets.passphrase.is_empty(),
+            "仅交互式身份不保存凭证"
+        );
     } else {
         ensure!(
             !secrets.password.is_empty()
@@ -663,6 +721,7 @@ pub fn vault_save_host(
         let mut hosts: Vec<Host> = serde_json::from_str(&read_record(&tx, "hosts")?)?;
         hosts.retain(|h| h.id != host.id);
         hosts.push(host);
+        validate_host_routes(&hosts)?;
         put_record(&tx, "hosts", &serde_json::to_string(&hosts)?)?;
         tx.commit()?;
         Ok(json)
@@ -674,23 +733,7 @@ pub async fn vault_authenticate_identity(
     connection_id: String,
     approved_fingerprint: String,
 ) -> Result<String> {
-    let (username, mut secrets) = with_vault(&token, |db| {
-        db.query_row(
-            "SELECT username,password,private_key,passphrase FROM identities WHERE id=?1",
-            [&identity_id],
-            |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    Secrets {
-                        password: Zeroizing::new(r.get(1)?),
-                        private_key: Zeroizing::new(r.get(2)?),
-                        passphrase: Zeroizing::new(r.get(3)?),
-                    },
-                ))
-            },
-        )
-        .map_err(|_| anyhow!("身份不存在，请编辑主机重新选择"))
-    })?;
+    let (username, mut secrets) = identity_secrets(&token, &identity_id)?;
     crate::session::authenticate(
         &connection_id,
         &approved_fingerprint,
@@ -707,6 +750,48 @@ pub async fn vault_authenticate_identity(
     }
     Ok(username)
 }
+/// Authenticates an intermediate route hop without opening a terminal.
+pub async fn vault_authenticate_jump_identity(
+    token: String,
+    identity_id: String,
+    connection_id: String,
+    approved_fingerprint: String,
+) -> Result<String> {
+    let (username, mut secrets) = identity_secrets(&token, &identity_id)?;
+    crate::session::authenticate_jump(
+        &connection_id,
+        &approved_fingerprint,
+        username.clone(),
+        std::mem::take(&mut *secrets.password),
+        std::mem::take(&mut *secrets.private_key),
+        std::mem::take(&mut *secrets.passphrase),
+    )
+    .await?;
+    if with_vault(&token, |_| Ok(())).is_err() {
+        crate::session::disconnect(&connection_id).await?;
+        return Err(anyhow!("保险库已锁定"));
+    }
+    Ok(username)
+}
+fn identity_secrets(token: &str, identity_id: &str) -> Result<(String, Secrets)> {
+    with_vault(token, |db| {
+        db.query_row(
+            "SELECT username,password,private_key,passphrase FROM identities WHERE id=?1",
+            [identity_id],
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    Secrets {
+                        password: Zeroizing::new(r.get(1)?),
+                        private_key: Zeroizing::new(r.get(2)?),
+                        passphrase: Zeroizing::new(r.get(3)?),
+                    },
+                ))
+            },
+        )
+        .map_err(|_| anyhow!("身份不存在，请编辑主机重新选择"))
+    })
+}
 fn within_folder(path: &str, parent: &str) -> bool {
     path == parent || path.starts_with(&format!("{parent}/"))
 }
@@ -717,6 +802,8 @@ pub fn vault_delete_folder(token: String, path: String, delete_hosts: bool) -> R
         let mut hosts: Vec<Host> = serde_json::from_str(&read_record(&tx, "hosts")?)?;
         if delete_hosts {
             hosts.retain(|h| !within_folder(&h.group, &path));
+            validate_host_routes(&hosts)
+                .context("有主机以被删除的主机为跳板，请先修改这些主机的路线")?;
         }
         for h in &mut hosts {
             if within_folder(&h.group, &path) {
@@ -907,14 +994,31 @@ pub fn vault_restore_backup(token: String, path: String, password: String) -> Re
             }
         }
         let mut hosts: Vec<Host> = serde_json::from_str(&read_record(&tx, "hosts")?)?;
+        let mut host_ids = HashMap::new();
         for h in &mut restored {
-            h.id = uuid::Uuid::new_v4().to_string();
+            let old = std::mem::take(&mut h.id);
+            let new_id = uuid::Uuid::new_v4().to_string();
+            host_ids.insert(old, new_id.clone());
+            h.id = new_id;
             h.name.push_str(" (恢复)");
             if !h.identity_id.is_empty() {
                 h.identity_id = ids.get(&h.identity_id).context("备份身份引用无效")?.clone();
             }
         }
+        for h in &mut restored {
+            h.jump_host_ids = h
+                .jump_host_ids
+                .iter()
+                .map(|id| {
+                    host_ids
+                        .get(id)
+                        .context("备份中的跳板主机引用无效")
+                        .cloned()
+                })
+                .collect::<Result<_>>()?;
+        }
         hosts.extend(restored);
+        validate_host_routes(&hosts)?;
         let mut folders: Vec<String> = serde_json::from_str(&read_record(&tx, "folders")?)?;
         folders.extend(serde_json::from_str::<Vec<String>>(&folder_json)?);
         folders.sort();
@@ -1393,6 +1497,194 @@ mod tests {
         ] {
             assert!(!bytes.windows(secret.len()).any(|b| b == secret.as_bytes()));
         }
+        Ok(())
+    }
+    #[test]
+    fn interactive_identity_persists_without_secrets() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let path = dir
+            .path()
+            .join("interactive.db")
+            .to_string_lossy()
+            .to_string();
+        let token = vault_open(path.clone(), "interactive identity password".into(), true)?.token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        let id = vault_save_identity(
+            token.clone(),
+            IdentityInput {
+                id: String::new(),
+                name: "MFA only".into(),
+                username: "mfa".into(),
+                kind: "interactive".into(),
+                password: String::new(),
+                private_key: String::new(),
+                passphrase: String::new(),
+                replace_secret: true,
+            },
+        )?;
+        assert_eq!(vault_identities(token.clone())?[0].kind, "interactive");
+        assert!(vault_save_identity(
+            token.clone(),
+            IdentityInput {
+                id: id.clone(),
+                name: "MFA only".into(),
+                username: "mfa".into(),
+                kind: "interactive".into(),
+                password: "must-not-store".into(),
+                private_key: String::new(),
+                passphrase: String::new(),
+                replace_secret: true,
+            },
+        )
+        .is_err());
+        vault_lock(token)?;
+        let reopened = vault_open(path, "interactive identity password".into(), false)?;
+        let items = vault_identities(reopened.token.clone())?;
+        assert_eq!(
+            (items[0].id.as_str(), items[0].kind.as_str()),
+            (id.as_str(), "interactive")
+        );
+        vault_lock(reopened.token)?;
+        Ok(())
+    }
+    #[tokio::test]
+    #[ignore = "Run scripts/test-core.sh to start the loopback fixture"]
+    async fn fixture_saved_interactive_identity_asks_each_connection() -> Result<()> {
+        async fn authenticate_with_mfa(token: &str, identity: &str, port: u16) -> Result<()> {
+            let (id, fingerprint) = crate::session::probe("127.0.0.1".into(), port).await?;
+            let task_id = id.clone();
+            let task_token = token.to_string();
+            let task_identity = identity.to_string();
+            let auth = tokio::spawn(async move {
+                vault_authenticate_identity(task_token, task_identity, task_id, fingerprint).await
+            });
+            for _ in 0..2 {
+                let challenge = tokio::time::timeout(Duration::from_secs(5), async {
+                    loop {
+                        if let Some(challenge) = crate::session::interactive::challenge(&id).await {
+                            return challenge;
+                        }
+                        tokio::time::sleep(Duration::from_millis(5)).await;
+                    }
+                })
+                .await
+                .context("fixture challenge timeout")?;
+                let answers = if challenge.prompts.len() == 2 {
+                    vec!["654321".into(), "visible".into()]
+                } else {
+                    vec![]
+                };
+                crate::session::interactive::respond(&id, &challenge.id, answers).await?;
+            }
+            tokio::time::timeout(Duration::from_secs(10), auth).await???;
+            assert!(crate::session::live(&id).await.is_ok());
+            crate::session::disconnect(&id).await?;
+            Ok(())
+        }
+        let dir = tempfile::tempdir()?;
+        let path = dir
+            .path()
+            .join("interactive.db")
+            .to_string_lossy()
+            .to_string();
+        let password = "interactive fixture master";
+        let opened = vault_open(path.clone(), password.into(), true)?;
+        let token = opened.token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        let id = vault_save_identity(
+            token.clone(),
+            IdentityInput {
+                id: String::new(),
+                name: "Fixture MFA".into(),
+                username: "mfa".into(),
+                kind: "interactive".into(),
+                password: String::new(),
+                private_key: String::new(),
+                passphrase: String::new(),
+                replace_secret: true,
+            },
+        )?;
+        let port: u16 = std::env::var("WTERM_TEST_PORT")?.parse()?;
+        authenticate_with_mfa(&token, &id, port).await?;
+        vault_lock(token)?;
+        let reopened = vault_open(path, password.into(), false)?;
+        authenticate_with_mfa(&reopened.token, &id, port).await?;
+        vault_lock(reopened.token)?;
+        Ok(())
+    }
+    #[test]
+    fn jump_routes_are_bounded_acyclic_and_remapped_on_restore() -> Result<()> {
+        let _serial = SERIAL.lock().unwrap();
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("routes.db").to_string_lossy().to_string();
+        let backup = dir
+            .path()
+            .join("routes-backup.db")
+            .to_string_lossy()
+            .to_string();
+        let token = vault_open(path, "jump route fixture password".into(), true)?.token;
+        vault_import_legacy(token.clone(), "[]".into(), "[]".into())?;
+        let host = |id: &str, name: &str, jumps: &[&str]| {
+            serde_json::json!({
+                "id": id, "name": name, "host": "127.0.0.1", "username": "wterm",
+                "port": 22, "group": "", "tags": [], "favorite": false,
+                "jumpHostIds": jumps
+            })
+            .to_string()
+        };
+        let save = |id: &str, name: &str, jumps: &[&str]| {
+            vault_save_host(token.clone(), host(id, name, jumps), None)
+        };
+        save("jump-a", "Jump A", &[])?;
+        save("jump-b", "Jump B", &["jump-a"])?;
+        save("target", "Target", &["jump-b"])?;
+        let stored: Vec<serde_json::Value> =
+            serde_json::from_str(&vault_read(token.clone(), "hosts".into())?)?;
+        assert!(stored
+            .iter()
+            .find(|v| v["id"] == "jump-a")
+            .unwrap()
+            .get("jumpHostIds")
+            .is_none());
+        assert!(vault_read(token.clone(), "hosts".into())?.contains("jumpHostIds"));
+        assert!(save("orphan", "Orphan", &["missing"]).is_err());
+        assert!(save("self", "Self", &["self"]).is_err());
+        assert!(save("jump-a", "Jump A", &["target"]).is_err());
+        assert!(save("jump-b", "Jump B", &["jump-a", "jump-a"]).is_err());
+        for (index, id) in ["d1", "d2", "d3", "d4", "d5"].iter().enumerate() {
+            let jumps: Vec<&str> = if index == 0 {
+                vec![]
+            } else {
+                vec![["d1", "d2", "d3", "d4", "d5"][index - 1]]
+            };
+            save(id, id, &jumps)?;
+        }
+        assert!(save("d6", "d6", &["d5"]).is_err());
+        let hosts: Vec<Host> = serde_json::from_str(&vault_read(token.clone(), "hosts".into())?)?;
+        let without_a = hosts
+            .iter()
+            .filter(|h| h.id != "jump-a")
+            .map(|h| serde_json::to_value(h).unwrap())
+            .collect::<Vec<_>>();
+        assert!(vault_write(
+            token.clone(),
+            "hosts".into(),
+            serde_json::to_string(&without_a)?
+        )
+        .is_err());
+        vault_export_backup(token.clone(), backup.clone(), "jump backup password".into())?;
+        vault_write(token.clone(), "hosts".into(), "[]".into())?;
+        vault_restore_backup(token.clone(), backup, "jump backup password".into())?;
+        let restored: Vec<Host> =
+            serde_json::from_str(&vault_read(token.clone(), "hosts".into())?)?;
+        let jump_a = restored.iter().find(|h| h.name == "Jump A (恢复)").unwrap();
+        let jump_b = restored.iter().find(|h| h.name == "Jump B (恢复)").unwrap();
+        let target = restored.iter().find(|h| h.name == "Target (恢复)").unwrap();
+        assert_ne!(jump_a.id, "jump-a");
+        assert_eq!(jump_b.jump_host_ids, vec![jump_a.id.clone()]);
+        assert_eq!(target.jump_host_ids, vec![jump_b.id.clone()]);
+        vault_lock(token)?;
         Ok(())
     }
     #[test]

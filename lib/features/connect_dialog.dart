@@ -111,7 +111,7 @@ class _ConnectDialogState extends State<ConnectDialog> {
             children: [
               Text(
                 widget.persistCredentials
-                    ? '主机和凭证将加密保存，下次可双击直接连接。'
+                    ? '密码或私钥将加密保存，下次可双击连接。密码留空时使用临时交互式连接，不保存凭证。'
                     : '直接连接服务器，凭证仅用于本次会话。',
                 style: const TextStyle(fontSize: 13),
               ),
@@ -196,7 +196,11 @@ class _ConnectDialogState extends State<ConnectDialog> {
                   obscureText: true,
                   autocorrect: false,
                   enableSuggestions: false,
-                  decoration: const InputDecoration(labelText: '密码'),
+                  decoration: const InputDecoration(
+                    labelText: '密码',
+                    helperText: '仅交互式认证可留空；验证码在连接后填写，不在此保存。',
+                    helperMaxLines: 2,
+                  ),
                   onFieldSubmitted: (_) => submit(),
                 ),
               if (error != null)

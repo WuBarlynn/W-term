@@ -83,6 +83,48 @@ fn sync_two_encrypted_vaults_merge_independent_edits_and_converge() {
     }
 }
 #[test]
+fn sync_interactive_identity_must_not_carry_secrets() {
+    let (_dir, a, _b, base) = pair();
+    a.execute(
+        "INSERT INTO identities VALUES ('interactive','MFA','mfa','interactive','','','')",
+        [],
+    )
+    .unwrap();
+    let local = capture(&a, &base, DEVICE_A).unwrap();
+    assert!(local.validate().is_ok());
+    let plan = merge(&base, &local, &base).unwrap();
+    assert!(plan.is_resolved());
+    let mut invalid = local.clone();
+    for record in &mut invalid.records {
+        if record.key.kind == Kind::Identity {
+            record.value.as_mut().unwrap()["password"] = json!("stored-secret");
+        }
+    }
+    assert!(invalid.validate().is_err());
+}
+#[test]
+fn sync_dangling_jump_reference_blocks_publish() {
+    let (_dir, _a, mut b, base) = pair();
+    put_record(
+        &b,
+        "hosts",
+        &json!([
+            host("host-one", "Original", "identity-one"),
+            {"id":"jump-target","name":"Target","host":"127.0.0.1","username":"tester","port":22,"group":"","tags":[],"favorite":false,"identityId":"identity-one","jumpHostIds":["missing-jump"]}
+        ])
+        .to_string(),
+    )
+    .unwrap();
+    let local = capture(&b, &base, DEVICE_B).unwrap();
+    let plan = merge(&base, &local, &base).unwrap();
+    assert!(!plan.is_resolved());
+    assert_eq!(plan.missing_jump_hosts().len(), 1);
+    assert_eq!(plan.missing_jump_hosts()[0].host_id, "jump-target");
+    assert_eq!(plan.missing_jump_hosts()[0].jump_host_id, "missing-jump");
+    assert!(plan.snapshot().is_err());
+    assert!(apply_merge(&mut b, &plan).is_err());
+}
+#[test]
 fn sync_conflicting_edit_and_delete_preserve_both_and_block_all_writes() {
     let (_dir, mut a, b, base) = pair();
     put_record(

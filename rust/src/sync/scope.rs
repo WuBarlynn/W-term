@@ -201,6 +201,36 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn local_only_jump_host_excludes_dependent_hosts() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let mut db = open_database(&dir.path().join("scope.db"), "fixture scope password", true)?;
+        let hosts = json!([
+            {"id":"jump","name":"Jump","host":"jump.example","port":22,"username":"tester","group":"","tags":[],"favorite":false},
+            {"id":"target","name":"Target","host":"target.example","port":22,"username":"tester","group":"","tags":[],"favorite":false,"jumpHostIds":["jump"]},
+            {"id":"direct","name":"Direct","host":"direct.example","port":22,"username":"tester","group":"","tags":[],"favorite":false}
+        ]);
+        put_record(&db, "hosts", &hosts.to_string())?;
+        put_record(&db, "snippets", "[]")?;
+        state::initialize(&mut db, SPACE.into())?;
+        let view = preview(&mut db, Some(vec![key("host", "jump")]))?;
+        let item = |id: &str| view.items.iter().find(|i| i.id == id).unwrap();
+        assert!(item("jump").selected && item("jump").excluded);
+        assert!(item("target").excluded);
+        assert!(!item("direct").excluded);
+        save(&mut db, &view.revision, vec![key("host", "jump")])?;
+        let s = state::load(&db)?.unwrap();
+        let full = vault::capture_in_transaction(&db, s.local_snapshot(), s.device())?;
+        let excluded = s.policy().excluded(&[&full]);
+        let host_key = |id: &str| Key {
+            kind: Kind::Host,
+            id: id.into(),
+        };
+        assert!(excluded.contains(&host_key("jump")));
+        assert!(excluded.contains(&host_key("target")));
+        assert!(!excluded.contains(&host_key("direct")));
+        Ok(())
+    }
+    #[test]
     fn stale_edits_and_failed_transaction_never_install_unreviewed_rules() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let mut db = setup(&dir);

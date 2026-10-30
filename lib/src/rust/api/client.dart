@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `mutable_remote_path`, `numbered_upload_path`, `replace_upload`, `upload_metadata`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<ServerIdentity> probeServer({required String host, required int port}) =>
     RustLib.instance.api.crateApiClientProbeServer(host: host, port: port);
@@ -21,6 +21,22 @@ Future<void> authenticate({
   required String privateKey,
   required String passphrase,
 }) => RustLib.instance.api.crateApiClientAuthenticate(
+  connectionId: connectionId,
+  approvedFingerprint: approvedFingerprint,
+  username: username,
+  password: password,
+  privateKey: privateKey,
+  passphrase: passphrase,
+);
+
+Future<void> authenticateJump({
+  required String connectionId,
+  required String approvedFingerprint,
+  required String username,
+  required String password,
+  required String privateKey,
+  required String passphrase,
+}) => RustLib.instance.api.crateApiClientAuthenticateJump(
   connectionId: connectionId,
   approvedFingerprint: approvedFingerprint,
   username: username,
@@ -183,6 +199,67 @@ Future<String> previewText({
   connectionId: connectionId,
   path: path,
 );
+
+Future<AuthChallenge?> authChallenge({required String connectionId}) => RustLib
+    .instance
+    .api
+    .crateApiClientAuthChallenge(connectionId: connectionId);
+
+Future<void> answerAuthChallenge({
+  required String connectionId,
+  required String challengeId,
+  required List<String> answers,
+}) => RustLib.instance.api.crateApiClientAnswerAuthChallenge(
+  connectionId: connectionId,
+  challengeId: challengeId,
+  answers: answers,
+);
+
+class AuthChallenge {
+  final String id;
+  final String name;
+  final String instructions;
+  final List<AuthPrompt> prompts;
+
+  const AuthChallenge({
+    required this.id,
+    required this.name,
+    required this.instructions,
+    required this.prompts,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ name.hashCode ^ instructions.hashCode ^ prompts.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthChallenge &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          instructions == other.instructions &&
+          prompts == other.prompts;
+}
+
+class AuthPrompt {
+  final String label;
+  final bool echo;
+
+  const AuthPrompt({required this.label, required this.echo});
+
+  @override
+  int get hashCode => label.hashCode ^ echo.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthPrompt &&
+          runtimeType == other.runtimeType &&
+          label == other.label &&
+          echo == other.echo;
+}
 
 class DirectoryListing {
   final String path;

@@ -3,4 +3,5 @@ pub mod vault;
 
 pub mod forward;
 
+pub mod proxy;
 pub mod sync;

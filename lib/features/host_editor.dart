@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../app/host_store.dart';
 import '../app/identity_store.dart';
 import '../app/errors.dart';
+import '../app/proxy_store.dart';
+import '../src/rust/api/proxy.dart' show ProxyProfile;
 import 'identities_pane.dart';
 
 class HostEditor extends StatefulWidget {
@@ -10,12 +12,20 @@ class HostEditor extends StatefulWidget {
   final IdentityStore? credentials;
   final String initialGroup;
   final List<String> folders;
+  final List<HostProfile> candidates;
+  final ConnectionProxyStore? proxies;
+  final List<ProxyProfile> proxyProfiles;
+  final String proxyBinding;
   const HostEditor({
     super.key,
     this.profile,
     this.credentials,
     this.initialGroup = '',
     this.folders = const [],
+    this.candidates = const [],
+    this.proxies,
+    this.proxyProfiles = const [],
+    this.proxyBinding = '',
   });
   @override
   State<HostEditor> createState() => _HostEditorState();
@@ -25,6 +35,9 @@ class _HostEditorState extends State<HostEditor> {
   final form = GlobalKey<FormState>();
   final password = TextEditingController();
   List<SavedIdentity> identities = [];
+  late List<String> jumpHostIds = [...?widget.profile?.jumpHostIds];
+  late String proxyBinding = widget.proxyBinding;
+  bool staleProxy = false;
   late String mode = widget.profile?.identityId.isNotEmpty == true
       ? 'saved'
       : widget.credentials != null
@@ -36,6 +49,12 @@ class _HostEditorState extends State<HostEditor> {
   @override
   void initState() {
     super.initState();
+    if (proxyBinding.isNotEmpty &&
+        proxyBinding != 'direct' &&
+        !widget.proxyProfiles.any((p) => p.id == proxyBinding)) {
+      staleProxy = true;
+      proxyBinding = '';
+    }
     loadIdentities();
   }
 
@@ -80,6 +99,74 @@ class _HostEditorState extends State<HostEditor> {
     }
   }
 
+  bool _leadsBack(HostProfile candidate) {
+    final targetId = widget.profile?.id;
+    if (targetId == null) return false;
+    final byId = {for (final h in widget.candidates) h.id: h};
+    final seen = <String>{};
+    bool walk(String id) {
+      if (id == targetId) return true;
+      if (!seen.add(id)) return true;
+      final host = byId[id];
+      if (host == null) return true;
+      return host.jumpHostIds.any(walk);
+    }
+
+    return walk(candidate.id);
+  }
+
+  Future<void> addJumpHost() async {
+    final currentId = widget.profile?.id;
+    final available = widget.candidates
+        .where(
+          (h) =>
+              h.id != currentId &&
+              !jumpHostIds.contains(h.id) &&
+              !_leadsBack(h),
+        )
+        .toList();
+    if (available.isEmpty) {
+      setState(() => error = '没有可添加的跳板主机；请先保存要作为跳板的主机');
+      return;
+    }
+    final picked = await showDialog<HostProfile>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('添加跳板'),
+        content: SizedBox(
+          width: 380,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final host in available)
+                ListTile(
+                  dense: true,
+                  title: Text(host.name),
+                  subtitle: Text(
+                    '${host.username}@${host.host}:${host.port}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => Navigator.pop(context, host),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        jumpHostIds.add(picked.id);
+        error = null;
+      });
+    }
+  }
+
   Future<void> submit() async {
     if (busy || loading || !form.currentState!.validate()) return;
     if (mode == 'saved' && !identities.any((i) => i.id == identityId)) {
@@ -87,22 +174,29 @@ class _HostEditorState extends State<HostEditor> {
       return;
     }
     final chosen = identities.where((i) => i.id == identityId).firstOrNull;
-    final profile = HostProfile(
-      id: widget.profile?.id ?? HostProfile.newId(),
-      name: fields[0].text.trim(),
-      host: fields[1].text.trim(),
-      port: int.parse(fields[2].text),
-      username: mode == 'saved' ? chosen!.username : fields[3].text.trim(),
-      group: fields[4].text.trim(),
-      tags: fields[5].text
-          .split(RegExp('[,，]'))
-          .map((v) => v.trim())
-          .where((v) => v.isNotEmpty)
-          .toSet()
-          .toList(),
-      favorite: widget.profile?.favorite ?? false,
-      identityId: mode == 'saved' ? identityId : '',
-    );
+    late final HostProfile profile;
+    try {
+      profile = HostProfile(
+        id: widget.profile?.id ?? HostProfile.newId(),
+        name: fields[0].text.trim(),
+        host: fields[1].text.trim(),
+        port: int.parse(fields[2].text),
+        username: mode == 'saved' ? chosen!.username : fields[3].text.trim(),
+        group: fields[4].text.trim(),
+        tags: fields[5].text
+            .split(RegExp('[,，]'))
+            .map((v) => v.trim())
+            .where((v) => v.isNotEmpty)
+            .toSet()
+            .toList(),
+        favorite: widget.profile?.favorite ?? false,
+        identityId: mode == 'saved' ? identityId : '',
+        jumpHostIds: jumpHostIds,
+      );
+    } on FormatException catch (e) {
+      setState(() => error = e.message);
+      return;
+    }
     final draft = mode == 'password'
         ? IdentityDraft(
             name: '${profile.name} · ${profile.username}',
@@ -116,6 +210,16 @@ class _HostEditorState extends State<HostEditor> {
       final saved = widget.credentials == null
           ? profile
           : await widget.credentials!.saveHost(profile, draft);
+      if (widget.proxies != null) {
+        try {
+          await widget.proxies!.setHostProxyBinding(saved.id, proxyBinding);
+        } catch (e) {
+          if (mounted) {
+            setState(() => error = '主机已保存，但代理设置失败：${userFacingError(e)}');
+          }
+          return;
+        }
+      }
       if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -278,6 +382,145 @@ class _HostEditorState extends State<HostEditor> {
                     icon: const Icon(Icons.key_outlined),
                     label: const Text('添加身份 / 私钥'),
                   ),
+                ],
+                if (widget.proxies != null) ...[
+                  const Divider(height: 28),
+                  Text(
+                    '连接代理（仅第一跳）',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: proxyBinding,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      helperText: '代理只用于直连第一跳；跳板后的目标由上一跳访问。',
+                      helperMaxLines: 2,
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: '', child: Text('继承默认代理')),
+                      const DropdownMenuItem(
+                        value: 'direct',
+                        child: Text('直连（不使用代理）'),
+                      ),
+                      for (final profile in widget.proxyProfiles)
+                        DropdownMenuItem(
+                          value: profile.id,
+                          child: Text(
+                            '${profile.name} · ${profile.mode.toUpperCase()} ${profile.host}:${profile.port}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: busy
+                        ? null
+                        : (value) => setState(() => proxyBinding = value!),
+                  ),
+                  if (staleProxy)
+                    Text(
+                      '此前指定的代理已不存在，已改为继承默认代理；请重新选择。',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                ],
+                if (widget.credentials != null) ...[
+                  const Divider(height: 28),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '跳板路线',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      Text(
+                        '${jumpHostIds.length}/4',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  if (jumpHostIds.isEmpty)
+                    Text(
+                      '默认直接连接目标主机。可选择已保存主机按顺序作为跳板。',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  for (var i = 0; i < jumpHostIds.length; i++)
+                    Builder(
+                      builder: (context) {
+                        final host = widget.candidates
+                            .where((h) => h.id == jumpHostIds[i])
+                            .firstOrNull;
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 12,
+                            child: Text(
+                              '${i + 1}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          title: Text(host?.name ?? '主机已删除'),
+                          subtitle: Text(
+                            host == null
+                                ? '请移除该项并重新选择跳板'
+                                : '${host.username}@${host.host}:${host.port}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: '上移',
+                                icon: const Icon(Icons.arrow_upward, size: 18),
+                                onPressed: busy || i == 0
+                                    ? null
+                                    : () => setState(() {
+                                        final id = jumpHostIds.removeAt(i);
+                                        jumpHostIds.insert(i - 1, id);
+                                      }),
+                              ),
+                              IconButton(
+                                tooltip: '下移',
+                                icon: const Icon(
+                                  Icons.arrow_downward,
+                                  size: 18,
+                                ),
+                                onPressed: busy || i == jumpHostIds.length - 1
+                                    ? null
+                                    : () => setState(() {
+                                        final id = jumpHostIds.removeAt(i);
+                                        jumpHostIds.insert(i + 1, id);
+                                      }),
+                              ),
+                              IconButton(
+                                tooltip: '移除跳板',
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: busy
+                                    ? null
+                                    : () => setState(
+                                        () => jumpHostIds.removeAt(i),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: busy || jumpHostIds.length >= 4
+                          ? null
+                          : addJumpHost,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('添加跳板'),
+                    ),
+                  ),
+                  const Divider(height: 20),
                 ],
                 if (error != null)
                   Text(

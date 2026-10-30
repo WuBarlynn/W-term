@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../app/host_store.dart';
 import '../app/errors.dart';
 import '../app/identity_store.dart';
+import '../app/proxy_store.dart';
+import '../src/rust/api/proxy.dart' show ProxyProfile;
 import 'host_editor.dart';
 import 'openssh_import_dialog.dart';
 
@@ -79,6 +81,27 @@ class HostsPageState extends State<HostsPage> {
   }
 
   Future<void> edit([HostProfile? profile, String initialGroup = '']) async {
+    final proxyStore = widget.store is ConnectionProxyStore
+        ? widget.store as ConnectionProxyStore
+        : null;
+    var proxyProfiles = const <ProxyProfile>[];
+    var proxyBinding = '';
+    if (proxyStore != null) {
+      try {
+        proxyProfiles = await proxyStore.proxyProfiles();
+        if (profile != null) {
+          proxyBinding = await proxyStore.hostProxyBinding(profile.id);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('无法读取代理设置：${userFacingError(e)}')),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
     final result = await showDialog<HostProfile>(
       context: context,
       barrierDismissible: false,
@@ -88,6 +111,10 @@ class HostsPageState extends State<HostsPage> {
             ? widget.store as IdentityStore
             : null,
         initialGroup: initialGroup,
+        candidates: hosts,
+        proxies: proxyStore,
+        proxyProfiles: proxyProfiles,
+        proxyBinding: proxyBinding,
         folders: {
           ...folders,
           ...hosts.map((h) => h.group),
@@ -117,6 +144,31 @@ class HostsPageState extends State<HostsPage> {
   }
 
   Future<void> remove(HostProfile profile) async {
+    final dependents = hosts
+        .where((h) => h.id != profile.id && h.jumpHostIds.contains(profile.id))
+        .toList();
+    if (dependents.isNotEmpty) {
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('不能删除此跳板主机'),
+            content: Text(
+              '以下主机的跳板路线仍引用“${profile.name}”：\n\n'
+              '${dependents.map((h) => '· ${h.name}').join('\n')}\n\n'
+              '请先编辑这些主机并移除该跳板。',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
     final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -374,7 +426,8 @@ class HostsPageState extends State<HostsPage> {
                   style: const TextStyle(fontSize: 13),
                 ),
                 subtitle: Text(
-                  '${h.username}@${h.host}:${h.port}',
+                  '${h.username}@${h.host}:${h.port}'
+                  '${h.jumpHostIds.isEmpty ? '' : ' · ${h.jumpHostIds.length} 台跳板'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 11),

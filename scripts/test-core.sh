@@ -26,7 +26,12 @@ cargo test --manifest-path rust/Cargo.toml --locked
 cargo test --manifest-path rust/Cargo.toml --locked fixture_ -- --ignored --test-threads=1
 if [[ "${WTERM_TEST_FORWARD_BRIDGE:-0}" == "1" ]]; then
   cargo build --manifest-path rust/Cargo.toml --locked
-  flutter test --no-pub tests/smoke/forward_bridge_test.dart \
+  flutter test --no-pub tests/smoke/forward_bridge_test.dart tests/smoke/interactive_auth_bridge_test.dart tests/smoke/proxy_bridge_test.dart tests/smoke/route_bridge_test.dart \
     --dart-define="WTERM_NATIVE_LIB=$PWD/rust/target/debug/libwterm_core.dylib" \
-    --dart-define="WTERM_TEST_PORT=$WTERM_TEST_PORT"
+    --dart-define="WTERM_TEST_PORT=$WTERM_TEST_PORT" \
+    --dart-define="WTERM_JUMP_PORT=$(cat "$WTERM_FIXTURE_ROOT/jump_port")" \
+    --dart-define="WTERM_JUMP2_PORT=$(cat "$WTERM_FIXTURE_ROOT/jump2_port")" \
+    --dart-define="WTERM_STALL_PORT=$(cat "$WTERM_FIXTURE_ROOT/stall_port")" \
+    --dart-define="WTERM_HTTP_PROXY_PORT=$(cat "$WTERM_FIXTURE_ROOT/http_proxy_port")" \
+    --dart-define="WTERM_SOCKS_PROXY_PORT=$(cat "$WTERM_FIXTURE_ROOT/socks5_proxy_port")"
 fi
