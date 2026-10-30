@@ -232,7 +232,11 @@ pub(crate) struct Host {
     pub(crate) identity_id: String,
     #[serde(default, rename = "jumpHostIds", skip_serializing_if = "Vec::is_empty")]
     pub(crate) jump_host_ids: Vec<String>,
-    #[serde(default, rename = "startupCommand", skip_serializing_if = "String::is_empty")]
+    #[serde(
+        default,
+        rename = "startupCommand",
+        skip_serializing_if = "String::is_empty"
+    )]
     pub(crate) startup_command: String,
     #[serde(default, rename = "environment", skip_serializing_if = "Vec::is_empty")]
     pub(crate) environment: Vec<String>,
@@ -304,14 +308,8 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
                     && !h.startup_command.contains('\0'),
                 "启动命令过长或包含控制字符"
             );
-            ensure!(
-                h.environment.len() <= 64,
-                "环境变量最多 64 项"
-            );
-            ensure!(
-                h.icon.len() <= 64,
-                "连接图标标识过长"
-            );
+            ensure!(h.environment.len() <= 64, "环境变量最多 64 项");
+            ensure!(h.icon.len() <= 64, "连接图标标识过长");
             ensure!(
                 h.wiki.len() <= 64 * 1024 && !h.wiki.contains('\0'),
                 "服务器 Wiki 过大或包含控制字符"

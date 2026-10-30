@@ -104,9 +104,10 @@ pub async fn run_command(connection_id: String, command: String) -> Result<Strin
         bail!("Command is empty or too large");
     }
     let live = session::live(&connection_id).await?;
-    let mut channel = tokio::time::timeout(Duration::from_secs(15), live.handle.channel_open_session())
-        .await
-        .context("Command channel timeout")??;
+    let mut channel =
+        tokio::time::timeout(Duration::from_secs(15), live.handle.channel_open_session())
+            .await
+            .context("Command channel timeout")??;
     channel.exec(true, command.as_bytes()).await?;
     let mut output = Vec::new();
     tokio::time::timeout(Duration::from_secs(30), async {
