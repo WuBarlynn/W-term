@@ -114,11 +114,6 @@ class FilesPaneState extends State<FilesPane> {
   }
 
   Future<void> downloadSelected() async {
-    if (Platform.isIOS) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('iOS 请在文件菜单中选择逐个下载并保存')));
-      return;
-    }
     final files = entries
         .where(
           (entry) =>
@@ -130,6 +125,46 @@ class FilesPaneState extends State<FilesPane> {
     if (files.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('请选择要下载的文件')));
+      return;
+    }
+    if (Platform.isIOS) {
+      Directory temp = await createAppTemporaryDirectory('wterm-batch-');
+      setState(() {
+        busy = true;
+        activity = '准备批量下载…';
+        error = null;
+      });
+      try {
+        final shared = <XFile>[];
+        for (var index = 0; index < files.length; index++) {
+          final entry = files[index];
+          if (!mounted) return;
+          setState(
+            () => activity = '下载 ${index + 1}/${files.length}：${entry.name}',
+          );
+          final local = '${temp.path}/${entry.name}';
+          await native.downloadFile(
+            connectionId: widget.connectionId,
+            remotePath: entry.path,
+            localPath: local,
+          );
+          shared.add(XFile(local));
+        }
+        await SharePlus.instance.share(
+          ShareParams(files: shared, text: 'W Term · ${files.length} 个文件'),
+        );
+        if (mounted) {
+          setState(() {
+            selecting = false;
+            selected.clear();
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => error = '批量下载失败：${userFacingError(e)}');
+      } finally {
+        if (mounted) setState(() => busy = false);
+        await temp.delete(recursive: true).catchError((Object _) => temp);
+      }
       return;
     }
     final directory = await getDirectoryPath();
