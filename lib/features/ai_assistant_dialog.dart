@@ -415,30 +415,59 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
       await _settings();
       if (settings.apiKey.trim().isEmpty) return;
     }
+    final history = messages
+        .where((m) => m.role != 'output' && m.text.trim().isNotEmpty)
+        .map((m) => (m.role, m.text))
+        .toList();
+    final bubble = _AiMessage.assistant('', null);
     setState(() {
       busy = true;
       error = null;
-      messages.add(_AiMessage.user(question));
+      messages
+        ..add(_AiMessage.user(question))
+        ..add(bubble);
       input.clear();
     });
     _scrollDown();
     try {
-      final history = messages
-          .where((m) => m.role != 'output')
-          .map((m) => (m.role, m.text))
-          .toList();
-      final reply = await AiService(
-        settings: settings,
-        history: history.length > 1
-            ? history.sublist(0, history.length - 1)
-            : const [],
-      ).ask(question: question, context: _context());
+      final reply = await AiService(settings: settings, history: history)
+          .askStream(
+            question: question,
+            context: _context(),
+            onDelta: (delta) {
+              if (!mounted) return;
+              setState(() => bubble.text += delta);
+              _scrollDown();
+            },
+            runTool: (command) async {
+              if (!await _allowed(command)) return null;
+              return native.runCommand(
+                connectionId: widget.session.connectionId,
+                command: command,
+              );
+            },
+            onToolResult: (command, output) {
+              if (!mounted) return;
+              setState(
+                () => messages.add(
+                  _AiMessage.output('\$ $command\n${output.trim()}'),
+                ),
+              );
+              _scrollDown();
+            },
+          );
       if (!mounted) return;
-      setState(
-        () => messages.add(_AiMessage.assistant(reply.text, reply.command)),
-      );
+      setState(() {
+        bubble.text = reply.text;
+        bubble.command = reply.command;
+      });
     } catch (e) {
-      if (mounted) setState(() => error = userFacingError(e));
+      if (mounted) {
+        setState(() {
+          error = userFacingError(e);
+          if (bubble.text.trim().isEmpty) messages.remove(bubble);
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
       _scrollDown();
@@ -702,9 +731,10 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
 }
 
 class _AiMessage {
-  final String role, text;
-  final String? command;
-  const _AiMessage(this.role, this.text, [this.command]);
+  final String role;
+  String text;
+  String? command;
+  _AiMessage(this.role, this.text, [this.command]);
   factory _AiMessage.user(String text) => _AiMessage('user', text);
   factory _AiMessage.assistant(String text, String? command) =>
       _AiMessage('assistant', text, command);

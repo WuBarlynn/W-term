@@ -15,6 +15,7 @@ class TerminalSession extends ChangeNotifier {
   final Terminal terminal = Terminal(maxLines: 5000);
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
+  final VoidCallback? onActivity;
   final CommandLineTracker _commandTracker = CommandLineTracker();
   final StreamController<List<int>> _bytes = StreamController<List<int>>(
     sync: true,
@@ -36,6 +37,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.onActivity,
     this.hostId = '',
   }) : _offline = false {
     _decoded = utf8.decoder
@@ -56,6 +58,7 @@ class TerminalSession extends ChangeNotifier {
         .listen(
           (data) {
             if (_closed) return;
+            onActivity?.call();
             _bytes.add(data);
             unawaited(
               native
@@ -75,6 +78,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.onActivity,
     this.hostId = '',
   }) : connectionId =
            'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',

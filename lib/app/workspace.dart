@@ -21,6 +21,7 @@ import '../features/command_history_dialog.dart';
 import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
+import 'task_notifications.dart';
 import '../features/hosts_page.dart';
 
 import 'dart:async';
@@ -103,6 +104,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
+    taskMonitor.addListener(_taskCompleted);
     unawaited(_restoreLayout());
     _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
   }
@@ -110,6 +112,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    taskMonitor.removeListener(_taskCompleted);
+    taskMonitor.cancelAll();
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     unawaited(_saveLayout());
@@ -570,14 +574,25 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         host: hops.last.host,
         username: connectedUsername,
         hostId: hops.last.hostId,
-        onEnded: () => _terminalEnded(connectedId),
-        onCommand: (command) => unawaited(
-          commandHistory.record(
-            command: command,
-            host: hops.last.host,
-            username: connectedUsername,
-          ),
-        ),
+        onEnded: () {
+          taskMonitor.sessionClosed(connectedId);
+          _terminalEnded(connectedId);
+        },
+        onActivity: () => taskMonitor.activity(connectedId),
+        onCommand: (command) {
+          unawaited(
+            commandHistory.record(
+              command: command,
+              host: hops.last.host,
+              username: connectedUsername,
+            ),
+          );
+          taskMonitor.commandSubmitted(
+            connectedId,
+            command,
+            title: '$connectedUsername@${hops.last.host}',
+          );
+        },
       );
       final session = _Session(
         connectedId,
@@ -663,6 +678,31 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         _sessionById(tab.activeSessionId) ??
         _sessionById(firstSession(tab.root) ?? '');
     return active?.host ?? '会话';
+  }
+
+  void _taskCompleted() {
+    if (!mounted) return;
+    for (final completion in taskMonitor.drain()) {
+      final command = completion.command.length > 48
+          ? '${completion.command.substring(0, 48)}…'
+          : completion.command;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '任务完成 · ${completion.title} · $command（${completion.elapsed.inSeconds} 秒）',
+          ),
+          action: SnackBarAction(
+            label: '查看',
+            onPressed: () {
+              final tab = _tabForSession(completion.sessionId);
+              if (tab == null) return;
+              setState(() => selected = tabs.indexOf(tab));
+              _scheduleLayoutSave();
+            },
+          ),
+        ),
+      );
+    }
   }
 
   void _terminalEnded(String id) {

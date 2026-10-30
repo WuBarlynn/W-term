@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -20,13 +21,24 @@ class _TmuxDialogState extends State<TmuxDialog> {
   static const _list =
       'tmux list-sessions -F "#{session_name}\\t#{session_windows}\\t#{session_attached}" 2>&1';
   List<(String, int, bool)> sessions = [];
+  final selected = <String>{};
   bool loading = true;
   String? error;
+  Timer? refreshTimer;
 
   @override
   void initState() {
     super.initState();
     load();
+    refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!loading && mounted) load();
+    });
+  }
+
+  @override
+  void dispose() {
+    refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> load() async {
@@ -52,6 +64,9 @@ class _TmuxDialogState extends State<TmuxDialog> {
       if (!mounted) return;
       setState(() {
         sessions = parsed;
+        selected.retainWhere(
+          (name) => parsed.any((session) => session.$1 == name),
+        );
         if (parsed.isEmpty && output.trim().isNotEmpty) error = output.trim();
       });
     } catch (e) {
@@ -171,6 +186,52 @@ class _TmuxDialogState extends State<TmuxDialog> {
     await _run("tmux kill-session -t '$name'", '已结束 tmux 会话');
   }
 
+  Future<void> killSelected() async {
+    if (selected.isEmpty) return;
+    final names = selected.toList();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('结束 ${names.length} 个 tmux 会话？'),
+        content: Text(
+          '以下会话中的程序会结束，此操作不可撤销：\n\n'
+          '${names.map((name) => '· $name').join('\n')}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('全部结束'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => loading = true);
+    try {
+      for (final name in names) {
+        await native.runCommand(
+          connectionId: widget.connectionId,
+          command: "tmux kill-session -t '$name'",
+        );
+      }
+      selected.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已结束 ${names.length} 个 tmux 会话')),
+        );
+      }
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text('tmux 会话 · ${widget.title}'),
@@ -182,9 +243,14 @@ class _TmuxDialogState extends State<TmuxDialog> {
           Row(
             children: [
               const Text(
-                '列出、进入、重命名或结束远端 tmux 会话',
+                '每 5 秒自动刷新 · 勾选后可批量结束',
                 style: TextStyle(fontSize: 12),
               ),
+              if (selected.isNotEmpty)
+                TextButton(
+                  onPressed: loading ? null : killSelected,
+                  child: Text('结束所选（${selected.length}）'),
+                ),
               const Spacer(),
               IconButton(
                 tooltip: '刷新',
@@ -216,11 +282,28 @@ class _TmuxDialogState extends State<TmuxDialog> {
                     children: [
                       for (final (name, windows, attached) in sessions)
                         ListTile(
-                          leading: Icon(
-                            attached ? Icons.link : Icons.link_off,
-                            size: 18,
+                          leading: Checkbox(
+                            value: selected.contains(name),
+                            onChanged: loading
+                                ? null
+                                : (value) => setState(() {
+                                    if (value == true) {
+                                      selected.add(name);
+                                    } else {
+                                      selected.remove(name);
+                                    }
+                                  }),
                           ),
-                          title: Text(name),
+                          title: Row(
+                            children: [
+                              Icon(
+                                attached ? Icons.link : Icons.link_off,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(name),
+                            ],
+                          ),
                           subtitle: Text(
                             '$windows 个窗口${attached ? ' · 已连接' : ''}',
                           ),

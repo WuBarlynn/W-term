@@ -14,6 +14,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool ip = pluginSettings.ipLookup;
   late bool preview = pluginSettings.filePreview;
   late bool completion = pluginSettings.commandCompletion;
+  late bool notifications = pluginSettings.taskNotifications;
   bool saving = false;
   String? error;
 
@@ -28,6 +29,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         ip: ip,
         preview: preview,
         completion: completion,
+        notifications: notifications,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -72,6 +74,14 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
                 : (value) => setState(() => completion = value),
             title: const Text('命令补全'),
             subtitle: const Text('输入 git、docker、kubectl 等命令时在终端底部显示参数提示'),
+          ),
+          SwitchListTile(
+            value: notifications,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => notifications = value),
+            title: const Text('任务完成通知'),
+            subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
           ),
           const Align(
             alignment: Alignment.centerLeft,

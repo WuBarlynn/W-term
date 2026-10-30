@@ -41,6 +41,7 @@ void main() {
         ip: true,
         preview: false,
         completion: false,
+        notifications: false,
       );
       final restored = PluginSettings(file: () async => file);
       await restored.load();
@@ -48,6 +49,7 @@ void main() {
       expect(restored.ipLookup, isTrue);
       expect(restored.filePreview, isFalse);
       expect(restored.commandCompletion, isFalse);
+      expect(restored.taskNotifications, isFalse);
     } finally {
       await dir.delete(recursive: true);
     }

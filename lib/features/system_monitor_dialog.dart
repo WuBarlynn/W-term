@@ -54,6 +54,99 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
 
   int get latencyIndex => _tabs.indexWhere((tab) => tab.$2 == '__latency__');
   int get resourceIndex => _tabs.indexWhere((tab) => tab.$2 == '__resources__');
+  int get processIndex => _tabs.indexWhere((tab) => tab.$1 == '进程');
+  int get portIndex => _tabs.indexWhere((tab) => tab.$1 == '端口');
+  final filter = TextEditingController();
+  String processSort = 'cpu';
+
+  String _commandFor(int tab) {
+    if (tab != processIndex) return _tabs[tab].$2;
+    final sort = processSort == 'mem' ? '%mem' : '%cpu';
+    return "sh -c 'ps -eo pid,ppid,comm,%cpu,%mem --sort=-$sort 2>/dev/null | head -40'";
+  }
+
+  String get filteredOutput {
+    final raw = output[index];
+    if (raw == null) return '尚未获取数据';
+    final query = filter.text.trim().toLowerCase();
+    if (query.isEmpty || (index != processIndex && index != portIndex)) {
+      return raw;
+    }
+    final lines = raw.split('\n');
+    final filtered = lines.where((line) => line.toLowerCase().contains(query));
+    return filtered.isEmpty
+        ? '没有匹配“${filter.text.trim()}”的行'
+        : filtered.join('\n');
+  }
+
+  Future<void> killProcess() async {
+    final controller = TextEditingController();
+    final pid = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('结束远端进程'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'PID',
+            helperText: '会先发送 SIGTERM；请确认 PID 对应预期进程',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('下一步'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
+    final value = pid?.trim() ?? '';
+    if (!RegExp(r'^[1-9][0-9]{0,9}$').hasMatch(value)) {
+      if (value.isNotEmpty && mounted) {
+        setState(() => error = 'PID 必须是正整数');
+      }
+      return;
+    }
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('向 PID $value 发送 SIGTERM？'),
+        content: const Text('进程可能不会立即退出，也可能影响正在运行的服务。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('结束进程'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await native.runCommand(
+        connectionId: widget.connectionId,
+        command: "kill -TERM $value",
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('已发送 SIGTERM')));
+        await _load();
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    }
+  }
 
   @override
   void initState() {
@@ -68,6 +161,7 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
   @override
   void dispose() {
     _sampler?.cancel();
+    filter.dispose();
     super.dispose();
   }
 
@@ -136,7 +230,7 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
       error = null;
     });
     try {
-      final command = _tabs[current].$2;
+      final command = _commandFor(current);
       if (command == '__latency__') {
         final samples = <int>[];
         for (var i = 0; i < 10; i++) {
@@ -309,6 +403,48 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                 child: const SizedBox.expand(),
               ),
             ),
+          if (index == processIndex || index == portIndex)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: filter,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        prefixIcon: Icon(Icons.filter_alt_outlined, size: 18),
+                        hintText: '筛选进程或端口',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  if (index == processIndex) ...[
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: processSort,
+                      items: const [
+                        DropdownMenuItem(value: 'cpu', child: Text('按 CPU')),
+                        DropdownMenuItem(value: 'mem', child: Text('按内存')),
+                      ],
+                      onChanged: loading.contains(index)
+                          ? null
+                          : (value) {
+                              setState(() => processSort = value ?? 'cpu');
+                              _load();
+                            },
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: loading.contains(index) ? null : killProcess,
+                      icon: const Icon(Icons.stop_circle_outlined, size: 16),
+                      label: const Text('结束 PID'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           if (index == resourceIndex)
             Expanded(child: _resourceView())
           else
@@ -324,7 +460,7 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                     ? const Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
                         child: SelectableText(
-                          output[index] ?? '尚未获取数据',
+                          filteredOutput,
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 12,

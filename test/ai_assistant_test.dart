@@ -18,6 +18,88 @@ void main() {
     expect(isReadOnlyCommand('echo \$(whoami)'), isFalse);
   });
 
+  test('stream accumulator merges content and tool-call fragments', () {
+    final accumulator = AiStreamAccumulator();
+    accumulator.addEvent({
+      'choices': [
+        {
+          'delta': {'content': '检查中'},
+        },
+      ],
+    });
+    accumulator.addEvent({
+      'choices': [
+        {
+          'delta': {'content': '…'},
+        },
+      ],
+    });
+    accumulator.addEvent({
+      'choices': [
+        {
+          'delta': {
+            'tool_calls': [
+              {
+                'index': 0,
+                'id': 'call-1',
+                'function': {'name': 'run_command', 'arguments': '{"comm'},
+              },
+            ],
+          },
+        },
+      ],
+    });
+    accumulator.addEvent({
+      'choices': [
+        {
+          'delta': {
+            'tool_calls': [
+              {
+                'index': 0,
+                'function': {'arguments': 'and":"uptime"}'},
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(accumulator.text, '检查中…');
+    expect(accumulator.toolCalls.single.id, 'call-1');
+    expect(accumulator.toolCalls.single.name, 'run_command');
+    expect(
+      accumulator.toolCalls.single.arguments.toString(),
+      '{"command":"uptime"}',
+    );
+  });
+
+  test('stream accumulator accepts a non-streaming message payload', () {
+    final accumulator = AiStreamAccumulator();
+    accumulator.addEvent({
+      'choices': [
+        {
+          'message': {
+            'content': '完成',
+            'tool_calls': [
+              {
+                'id': 'call-2',
+                'function': {
+                  'name': 'run_command',
+                  'arguments': '{"command":"df -h"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(accumulator.text, '完成');
+    expect(
+      accumulator.toolCalls.single.arguments.toString(),
+      '{"command":"df -h"}',
+    );
+    expect(accumulator.toolCalls.single.toJson()['type'], 'function');
+  });
+
   test('AI settings round-trip permission and bounds', () {
     final settings = const AiSettings(
       baseUrl: 'https://example.com/v1',

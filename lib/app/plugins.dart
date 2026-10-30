@@ -20,6 +20,7 @@ class PluginSettings extends ChangeNotifier {
   final Future<File> Function() _file;
   bool jsonFormatter = true, ipLookup = true, filePreview = true;
   bool commandCompletion = true;
+  bool taskNotifications = true;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -39,6 +40,7 @@ class PluginSettings extends ChangeNotifier {
           ipLookup = value['ipLookup'] != false;
           filePreview = value['filePreview'] != false;
           commandCompletion = value['commandCompletion'] != false;
+          taskNotifications = value['taskNotifications'] != false;
         }
       }
     } catch (_) {
@@ -54,11 +56,13 @@ class PluginSettings extends ChangeNotifier {
     required bool ip,
     required bool preview,
     bool? completion,
+    bool? notifications,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
     filePreview = preview;
     commandCompletion = completion ?? commandCompletion;
+    taskNotifications = notifications ?? taskNotifications;
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
@@ -70,6 +74,7 @@ class PluginSettings extends ChangeNotifier {
         'ipLookup': ip,
         'filePreview': preview,
         'commandCompletion': commandCompletion,
+        'taskNotifications': taskNotifications,
       }),
       flush: true,
     );
