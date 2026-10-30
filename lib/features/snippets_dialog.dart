@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app/snippet_store.dart';
 import '../app/errors.dart';
+import '../app/snippet_catalog.dart';
 
 class SnippetsDialog extends StatefulWidget {
   final SnippetStore store;
@@ -21,6 +22,7 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
   String query = '';
   String? error;
   bool busy = true;
+  bool market = false;
   @override
   void initState() {
     super.initState();
@@ -36,6 +38,22 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
           entries = result;
           error = null;
         });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> addCatalog(SnippetCatalogEntry entry) async {
+    setState(() => busy = true);
+    try {
+      await widget.store.saveSnippet('', entry.name, entry.command);
+      await load();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('已添加片段：${entry.name}')));
       }
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -98,6 +116,38 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
     }
   }
 
+  Widget _catalogList(int ignored) {
+    final needle = query.trim().toLowerCase();
+    final entries = snippetCatalog
+        .where(
+          (entry) => '${entry.name} ${entry.category} ${entry.command}'
+              .toLowerCase()
+              .contains(needle),
+        )
+        .toList();
+    if (entries.isEmpty) return const Center(child: Text('没有匹配的官方片段'));
+    return ListView(
+      children: [
+        for (final entry in entries)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(entry.name),
+            subtitle: Text(
+              '${entry.category} · ${entry.command}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: IconButton(
+              tooltip: '添加到我的片段',
+              onPressed: busy ? null : () => addCatalog(entry),
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+            ),
+            onTap: busy ? null : () => addCatalog(entry),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = entries
@@ -132,6 +182,17 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                     : '片段加密保存在保险库，可在未连接服务器时管理。点击片段编辑，菜单可复制命令。',
                 style: TextStyle(fontSize: 12),
               ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('我的片段')),
+                  ButtonSegment(value: true, label: Text('官方精选')),
+                ],
+                selected: {market},
+                onSelectionChanged: (value) =>
+                    setState(() => market = value.first),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 decoration: const InputDecoration(labelText: '搜索片段'),
                 onChanged: (v) => setState(() => query = v),
@@ -143,7 +204,9 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               Expanded(
-                child: visible.isEmpty
+                child: market
+                    ? _catalogList(visible.length)
+                    : visible.isEmpty
                     ? const Center(child: Text('没有匹配片段'))
                     : ListView(
                         children: [
