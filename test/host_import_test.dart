@@ -32,6 +32,25 @@ void main() {
     expect(hosts.single.username, 'root');
   });
 
+  test('CSV password columns become credentials without leaking into tags', () {
+    final bundle = parseHostImportBundle(
+      'hosts.csv',
+      'name,host,port,username,password,group\n'
+          'Prod,example.com,2222,root,s3cret,Production\n',
+    );
+    expect(bundle.hosts.single.group, 'Production');
+    expect(bundle.hosts.single.tags, isEmpty);
+    expect(bundle.passwords[bundle.hosts.single.id], 's3cret');
+    expect(
+      parseHostImportBundle(
+        'hosts.csv',
+        'name,host,port,username,password\n'
+            'Prod,example.com,22,root,s3cret\n',
+      ).hosts.single.group,
+      isEmpty,
+    );
+  });
+
   test('imports Xshell xsh sessions', () {
     final hosts = parseHostImport(
       'ops.xsh',

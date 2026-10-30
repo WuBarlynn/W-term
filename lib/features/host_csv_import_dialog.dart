@@ -5,7 +5,6 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app/host_import.dart';
-import '../app/host_store.dart';
 
 class HostCsvImportDialog extends StatefulWidget {
   const HostCsvImportDialog({super.key});
@@ -16,7 +15,7 @@ class HostCsvImportDialog extends StatefulWidget {
 class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
   final text = TextEditingController();
   String? error;
-  int count = 0;
+  int count = 0, passwordCount = 0;
   String fileName = 'pasted.csv';
   Uint8List? binaryBytes;
 
@@ -41,15 +40,17 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
               bytes[2] == 0x03 &&
               bytes[3] == 0x04);
       if (archive) {
-        final hosts = parseHostImportBytes(file.name, bytes);
+        final bundle = parseHostImportBytesBundle(file.name, bytes);
+        final hosts = bundle.hosts;
         setState(() {
           binaryBytes = bytes;
           fileName = file.name;
           text.text =
-              'Xshell 备份包：${file.name}\n\n'
+              '表格备份：${file.name}\n\n'
               '${hosts.take(50).map((host) => '· ${host.name}  ${host.username}@${host.host}:${host.port}').join('\n')}'
               '${hosts.length > 50 ? '\n…' : ''}';
           count = hosts.length;
+          passwordCount = bundle.passwords.length;
           error = null;
         });
         return;
@@ -65,20 +66,22 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
     }
   }
 
-  List<HostProfile> parseHosts() => binaryBytes != null
-      ? parseHostImportBytes(fileName, binaryBytes!)
-      : parseHostImport(fileName, text.text);
+  HostImportBundle parseBundle() => binaryBytes != null
+      ? parseHostImportBytesBundle(fileName, binaryBytes!)
+      : parseHostImportBundle(fileName, text.text);
 
   void parse() {
     try {
-      final hosts = parseHosts();
+      final bundle = parseBundle();
       setState(() {
-        count = hosts.length;
+        count = bundle.hosts.length;
+        passwordCount = bundle.passwords.length;
         error = null;
       });
     } on FormatException catch (e) {
       setState(() {
         count = 0;
+        passwordCount = 0;
         error = e.message;
       });
     }
@@ -120,6 +123,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
                 binaryBytes = null;
                 fileName = 'pasted.csv';
                 count = 0;
+                passwordCount = 0;
                 error = null;
               }),
               decoration: const InputDecoration(
@@ -141,7 +145,10 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
           if (count > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('可导入 $count 台主机'),
+              child: Text(
+                '可导入 $count 台主机'
+                '${passwordCount == 0 ? '' : '，$passwordCount 个密码将存入身份库'}',
+              ),
             ),
         ],
       ),
@@ -154,8 +161,8 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
       FilledButton(
         onPressed: () {
           try {
-            final hosts = parseHosts();
-            Navigator.pop<List<HostProfile>>(context, hosts);
+            final bundle = parseBundle();
+            Navigator.pop<HostImportBundle>(context, bundle);
           } on FormatException catch (e) {
             setState(() => error = e.message);
           }

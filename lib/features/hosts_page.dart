@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/host_import.dart';
 import '../app/host_store.dart';
 import '../app/host_icons.dart';
 import '../app/errors.dart';
@@ -67,15 +68,53 @@ class HostsPageState extends State<HostsPage> {
   }
 
   Future<void> importCsv() async {
-    final imported = await showDialog<List<HostProfile>>(
+    final bundle = await showDialog<HostImportBundle>(
       context: context,
       builder: (_) => const HostCsvImportDialog(),
     );
-    if (imported == null || imported.isEmpty || !mounted) return;
-    await persist([...hosts, ...imported]);
+    if (bundle == null || bundle.hosts.isEmpty || !mounted) return;
+    if (widget.store is IdentityStore) {
+      final identityStore = widget.store as IdentityStore;
+      var saved = 0, savedPasswords = 0, failed = 0;
+      for (final host in bundle.hosts) {
+        final password = bundle.passwords[host.id];
+        try {
+          await identityStore.saveHost(
+            host,
+            password == null
+                ? null
+                : IdentityDraft(
+                    name: '导入 · ${host.name}',
+                    username: host.username,
+                    kind: 'password',
+                    password: password,
+                  ),
+          );
+          saved++;
+          if (password != null) savedPasswords++;
+        } catch (_) {
+          failed++;
+        }
+      }
+      await load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '已导入 $saved 台主机'
+              '${savedPasswords == 0 ? '' : '，$savedPasswords 个密码已存入身份库'}'
+              '${failed == 0 ? '' : '，$failed 台失败'}',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    await persist([...hosts, ...bundle.hosts]);
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('已导入 ${imported.length} 台主机')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已导入 ${bundle.hosts.length} 台主机')));
     }
   }
 

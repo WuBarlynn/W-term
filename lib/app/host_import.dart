@@ -6,9 +6,19 @@ import 'host_store.dart';
 import 'xlsx_import.dart';
 import 'zip_reader.dart';
 
+class HostImportBundle {
+  final List<HostProfile> hosts;
+  final Map<String, String> passwords;
+  const HostImportBundle({required this.hosts, this.passwords = const {}});
+}
+
 /// Imports the text formats that can be read without a platform SDK:
 /// CSV/TSV, PuTTY registry exports, and SecureCRT/MobaXterm INI exports.
-List<HostProfile> parseHostImport(String fileName, String content) {
+List<HostProfile> parseHostImport(
+  String fileName,
+  String content, {
+  void Function(HostProfile host, String password)? onPassword,
+}) {
   final lower = fileName.toLowerCase();
   if (lower.endsWith('.reg')) return parsePuttyRegistry(content);
   if (lower.endsWith('.xsh') || content.contains('[XSH SESSION]')) {
@@ -18,7 +28,27 @@ List<HostProfile> parseHostImport(String fileName, String content) {
     final parsed = parseIniSessions(content);
     if (parsed.isNotEmpty) return parsed;
   }
-  return parseHostCsv(content);
+  return parseHostCsv(content, onPassword: onPassword);
+}
+
+HostImportBundle parseHostImportBundle(String fileName, String content) {
+  final passwords = <String, String>{};
+  final hosts = parseHostImport(
+    fileName,
+    content,
+    onPassword: (host, password) => passwords[host.id] = password,
+  );
+  return HostImportBundle(hosts: hosts, passwords: passwords);
+}
+
+HostImportBundle parseHostImportBytesBundle(String fileName, Uint8List bytes) {
+  final passwords = <String, String>{};
+  final hosts = parseHostImportBytes(
+    fileName,
+    bytes,
+    onPassword: (host, password) => passwords[host.id] = password,
+  );
+  return HostImportBundle(hosts: hosts, passwords: passwords);
 }
 
 String _unquote(String value) {
@@ -172,7 +202,11 @@ List<HostProfile> parseIniSessions(String content) {
 
 /// Imports Xshell's `.xsh` session or a `.xts` backup archive. Passwords in
 /// Xshell files are encrypted per-installation and are intentionally ignored.
-List<HostProfile> parseHostImportBytes(String fileName, Uint8List bytes) {
+List<HostProfile> parseHostImportBytes(
+  String fileName,
+  Uint8List bytes, {
+  void Function(HostProfile host, String password)? onPassword,
+}) {
   final lower = fileName.toLowerCase();
   final looksLikeZip =
       bytes.length > 4 &&
