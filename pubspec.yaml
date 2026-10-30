@@ -44,6 +44,8 @@ dependencies:
   share_plus: ^13.3.0
   desktop_drop: ^0.8.4
   url_launcher: ^6.3.2
+  desktop_multi_window: ^0.3.1
+  window_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:

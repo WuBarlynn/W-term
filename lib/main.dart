@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
@@ -24,12 +27,26 @@ Map<String, String>? detachedPayload(List<String> args) {
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  Map<String, String>? detached = detachedPayload(args);
+  if (Platform.isWindows) {
+    try {
+      await windowManager.ensureInitialized();
+      final controller = await WindowController.fromCurrentEngine();
+      if (controller.arguments.isNotEmpty) {
+        final decoded = jsonDecode(controller.arguments);
+        if (decoded is Map) {
+          detached = decoded.map((key, value) => MapEntry('$key', '$value'));
+        }
+      }
+    } catch (_) {
+      // The main window may predate the multi-window plugin; stay usable.
+    }
+  }
   try {
     await RustLib.init();
     await terminalAppearance.load();
     await pinnedCommands.load();
     await pluginSettings.load();
-    final detached = detachedPayload(args);
     runApp(
       detached == null
           ? const WTermApp()

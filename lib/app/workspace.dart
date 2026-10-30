@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:xterm/zmodem.dart';
@@ -1093,8 +1094,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   }
 
   Future<void> _detachToWindow(String id) async {
-    if (!Platform.isMacOS) {
-      message('独立终端窗口目前仅支持 macOS。');
+    if (!Platform.isMacOS && !Platform.isWindows) {
+      message('独立终端窗口目前仅支持 macOS 和 Windows。');
       return;
     }
     final session = _sessionById(id);
@@ -1114,21 +1115,29 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
 
     final title = '${session.username}@${session.host}';
+    final payload = jsonEncode({
+      'connectionId': session.id,
+      'host': session.host,
+      'username': session.username,
+      'snapshot': snapshot,
+      'title': title,
+    });
     var opened = false;
     try {
-      opened =
-          await const MethodChannel('dev.wterm/biometrics')
-              .invokeMethod<bool>('openTerminalWindow', {
-                'payload': jsonEncode({
-                  'connectionId': session.id,
-                  'host': session.host,
-                  'username': session.username,
-                  'snapshot': snapshot,
+      if (Platform.isWindows) {
+        await WindowController.create(
+          WindowConfiguration(arguments: payload, hiddenAtLaunch: false),
+        );
+        opened = true;
+      } else {
+        opened =
+            await const MethodChannel('dev.wterm/biometrics')
+                .invokeMethod<bool>('openTerminalWindow', {
+                  'payload': payload,
                   'title': title,
-                }),
-                'title': title,
-              }) ??
-          false;
+                }) ??
+            false;
+      }
     } catch (e) {
       message('无法打开独立窗口：${userFacingError(e)}');
     }
@@ -1727,7 +1736,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           value: 'locate',
           child: _menuRow(Icons.my_location, '定位当前连接'),
         ),
-        if (Platform.isMacOS)
+        if (Platform.isMacOS || Platform.isWindows)
           PopupMenuItem(
             value: 'detach',
             child: _menuRow(Icons.open_in_new, '在新窗口打开'),

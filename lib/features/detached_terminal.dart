@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../app/terminal_session.dart';
 import 'terminal_pane.dart';
@@ -69,6 +71,10 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage> {
     if (closing) return;
     setState(() => closing = true);
     await session.close();
+    if (Platform.isWindows) {
+      await windowManager.close();
+      return;
+    }
     try {
       await _window.invokeMethod<void>('close');
     } on PlatformException {
