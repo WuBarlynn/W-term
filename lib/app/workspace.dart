@@ -2426,6 +2426,7 @@ class _TabViewState extends State<_TabView> {
           key: _filesKey(active.id),
           connectionId: active.id,
           dropActive: widget.active && files && active.connected,
+          followedPath: active.terminal.currentDirectory,
         );
         return Column(
           children: [

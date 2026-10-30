@@ -31,10 +31,12 @@ import '../src/rust/api/client.dart' as native;
 class FilesPane extends StatefulWidget {
   final String connectionId;
   final bool dropActive;
+  final String? followedPath;
   const FilesPane({
     super.key,
     required this.connectionId,
     this.dropActive = true,
+    this.followedPath,
   });
   @override
   State<FilesPane> createState() => FilesPaneState();
@@ -53,7 +55,7 @@ class FilesPaneState extends State<FilesPane> {
   List<XFile> uploadSources = const [];
   final history = DirectoryHistory();
   final search = TextEditingController();
-  bool showHidden = true, descending = false;
+  bool showHidden = true, descending = false, follow = false;
   FileSort sort = FileSort.name;
   final path = TextEditingController(text: '.');
   @override
@@ -69,6 +71,21 @@ class FilesPaneState extends State<FilesPane> {
     path.dispose();
     search.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant FilesPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.followedPath;
+    if (follow &&
+        next != null &&
+        next != oldWidget.followedPath &&
+        !busy &&
+        listing?.path != next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && follow) load(next);
+      });
+    }
   }
 
   Future<void> refresh() => load(listing?.path ?? '.');
@@ -834,6 +851,21 @@ class FilesPaneState extends State<FilesPane> {
                           prefixIcon: Icon(Icons.folder_outlined, size: 18),
                         ),
                         onSubmitted: load,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: follow ? '停止跟随终端目录' : '跟随终端目录',
+                      onPressed: () {
+                        setState(() => follow = !follow);
+                        final target = widget.followedPath;
+                        if (follow && target != null && !busy) load(target);
+                      },
+                      icon: Icon(
+                        follow ? Icons.link : Icons.link_off,
+                        size: 19,
+                        color: follow
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
                     ),
                     IconButton(

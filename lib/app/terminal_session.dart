@@ -27,6 +27,7 @@ class TerminalSession extends ChangeNotifier {
   final bool _offline;
   String? _error;
   int? _lastColumns, _lastRows;
+  String? currentDirectory;
   static int _offlineSequence = 0;
 
   TerminalSession({
@@ -41,6 +42,14 @@ class TerminalSession extends ChangeNotifier {
         .listen(terminal.write, onError: (_) {});
     terminal.onOutput = send;
     terminal.onResize = _resize;
+    terminal.onPrivateOSC = (code, args) {
+      if (code != '7' || args.isEmpty) return;
+      final uri = Uri.tryParse(args.first);
+      final value = uri?.path;
+      if (value == null || value.isEmpty) return;
+      currentDirectory = Uri.decodeComponent(value);
+      notifyListeners();
+    };
     _output = native
         .terminalOutput(connectionId: connectionId)
         .listen(
@@ -135,6 +144,7 @@ class TerminalSession extends ChangeNotifier {
     _resizeTimer?.cancel();
     terminal.onOutput = null;
     terminal.onResize = null;
+    terminal.onPrivateOSC = null;
     final output = _output;
     _output = null;
     await output?.cancel();
