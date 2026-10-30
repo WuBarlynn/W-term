@@ -11,7 +11,8 @@
 - 片段：内置 32 条官方精选命令可搜索并加入加密库；固定命令条跨会话持久化，支持一键发送和取消固定。
 - 终端：分享终端视图为 PNG、选中 JSON 格式化、全选复制、打开文件面板；缺模板/行号/水印。
 - SFTP：解析 OSC 7 跟随终端目录；桌面多选批量下载到目录、同名自动改名；缺自动配置 PROMPT_COMMAND、ZMODEM 和 iOS 目录批量下载。
-- 验证：Flutter 与 Rust 全量测试、静态检查、双端构建和 Windows CI 见本轮日志/产物；真实设备交互仍未验收。
+- 验证：Flutter 219 项、Rust 118/19/7 项、保险库桥接 1 项通过；analyze/fmt/clippy 通过；macOS 自签名 1.0.2、DMG、iOS IPA、Windows 构建/版本校验/启动冒烟/Inno Setup/Rust 测试通过。真实设备交互仍未验收。
+- 产物：`build/release-1.0.2/` 下 macOS DMG、iOS IPA、Windows 安装程序、Windows 便携包和 `SHA256SUMS.txt`；已发布 GitHub Release v1.0.2。
 
 ## 1.0.1 Windows 字体、安装包、DMG 与图标（2026-10-30）
 
