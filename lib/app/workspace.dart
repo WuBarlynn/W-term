@@ -268,6 +268,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           tags: profile?.tags ?? [],
           favorite: profile?.favorite ?? false,
           jumpHostIds: profile?.jumpHostIds ?? const [],
+          startupCommand: profile?.startupCommand ?? '',
+          environment: profile?.environment ?? const [],
         );
         final saved = await credentials.saveHost(
           host,
@@ -599,6 +601,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           (_) => replace.terminal.dispose(),
         );
       }
+      if (profile != null) _applyStartup(session, profile);
       _scheduleLayoutSave();
       handedOff = true;
       activeOperationId = null;
@@ -898,6 +901,24 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void _reconnectById(String id) {
     final session = _sessionById(id);
     if (session != null) unawaited(_reconnect(session));
+  }
+
+  static String _shellQuote(String value) =>
+      "'${value.replaceAll("'", "'\\''")}'";
+
+  void _applyStartup(_Session session, HostProfile profile) {
+    for (final line in profile.environment) {
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final separator = line.indexOf('=');
+      if (separator <= 0) continue;
+      final key = line.substring(0, separator);
+      final value = line.substring(separator + 1);
+      session.terminal.send(' export $key=${_shellQuote(value)}\n');
+    }
+    final command = profile.startupCommand.trim();
+    if (command.isNotEmpty) {
+      session.terminal.send(' $command\n');
+    }
   }
 
   Future<File> _layoutFile() async => File(

@@ -9,6 +9,8 @@ class HostProfile {
   final List<String> tags;
   final bool favorite;
   final List<String> jumpHostIds;
+  final String startupCommand;
+  final List<String> environment;
   HostProfile({
     required this.id,
     required this.name,
@@ -20,8 +22,11 @@ class HostProfile {
     List<String> tags = const [],
     this.favorite = false,
     List<String> jumpHostIds = const [],
+    this.startupCommand = '',
+    List<String> environment = const [],
   }) : tags = List.unmodifiable(tags),
-       jumpHostIds = List.unmodifiable(jumpHostIds) {
+       jumpHostIds = List.unmodifiable(jumpHostIds),
+       environment = List.unmodifiable(environment) {
     if ([id, name, host, username].any((s) => s.trim().isEmpty) ||
         port < 1 ||
         port > 65535) {
@@ -49,6 +54,8 @@ class HostProfile {
     favorite: v['favorite'] as bool,
     identityId: v['identityId'] as String? ?? '',
     jumpHostIds: List<String>.from(v['jumpHostIds'] as List? ?? const []),
+    startupCommand: v['startupCommand'] as String? ?? '',
+    environment: List<String>.from(v['environment'] as List? ?? const []),
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -61,6 +68,8 @@ class HostProfile {
     'favorite': favorite,
     if (identityId.isNotEmpty) 'identityId': identityId,
     if (jumpHostIds.isNotEmpty) 'jumpHostIds': jumpHostIds,
+    if (startupCommand.isNotEmpty) 'startupCommand': startupCommand,
+    if (environment.isNotEmpty) 'environment': environment,
   };
   HostProfile toggleFavorite() => HostProfile(
     id: id,
@@ -73,6 +82,8 @@ class HostProfile {
     favorite: !favorite,
     identityId: identityId,
     jumpHostIds: jumpHostIds,
+    startupCommand: startupCommand,
+    environment: environment,
   );
   bool matches(String query) => [
     name,

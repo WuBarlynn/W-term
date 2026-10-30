@@ -232,6 +232,10 @@ pub(crate) struct Host {
     pub(crate) identity_id: String,
     #[serde(default, rename = "jumpHostIds", skip_serializing_if = "Vec::is_empty")]
     pub(crate) jump_host_ids: Vec<String>,
+    #[serde(default, rename = "startupCommand", skip_serializing_if = "String::is_empty")]
+    pub(crate) startup_command: String,
+    #[serde(default, rename = "environment", skip_serializing_if = "Vec::is_empty")]
+    pub(crate) environment: Vec<String>,
 }
 pub(crate) const MAX_JUMP_HOSTS: usize = 4;
 
@@ -289,6 +293,37 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
                 "分类或标签过长"
             );
             let _ = h.favorite;
+            ensure!(
+                h.startup_command.len() <= 16 * 1024
+                    && !h.startup_command.contains('\n')
+                    && !h.startup_command.contains('\r')
+                    && !h.startup_command.contains('\0'),
+                "启动命令过长或包含控制字符"
+            );
+            ensure!(
+                h.environment.len() <= 64,
+                "环境变量最多 64 项"
+            );
+            for item in &h.environment {
+                ensure!(
+                    item.len() <= 4096
+                        && !item.contains('\n')
+                        && !item.contains('\r')
+                        && !item.contains('\0'),
+                    "环境变量过长或包含控制字符"
+                );
+                let (key, _) = item.split_once('=').context("环境变量必须为 KEY=VALUE")?;
+                ensure!(
+                    !key.is_empty()
+                        && key.len() <= 256
+                        && key
+                            .chars()
+                            .enumerate()
+                            .all(|(i, c)| (c.is_ascii_alphabetic() || c == '_')
+                                || (i > 0 && c.is_ascii_digit())),
+                    "环境变量名无效"
+                );
+            }
             ensure!(
                 h.jump_host_ids.len() <= MAX_JUMP_HOSTS,
                 "每台主机最多 4 台跳板主机"

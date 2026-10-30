@@ -181,7 +181,7 @@ void main() {
       0: 'Server',
       1: 'example.com',
       3: 'alice',
-      6: 'fixture-password',
+      8: 'fixture-password',
     }.entries) {
       await tester.enterText(fields.at(e.key), e.value);
     }

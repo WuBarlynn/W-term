@@ -40,6 +40,21 @@ void main() {
       expect(restored.favorite, isTrue);
     },
   );
+  test('startup command and environment round-trip without credentials', () {
+    final host = HostProfile(
+      id: 'b',
+      name: 'startup',
+      host: 'example.com',
+      username: 'alice',
+      startupCommand: 'cd /srv/app',
+      environment: ['APP_ENV=prod', 'TOKEN=a b'],
+    );
+    final restored = HostProfile.fromJson(host.toJson());
+    expect(restored.startupCommand, 'cd /srv/app');
+    expect(restored.environment, ['APP_ENV=prod', 'TOKEN=a b']);
+    expect(restored.toJson()['environment'], ['APP_ENV=prod', 'TOKEN=a b']);
+    expect(restored.toJson().containsKey('identityId'), isFalse);
+  });
   test('malformed and future data are not silently treated as empty', () async {
     for (final raw in [
       'invalid',

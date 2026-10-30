@@ -34,6 +34,12 @@ class HostEditor extends StatefulWidget {
 class _HostEditorState extends State<HostEditor> {
   final form = GlobalKey<FormState>();
   final password = TextEditingController();
+  late final startup = TextEditingController(
+    text: widget.profile?.startupCommand ?? '',
+  );
+  late final environment = TextEditingController(
+    text: widget.profile?.environment.join('\n') ?? '',
+  );
   List<SavedIdentity> identities = [];
   late List<String> jumpHostIds = [...?widget.profile?.jumpHostIds];
   late String proxyBinding = widget.proxyBinding;
@@ -192,6 +198,12 @@ class _HostEditorState extends State<HostEditor> {
         favorite: widget.profile?.favorite ?? false,
         identityId: mode == 'saved' ? identityId : '',
         jumpHostIds: jumpHostIds,
+        startupCommand: startup.text.trim(),
+        environment: environment.text
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty && !line.startsWith('#'))
+            .toList(),
       );
     } on FormatException catch (e) {
       setState(() => error = e.message);
@@ -244,6 +256,8 @@ class _HostEditorState extends State<HostEditor> {
     }
     password.clear();
     password.dispose();
+    startup.dispose();
+    environment.dispose();
     super.dispose();
   }
 
@@ -321,6 +335,53 @@ class _HostEditorState extends State<HostEditor> {
                       },
                     ),
                   ),
+                const Divider(height: 24),
+                TextFormField(
+                  controller: startup,
+                  enabled: !busy,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: '启动命令（可选）',
+                    helperText: '连接成功后自动执行，行首会加空格以避免污染 shell 历史',
+                  ),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.length > 16 * 1024) return '启动命令不能超过 16 KiB';
+                    if (text.contains('\n') || text.contains('\r')) {
+                      return '启动命令必须为单行';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: environment,
+                  enabled: !busy,
+                  autocorrect: false,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '环境变量（可选）',
+                    helperText: '每行 KEY=VALUE；# 开头为注释；最多 64 项',
+                  ),
+                  validator: (value) {
+                    final lines = (value ?? '')
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .where(
+                          (line) => line.isNotEmpty && !line.startsWith('#'),
+                        )
+                        .toList();
+                    if (lines.length > 64) return '环境变量最多 64 项';
+                    final key = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*=');
+                    for (final line in lines) {
+                      if (line.length > 4096 || !key.hasMatch(line)) {
+                        return '环境变量格式必须为 KEY=VALUE';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
                 if (widget.credentials != null) ...[
                   if (loading) const LinearProgressIndicator(),
                   DropdownButtonFormField<String>(

@@ -9,7 +9,8 @@
 - Windows 安装程序：新增 `installer/wterm.iss`（Inno Setup，按用户安装到 `%LOCALAPPDATA%`，含开始菜单/可选桌面快捷方式），CI 构建安装包并校验 exe 版本。
 - macOS DMG：新增 `scripts/package-macos-dmg.sh`，把自签名 App、Applications 链接和 LICENSE 打成 UDZO DMG，可用同一签名身份签署 DMG。
 - 新增 [CLOUDTERM_FEATURE_AUDIT.md](CLOUDTERM_FEATURE_AUDIT.md)，按公开 Cloud Term 指南逐项标注已有/部分/缺失；排除自定义皮肤和彩蛋，但列出其余全部差距。
-- 验证：macOS 1.0.1 自签名与 DMG 构建成功；iOS 1.0.1 IPA 构建成功；Windows CI 正在构建安装包。真实 Windows 输入、安装和雅黑显示仍需人工验收。
+- 新增连接启动命令与环境变量：主机编辑器可配置单行启动命令和最多 64 条 `KEY=VALUE`；连接成功后以行首空格执行/导出，避免污染 shell 历史，值使用 shell 单引号转义。环境注入暂用 `export` 回落，尚未使用 SSH env 请求。
+- 验证：Flutter 全量 204 项、Rust 118 项通过；macOS 1.0.1 自签名与 DMG 构建成功；iOS 1.0.1 IPA 构建成功；Windows CI 的安装说明、exe 启动冒烟和 Inno Setup 安装包构建成功。真实 Windows 输入、安装和雅黑显示仍需人工验收。
 
 ## 1.0.0 三端构建（2026-10-30）
 
