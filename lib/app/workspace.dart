@@ -76,6 +76,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   final sessions = <_Session>[];
   final tabs = <WorkspaceTab>[];
   int selected = -1, attempt = 0;
+  BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
   String status = '';
   String? pending;
@@ -828,6 +829,111 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     _dropTab(sourceTabId, targetSessionId, edge);
   }
 
+  void _handleShortcut(String action, int? index) {
+    if (!mounted) return;
+    if (action == 'new') {
+      unawaited(connect());
+    } else if (action == 'close-tab') {
+      if (_activeTabIndex >= 0) unawaited(closeTab(tabs[selected]));
+    } else if (action == 'tab' && index != null) {
+      if (index >= 0 && index < tabs.length) {
+        setState(() => selected = index);
+      }
+    } else if (action == 'next-tab' || action == 'prev-tab') {
+      if (tabs.length < 2) return;
+      final step = action == 'next-tab' ? 1 : -1;
+      setState(() => selected = (selected + step + tabs.length) % tabs.length);
+    } else if (action == 'sessions') {
+      unawaited(showSessionPicker());
+    }
+  }
+
+  Future<void> showSessionPicker() async {
+    if (sessions.isEmpty) {
+      message('当前没有已打开的终端。');
+      return;
+    }
+    final activeId = _activeTabIndex >= 0
+        ? tabs[selected].activeSessionId
+        : null;
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('已打开的终端'),
+        content: SizedBox(
+          width: 480,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final session in sessions)
+                ListTile(
+                  leading: Icon(
+                    session.connected ? Icons.terminal : Icons.link_off,
+                    size: 18,
+                  ),
+                  title: Text(
+                    '${session.username}@${session.host}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '${_tabForSession(session.id) == null ? '未分组' : _tabTitle(_tabForSession(session.id)!)}'
+                    '${session.connected ? '' : ' · 已断开'}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: session.id == activeId
+                      ? const Icon(Icons.check, size: 18)
+                      : null,
+                  onTap: () => Navigator.pop(context, session.id),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    final tab = _tabForSession(chosen);
+    if (tab == null) return;
+    setState(() {
+      selected = tabs.indexOf(tab);
+      tab.activeSessionId = chosen;
+    });
+  }
+
+  Future<void> _setBroadcastScope(BroadcastScope scope) async {
+    if (scope == broadcastScope) return;
+    if (scope == BroadcastScope.all) {
+      final count = sessions.where((session) => session.connected).length;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('向所有已连接会话广播输入？'),
+          content: Text(
+            '键盘输入将同时写入 $count 个已连接终端（包含当前终端）。'
+            '请确认没有正在执行的敏感命令。可随时从终端工具栏关闭广播。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('开始广播'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    setState(() => broadcastScope = scope);
+  }
+
   Future<void> _splitSession(String targetSessionId, Axis axis) =>
       _splitSessionAt(targetSessionId, edgeForAxis(axis));
 
@@ -1327,12 +1433,15 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         }
       case 'known':
         await showKnownHosts();
+      case 'sessions':
+        await showSessionPicker();
       case 'lock':
         widget.onLock?.call();
     }
   }
 
   List<PopupMenuEntry<String>> _settingsItems() => [
+    popupItem('sessions', Icons.list_alt, '已打开终端'),
     if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
     if (hostStore is SyncStore) popupItem('sync', Icons.sync, 'GitHub 同步'),
     if (hostStore is ConnectionProxyStore)
@@ -1638,6 +1747,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     ruleStore: hostStore is ForwardRuleStore
         ? hostStore as ForwardRuleStore
         : null,
+    broadcastScope: broadcastScope,
+    onBroadcastChanged: _setBroadcastScope,
+    onShortcut: _handleShortcut,
     onActivate: (sessionId) {
       if (tab.activeSessionId != sessionId) {
         setState(() => tab.activeSessionId = sessionId);
@@ -1860,6 +1972,9 @@ class _TabView extends StatefulWidget {
   final SnippetStore? snippets;
   final ForwardRuleStore? ruleStore;
   final bool active;
+  final BroadcastScope broadcastScope;
+  final ValueChanged<BroadcastScope> onBroadcastChanged;
+  final void Function(String action, int? index)? onShortcut;
   final ValueChanged<String> onActivate;
   final void Function(String sessionId, Axis axis) onSplit;
   final ValueChanged<String> onSplitBack;
@@ -1877,6 +1992,9 @@ class _TabView extends StatefulWidget {
     this.snippets,
     this.ruleStore,
     required this.active,
+    required this.broadcastScope,
+    required this.onBroadcastChanged,
+    this.onShortcut,
     required this.onActivate,
     required this.onSplit,
     required this.onSplitBack,
@@ -1977,6 +2095,9 @@ class _TabViewState extends State<_TabView> {
           sessions: widget.sessions,
           snippets: widget.snippets,
           active: widget.active,
+          broadcastScope: widget.broadcastScope,
+          onBroadcastChanged: widget.onBroadcastChanged,
+          onShortcut: widget.onShortcut,
           onActivate: widget.onActivate,
           onSplit: widget.onSplit,
           onSplitBack: widget.onSplitBack,
@@ -2077,6 +2198,9 @@ class _PaneTree extends StatelessWidget {
   final List<_Session> sessions;
   final SnippetStore? snippets;
   final bool active;
+  final BroadcastScope broadcastScope;
+  final ValueChanged<BroadcastScope> onBroadcastChanged;
+  final void Function(String action, int? index)? onShortcut;
   final ValueChanged<String> onActivate;
   final void Function(String sessionId, Axis axis) onSplit;
   final ValueChanged<String> onSplitBack;
@@ -2094,6 +2218,9 @@ class _PaneTree extends StatelessWidget {
     required this.sessions,
     this.snippets,
     required this.active,
+    required this.broadcastScope,
+    required this.onBroadcastChanged,
+    this.onShortcut,
     required this.onActivate,
     required this.onSplit,
     required this.onSplitBack,
@@ -2109,10 +2236,29 @@ class _PaneTree extends StatelessWidget {
     final session = _byId(sessionId);
     if (session == null) return const SizedBox.shrink();
     final count = sessionIds(tab.root).length;
+    final targetIds = broadcastTargetIds(
+      sourceId: session.id,
+      scope: broadcastScope,
+      tabSessionIds: sessionIdsOrdered(tab.root),
+      allSessionIds: sessions.map((item) => item.id),
+      connectedSessionIds: {
+        for (final item in sessions)
+          if (item.connected) item.id,
+      },
+    );
+    final byId = {for (final item in sessions) item.id: item};
+    final targets = [
+      for (final id in targetIds)
+        if (byId[id] != null) byId[id]!.terminal,
+    ];
     final pane = TerminalPane(
       session: session.terminal,
       snippets: snippets,
       active: active && tab.activeSessionId == session.id,
+      broadcastScope: broadcastScope,
+      broadcastTargets: targets,
+      onBroadcastChanged: onBroadcastChanged,
+      onShortcut: onShortcut,
       onActivate: () => onActivate(session.id),
       onSplitHorizontal: () => onSplit(session.id, Axis.horizontal),
       onSplitVertical: () => onSplit(session.id, Axis.vertical),
@@ -2187,6 +2333,9 @@ class _PaneTree extends StatelessWidget {
             sessions: sessions,
             snippets: snippets,
             active: active,
+            broadcastScope: broadcastScope,
+            onBroadcastChanged: onBroadcastChanged,
+            onShortcut: onShortcut,
             onActivate: onActivate,
             onSplit: onSplit,
             onSplitBack: onSplitBack,
@@ -2203,6 +2352,9 @@ class _PaneTree extends StatelessWidget {
             sessions: sessions,
             snippets: snippets,
             active: active,
+            broadcastScope: broadcastScope,
+            onBroadcastChanged: onBroadcastChanged,
+            onShortcut: onShortcut,
             onActivate: onActivate,
             onSplit: onSplit,
             onSplitBack: onSplitBack,

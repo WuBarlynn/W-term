@@ -2,6 +2,27 @@ import 'package:flutter/widgets.dart';
 
 enum SplitEdge { left, right, top, bottom }
 
+enum BroadcastScope { off, tab, all }
+
+/// Sessions that receive a pane's keystrokes. The source pane is excluded and
+/// only currently connected sessions are eligible.
+List<String> broadcastTargetIds({
+  required String sourceId,
+  required BroadcastScope scope,
+  required Iterable<String> tabSessionIds,
+  required Iterable<String> allSessionIds,
+  required Set<String> connectedSessionIds,
+}) {
+  if (scope == BroadcastScope.off) return const [];
+  final candidates = scope == BroadcastScope.tab
+      ? tabSessionIds
+      : allSessionIds;
+  return [
+    for (final id in candidates)
+      if (id != sourceId && connectedSessionIds.contains(id)) id,
+  ];
+}
+
 sealed class PaneNode {
   const PaneNode();
 }

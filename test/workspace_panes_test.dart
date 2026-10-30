@@ -108,4 +108,22 @@ void main() {
     expect(nearestSplitEdge(const Offset(500, 300), size), SplitEdge.top);
     expect(nearestSplitEdge(Offset.zero, Size.zero), SplitEdge.right);
   });
+
+  test(
+    'broadcast targets exclude source, disconnected and out-of-scope panes',
+    () {
+      List<String> targets(BroadcastScope scope, Set<String> connected) =>
+          broadcastTargetIds(
+            sourceId: 'a',
+            scope: scope,
+            tabSessionIds: const ['a', 'b'],
+            allSessionIds: const ['a', 'b', 'c'],
+            connectedSessionIds: connected,
+          );
+      expect(targets(BroadcastScope.off, {'a', 'b', 'c'}), isEmpty);
+      expect(targets(BroadcastScope.tab, {'a', 'b', 'c'}), ['b']);
+      expect(targets(BroadcastScope.all, {'a', 'b', 'c'}), ['b', 'c']);
+      expect(targets(BroadcastScope.all, {'a', 'c'}), ['c']);
+    },
+  );
 }

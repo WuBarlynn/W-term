@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/terminal_session.dart';
+import '../app/workspace_layout.dart';
 
 /// A view over a [TerminalSession]. Multiple panes never own the SSH session;
 /// disposing or moving this widget never disconnects the connection.
@@ -19,6 +20,10 @@ class TerminalPane extends StatefulWidget {
   final TerminalSession session;
   final SnippetStore? snippets;
   final bool active;
+  final BroadcastScope broadcastScope;
+  final List<TerminalSession> broadcastTargets;
+  final ValueChanged<BroadcastScope>? onBroadcastChanged;
+  final void Function(String action, int? index)? onShortcut;
   final VoidCallback onActivate;
   final VoidCallback? onSplitHorizontal;
   final VoidCallback? onSplitVertical;
@@ -29,6 +34,10 @@ class TerminalPane extends StatefulWidget {
     required this.session,
     this.snippets,
     required this.active,
+    this.broadcastScope = BroadcastScope.off,
+    this.broadcastTargets = const [],
+    this.onBroadcastChanged,
+    this.onShortcut,
     required this.onActivate,
     this.onSplitHorizontal,
     this.onSplitVertical,
@@ -48,6 +57,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     super.initState();
     terminalAppearance.addListener(appearanceChanged);
     widget.session.addListener(sessionChanged);
+    widget.session.terminal.onOutput = _output;
     _wasActive = widget.active;
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
@@ -59,12 +69,30 @@ class _TerminalPaneState extends State<TerminalPane> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(sessionChanged);
+      oldWidget.session.terminal.onOutput = oldWidget.session.send;
       widget.session.addListener(sessionChanged);
+      widget.session.terminal.onOutput = _output;
     }
     if (widget.active && !_wasActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
     }
     _wasActive = widget.active;
+  }
+
+  /// Routes terminal input through the pane so an explicit broadcast scope
+  /// writes the same bytes to every connected target.
+  void _output(String text) {
+    widget.session.send(text);
+    for (final target in widget.broadcastTargets) {
+      target.send(text);
+    }
+  }
+
+  void _sendInput(String text) {
+    widget.session.send(text);
+    for (final target in widget.broadcastTargets) {
+      target.send(text);
+    }
   }
 
   void _focus() {
@@ -197,6 +225,8 @@ class _TerminalPaneState extends State<TerminalPane> {
   Widget _toolbar() => LayoutBuilder(
     builder: (context, constraints) {
       final compact = constraints.maxWidth < 520;
+      final broadcasting = widget.broadcastScope != BroadcastScope.off;
+      final targets = widget.broadcastTargets.length;
       return Row(
         children: [
           Icon(
@@ -207,11 +237,51 @@ class _TerminalPaneState extends State<TerminalPane> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              ended ? '已断开 · ${widget.session.title}' : widget.session.title,
+              '${ended ? '已断开 · ' : ''}${widget.session.title}'
+              '${broadcasting ? ' · 广播 $targets' : ''}',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xffa5adba), fontSize: 12),
+              style: TextStyle(
+                color: broadcasting
+                    ? const Color(0xffffc66d)
+                    : const Color(0xffa5adba),
+                fontSize: 12,
+              ),
             ),
           ),
+          if (widget.onBroadcastChanged != null)
+            PopupMenuButton<BroadcastScope>(
+              tooltip: '广播输入',
+              icon: Icon(
+                Icons.podcasts,
+                color: broadcasting
+                    ? const Color(0xffffc66d)
+                    : const Color(0xffa5adba),
+                size: 17,
+              ),
+              onSelected: widget.onBroadcastChanged,
+              itemBuilder: (_) => [
+                if (broadcasting)
+                  PopupMenuItem(
+                    enabled: false,
+                    child: Text('当前输入目标：$targets 个会话'),
+                  ),
+                CheckedPopupMenuItem(
+                  value: BroadcastScope.off,
+                  checked: widget.broadcastScope == BroadcastScope.off,
+                  child: const Text('关闭广播'),
+                ),
+                CheckedPopupMenuItem(
+                  value: BroadcastScope.tab,
+                  checked: widget.broadcastScope == BroadcastScope.tab,
+                  child: const Text('当前标签内广播'),
+                ),
+                CheckedPopupMenuItem(
+                  value: BroadcastScope.all,
+                  checked: widget.broadcastScope == BroadcastScope.all,
+                  child: const Text('全部已连接会话'),
+                ),
+              ],
+            ),
           if (!compact) ...[
             if (widget.snippets != null)
               IconButton(
@@ -291,6 +361,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   void dispose() {
     terminalAppearance.removeListener(appearanceChanged);
     widget.session.removeListener(sessionChanged);
+    widget.session.terminal.onOutput = widget.session.send;
     focus.dispose();
     controller.dispose();
     super.dispose();
@@ -313,7 +384,9 @@ class _TerminalPaneState extends State<TerminalPane> {
       child: Column(
         children: [
           Container(
-            color: const Color(0xff161c24),
+            color: widget.broadcastScope == BroadcastScope.off
+                ? const Color(0xff161c24)
+                : const Color(0xff2a2115),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: _toolbar(),
           ),
@@ -330,6 +403,57 @@ class _TerminalPaneState extends State<TerminalPane> {
                 controller: controller,
                 focusNode: focus,
                 onKeyEvent: (_, event) {
+                  if (event is KeyDownEvent && widget.onShortcut != null) {
+                    final keyboard = HardwareKeyboard.instance;
+                    final apple =
+                        Theme.of(context).platform == TargetPlatform.macOS ||
+                        Theme.of(context).platform == TargetPlatform.iOS;
+                    final primary = apple
+                        ? keyboard.isMetaPressed
+                        : keyboard.isControlPressed && keyboard.isShiftPressed;
+                    if (primary) {
+                      final key = event.logicalKey;
+                      if (key == LogicalKeyboardKey.keyT) {
+                        widget.onShortcut!('new', null);
+                        return KeyEventResult.handled;
+                      }
+                      if (key == LogicalKeyboardKey.keyW) {
+                        widget.onShortcut!('close-tab', null);
+                        return KeyEventResult.handled;
+                      }
+                      if (key == LogicalKeyboardKey.keyO &&
+                          keyboard.isShiftPressed) {
+                        widget.onShortcut!('sessions', null);
+                        return KeyEventResult.handled;
+                      }
+                      if (keyboard.isShiftPressed &&
+                          key == LogicalKeyboardKey.bracketLeft) {
+                        widget.onShortcut!('prev-tab', null);
+                        return KeyEventResult.handled;
+                      }
+                      if (keyboard.isShiftPressed &&
+                          key == LogicalKeyboardKey.bracketRight) {
+                        widget.onShortcut!('next-tab', null);
+                        return KeyEventResult.handled;
+                      }
+                      const digits = [
+                        LogicalKeyboardKey.digit1,
+                        LogicalKeyboardKey.digit2,
+                        LogicalKeyboardKey.digit3,
+                        LogicalKeyboardKey.digit4,
+                        LogicalKeyboardKey.digit5,
+                        LogicalKeyboardKey.digit6,
+                        LogicalKeyboardKey.digit7,
+                        LogicalKeyboardKey.digit8,
+                        LogicalKeyboardKey.digit9,
+                      ];
+                      final index = digits.indexOf(key);
+                      if (index >= 0) {
+                        widget.onShortcut!('tab', index);
+                        return KeyEventResult.handled;
+                      }
+                    }
+                  }
                   if (event is KeyDownEvent &&
                       event.logicalKey == LogicalKeyboardKey.keyF &&
                       (HardwareKeyboard.instance.isMetaPressed ||
@@ -404,7 +528,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                       onPressed: ended
                           ? null
                           : () {
-                              widget.session.send(key.$2);
+                              _sendInput(key.$2);
                               _focus();
                             },
                       child: Text(
