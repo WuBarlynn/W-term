@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  app_links
   desktop_drop
   desktop_multi_window
   file_selector_windows

@@ -30,6 +30,11 @@ ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64compatible
 LicenseFile=..\LICENSE
 
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\wterm"; ValueType: string; ValueName: ""; ValueData: "URL:W Term"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\wterm"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\wterm\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 

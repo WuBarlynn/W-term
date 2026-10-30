@@ -22,6 +22,7 @@ import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
 import 'task_notifications.dart';
+import 'deep_links.dart';
 import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
 
@@ -111,6 +112,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     unawaited(commandHistory.load());
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
+    pendingDeepLink.addListener(_deepLinkReceived);
     unawaited(_restoreLayout());
     _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
   }
@@ -121,6 +123,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     taskMonitor.removeListener(_taskCompleted);
     taskMonitor.cancelAll();
     trayConnectRequests.removeListener(_trayConnectRequested);
+    pendingDeepLink.removeListener(_deepLinkReceived);
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     unawaited(_saveLayout());
@@ -792,6 +795,19 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
     }
     return offers;
+  }
+
+  void _deepLinkReceived() {
+    final uri = pendingDeepLink.value;
+    if (uri == null || !mounted) return;
+    pendingDeepLink.value = null;
+    final profile = hostProfileFromDeepLink(uri);
+    if (profile == null) return;
+    if (connecting) {
+      message('已有连接正在进行，请稍后重试深链接。');
+      return;
+    }
+    unawaited(connect(profile));
   }
 
   void _trayConnectRequested() {

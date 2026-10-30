@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
+import 'app/deep_links.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
@@ -58,8 +59,11 @@ Future<void> main(List<String> args) async {
           ? const WTermApp()
           : DetachedTerminalApp(payload: detached),
     );
-    if (detached == null && !Platform.isAndroid && !Platform.isIOS) {
-      unawaited(desktopTray.setup());
+    if (detached == null) {
+      unawaited(deepLinkService.start());
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        unawaited(desktopTray.setup());
+      }
     }
   } catch (error) {
     runApp(
