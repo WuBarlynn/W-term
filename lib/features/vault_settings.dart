@@ -8,6 +8,7 @@ import '../app/temporary_directory.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../app/identity_store.dart';
+import '../app/auto_backup.dart';
 import '../app/errors.dart';
 import '../app/quick_unlock.dart';
 
@@ -142,6 +143,16 @@ class _VaultSettingsState extends State<VaultSettings> {
     }
   }
 
+  Future<void> openAutoBackups() async {
+    final restored = await showDialog<int>(
+      context: context,
+      builder: (_) =>
+          _AutoBackupDialog(store: widget.store, service: autoBackup),
+    );
+    if (!mounted || restored == null) return;
+    setState(() => message = '已从本机自动备份恢复 $restored 台主机，原有数据保留。');
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !busy,
@@ -184,6 +195,13 @@ class _VaultSettingsState extends State<VaultSettings> {
               onPressed: busy ? null : () => action('restore'),
               icon: const Icon(Icons.restore),
               label: const Text('恢复加密备份'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: busy ? null : openAutoBackups,
+              icon: const Icon(Icons.history),
+              label: const Text('自动备份与恢复'),
             ),
             if (busy) const LinearProgressIndicator(),
             if (message.isNotEmpty)
@@ -304,6 +322,161 @@ class _PasswordDialogState extends State<_PasswordDialog> {
           }
         },
         child: const Text('确认'),
+      ),
+    ],
+  );
+}
+
+class _AutoBackupDialog extends StatefulWidget {
+  final VaultMaintenance store;
+  final AutoBackupService service;
+  const _AutoBackupDialog({required this.store, required this.service});
+
+  @override
+  State<_AutoBackupDialog> createState() => _AutoBackupDialogState();
+}
+
+class _AutoBackupDialogState extends State<_AutoBackupDialog> {
+  List<File> files = const [];
+  bool busy = false, loading = true;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final next = await widget.service.list();
+    if (mounted) {
+      setState(() {
+        files = next;
+        loading = false;
+      });
+    }
+  }
+
+  String _time(File file) {
+    final parts = file.path.split('/').last.split('-');
+    if (parts.length < 3) return file.path.split('/').last;
+    final stamp = parts[1];
+    return '${stamp.substring(0, 4)}-${stamp.substring(4, 6)}-${stamp.substring(6, 8)} '
+        '${stamp.substring(9, 11)}:${stamp.substring(11, 13)}';
+  }
+
+  Future<void> _backup() async {
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    final file = await widget.service.ensureRecent(widget.store, force: true);
+    if (!mounted) return;
+    setState(() {
+      busy = false;
+      error = file == null ? '自动备份失败，请检查存储权限' : null;
+    });
+    await _load();
+  }
+
+  Future<void> _restore(File file) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('恢复本机自动备份？'),
+        content: const Text(
+          '恢复的项目会以“恢复”标注加入当前保险库，现有数据保留。'
+          '自动备份密钥保存在系统安全存储中。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('恢复'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final count = await widget.service.restore(file, widget.store);
+      if (mounted) Navigator.pop(context, count);
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('自动备份与恢复'),
+    content: SizedBox(
+      width: 460,
+      height: 420,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '每次启动最多自动备份一次，保留最近 5 份；备份使用系统安全存储中的随机密钥加密。',
+            style: TextStyle(fontSize: 12),
+          ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          if (busy) const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: busy ? null : _backup,
+            icon: const Icon(Icons.backup),
+            label: const Text('立即备份'),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : files.isEmpty
+                ? const Center(child: Text('尚无自动备份'))
+                : ListView(
+                    children: [
+                      for (final file in files)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.lock_outline, size: 18),
+                          title: Text(_time(file)),
+                          subtitle: Text(
+                            '${(file.lengthSync() / 1024).toStringAsFixed(1)} KiB · ${file.path.split('/').last}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: TextButton(
+                            onPressed: busy ? null : () => _restore(file),
+                            child: const Text('恢复'),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: busy ? null : () => Navigator.pop(context),
+        child: const Text('关闭'),
       ),
     ],
   );

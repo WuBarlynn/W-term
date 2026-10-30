@@ -22,6 +22,7 @@ import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
 import 'task_notifications.dart';
+import 'auto_backup.dart';
 import 'deep_links.dart';
 import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
@@ -110,6 +111,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
+    if (hostStore is VaultMaintenance) {
+      unawaited(autoBackup.ensureRecent(hostStore as VaultMaintenance));
+    }
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
     pendingDeepLink.addListener(_deepLinkReceived);

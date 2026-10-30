@@ -21,6 +21,7 @@ class PluginSettings extends ChangeNotifier {
   bool jsonFormatter = true, ipLookup = true, filePreview = true;
   bool commandCompletion = true;
   bool taskNotifications = true;
+  bool desktopHotkey = false;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -41,6 +42,7 @@ class PluginSettings extends ChangeNotifier {
           filePreview = value['filePreview'] != false;
           commandCompletion = value['commandCompletion'] != false;
           taskNotifications = value['taskNotifications'] != false;
+          desktopHotkey = value['desktopHotkey'] == true;
         }
       }
     } catch (_) {
@@ -57,12 +59,14 @@ class PluginSettings extends ChangeNotifier {
     required bool preview,
     bool? completion,
     bool? notifications,
+    bool? hotkey,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
     filePreview = preview;
     commandCompletion = completion ?? commandCompletion;
     taskNotifications = notifications ?? taskNotifications;
+    desktopHotkey = hotkey ?? desktopHotkey;
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
@@ -75,6 +79,7 @@ class PluginSettings extends ChangeNotifier {
         'filePreview': preview,
         'commandCompletion': commandCompletion,
         'taskNotifications': taskNotifications,
+        'desktopHotkey': desktopHotkey,
       }),
       flush: true,
     );

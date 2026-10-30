@@ -42,8 +42,8 @@ void main() {
       ),
     );
     final buttons = find.byType(OutlinedButton);
-    expect(buttons, findsNWidgets(3));
-    for (var i = 0; i < 3; i++) {
+    expect(buttons, findsNWidgets(4));
+    for (var i = 0; i < 4; i++) {
       expect(tester.getSize(buttons.at(i)).height, greaterThanOrEqualTo(48));
       if (i > 0) {
         expect(

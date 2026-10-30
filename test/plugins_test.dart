@@ -45,6 +45,7 @@ void main() {
         preview: false,
         completion: false,
         notifications: false,
+        hotkey: true,
       );
       final restored = PluginSettings(file: () async => file);
       await restored.load();
@@ -53,6 +54,7 @@ void main() {
       expect(restored.filePreview, isFalse);
       expect(restored.commandCompletion, isFalse);
       expect(restored.taskNotifications, isFalse);
+      expect(restored.desktopHotkey, isTrue);
     } finally {
       await dir.delete(recursive: true);
     }
