@@ -337,31 +337,31 @@ Windows 构建必须在 Windows 主机执行（Visual Studio C++ + Rust）：`fl
 
 ## 10. 交接时的验证证据
 
-以下是**本轮 2026-10-30（1.0.13）实际执行结果**，日志位于本机 `build/`：
+以下是**本轮 2026-10-30（1.0.14）实际执行结果**，日志位于本机 `build/`：
 
 | 证据 | 留存结果 |
 | --- | --- |
 | `build/p102-tests.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；真实桥接通过（含系统监控与 detach 输出交接） |
-| `build/flutter-tests-1.0.13.log` | **252 项** Flutter 全量测试通过（含系统通知接线/批量连接/自动备份/密码导入/深链接/独立窗口） |
+| `build/flutter-tests-1.0.14.log` | **255 项** Flutter 全量测试通过（含关键字匹配/持久化/系统通知/自动备份/深链接/独立窗口） |
 | `build/vault-bridge-1.0.1.log` | 1 项真实保险库桥接通过 |
 | `build/clippy-1.0.1.log`、`build/fmt-1.0.1.log`（1.0.4 未改 Rust 业务逻辑） | Rust 格式检查与 Clippy 通过 |
-| `build/macos-notifications.log` | macOS 自签名 Release 构建、严格签名验证通过 |
-| `build/macos-dmg-1.0.13.log` | macOS UDZO DMG 打包完成 |
-| `build/ios-build-1.0.13.log` | iOS Release 与 IPA 打包完成 |
-| GitHub Actions `Windows preview` 41130001564 | Windows Release、版本校验、启动冒烟、Inno Setup 安装包与 Rust 测试/artifact 全部通过（含系统通知插件） |
+| `build/macos-signing-1.0.14.log` | macOS 自签名 Release 构建、严格签名验证通过 |
+| `build/macos-dmg-1.0.14.log` | macOS UDZO DMG 打包完成 |
+| `build/ios-build-1.0.14.log` | iOS Release 与 IPA 打包完成 |
+| GitHub Actions `Windows preview` 41132865425 | Windows Release、版本校验、启动冒烟、Inno Setup 安装包与 Rust 测试/artifact 全部通过（含原生全局快捷键） |
 
-2026-10-30 核对三端版本均为 **1.0.13（66）**，当前存在：
+2026-10-30 核对三端版本均为 **1.0.14（67）**，当前存在：
 
 ```text
 build/macos-signed/Build/Products/Release/W Term.app
-build/release-1.0.13/wterm-macos-1.0.13-66.dmg
-build/release-1.0.13/wterm-ios-1.0.13-66-unsigned.ipa
-build/release-1.0.13/wterm-windows-1.0.13-66-setup.exe
-build/release-1.0.13/wterm-windows-1.0.13-66-portable.zip
-build/release-1.0.13/SHA256SUMS.txt
+build/release-1.0.14/wterm-macos-1.0.14-67.dmg
+build/release-1.0.14/wterm-ios-1.0.14-67-unsigned.ipa
+build/release-1.0.14/wterm-windows-1.0.14-67-setup.exe
+build/release-1.0.14/wterm-windows-1.0.14-67-portable.zip
+build/release-1.0.14/SHA256SUMS.txt
 ```
 
-GitHub Release v1.0.13 已发布（上面 5 个附件 + 校验文件），三端包内版本一致。`build/detached-bridge.log` 保留真实 detach 桥接通过记录；Windows 独立窗口、托盘、深链接与系统通知仅经 CI 构建/冒烟，未在 Windows 桌面实际点击；系统通知未在真机授权验证。全局快捷键仍因 hotkey_manager 的 macOS Pod 无法离线获取而未交付。
+GitHub Release v1.0.14 已发布（上面 5 个附件 + 校验文件），三端包内版本一致。`build/detached-bridge.log` 保留真实 detach 桥接通过记录；Windows 独立窗口、托盘、深链接、系统通知与全局快捷键仅经 CI 构建/冒烟；全局快捷键未在真实桌面按压验证，系统通知未在真机授权验证。关键词高亮由单元测试覆盖匹配与持久化。
 
 macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库与构建目录 SHA256 一致均已核对；Windows exe 版本由 CI 脚本校验，安装包由 Inno Setup 构建，CI 还执行了启动进程的冒烟检查。**未在 Windows 桌面实际交互、未在 Apple 真机验证雅黑/图标/DMG/安装和所有新功能**。Cloud Term 公开指南的逐项缺口见 [CLOUDTERM_FEATURE_AUDIT.md](docs/CLOUDTERM_FEATURE_AUDIT.md)；AI、插件、内置皮肤、云账号/团队/Web、导入格式完整覆盖等仍未实现，不能把 1.0.1 当作 Cloud Term 全功能等价或 P2 验收完成。0.1.51 及更早日志仅作历史证据。
 
