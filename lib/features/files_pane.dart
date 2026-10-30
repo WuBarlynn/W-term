@@ -56,6 +56,8 @@ class FilesPaneState extends State<FilesPane> {
   final history = DirectoryHistory();
   final search = TextEditingController();
   bool showHidden = true, descending = false, follow = false;
+  bool selecting = false;
+  final selected = <String>{};
   FileSort sort = FileSort.name;
   final path = TextEditingController(text: '.');
   @override
@@ -88,7 +90,83 @@ class FilesPaneState extends State<FilesPane> {
     }
   }
 
+  List<native.RemoteEntry> get entries => filterRemoteEntries(
+    listing?.entries ?? [],
+    query: search.text,
+    showHidden: showHidden,
+    sort: sort,
+    descending: descending,
+  );
+
   Future<void> refresh() => load(listing?.path ?? '.');
+
+  String _uniqueLocal(String directory, String name) {
+    var candidate = '$directory/$name';
+    var index = 1;
+    while (File(candidate).existsSync()) {
+      final dot = name.lastIndexOf('.');
+      final stem = dot > 0 ? name.substring(0, dot) : name;
+      final extension = dot > 0 ? name.substring(dot) : '';
+      candidate = '$directory/$stem ($index)$extension';
+      index++;
+    }
+    return candidate;
+  }
+
+  Future<void> downloadSelected() async {
+    if (Platform.isIOS) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('iOS 请在文件菜单中选择逐个下载并保存')));
+      return;
+    }
+    final files = entries
+        .where(
+          (entry) =>
+              selected.contains(entry.path) &&
+              !entry.isDirectory &&
+              !entry.isSymlink,
+        )
+        .toList();
+    if (files.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请选择要下载的文件')));
+      return;
+    }
+    final directory = await getDirectoryPath();
+    if (directory == null || !mounted) return;
+    setState(() {
+      busy = true;
+      activity = '准备批量下载…';
+      error = null;
+    });
+    var completed = 0;
+    try {
+      for (final entry in files) {
+        if (!mounted) return;
+        setState(
+          () => activity = '下载 ${completed + 1}/${files.length}：${entry.name}',
+        );
+        await native.downloadFile(
+          connectionId: widget.connectionId,
+          remotePath: entry.path,
+          localPath: _uniqueLocal(directory, entry.name),
+        );
+        completed++;
+      }
+      if (mounted) {
+        setState(() {
+          selecting = false;
+          selected.clear();
+        });
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('已下载 $completed 个文件')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '批量下载失败：${userFacingError(e)}');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
   Future<void> load(String target, {int? historyIndex}) async {
     if (busy) return;
@@ -869,6 +947,22 @@ class FilesPaneState extends State<FilesPane> {
                       ),
                     ),
                     IconButton(
+                      tooltip: selecting ? '取消多选' : '多选文件',
+                      onPressed: busy
+                          ? null
+                          : () => setState(() {
+                              selecting = !selecting;
+                              if (!selecting) selected.clear();
+                            }),
+                      icon: Icon(
+                        selecting ? Icons.close : Icons.checklist,
+                        size: 19,
+                        color: selecting
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                    IconButton(
                       tooltip: '刷新',
                       onPressed: busy ? null : () => load(path.text),
                       icon: const Icon(Icons.refresh, size: 19),
@@ -954,6 +1048,39 @@ class FilesPaneState extends State<FilesPane> {
                     setState(() => descending = !descending),
                 onSort: (value) => setState(() => sort = value),
               ),
+              if (selecting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                  child: Row(
+                    children: [
+                      Text(
+                        '已选 ${selected.length} 个文件',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => setState(() {
+                                selected.addAll(
+                                  entries
+                                      .where(
+                                        (entry) =>
+                                            !entry.isDirectory &&
+                                            !entry.isSymlink,
+                                      )
+                                      .map((entry) => entry.path),
+                                );
+                              }),
+                        child: const Text('全选文件'),
+                      ),
+                      FilledButton(
+                        onPressed: busy ? null : downloadSelected,
+                        child: const Text('下载所选'),
+                      ),
+                    ],
+                  ),
+                ),
               if (busy) const LinearProgressIndicator(minHeight: 2),
               if (busy)
                 Padding(
@@ -1002,17 +1129,28 @@ class FilesPaneState extends State<FilesPane> {
                           return ListTile(
                             dense: true,
                             enabled: !busy,
-                            leading: Icon(
-                              entry.isDirectory
-                                  ? Icons.folder_outlined
-                                  : entry.isSymlink
-                                  ? Icons.link
-                                  : Icons.insert_drive_file_outlined,
-                              size: 21,
-                              color: entry.isDirectory
-                                  ? Theme.of(context).colorScheme.primary
-                                  : null,
-                            ),
+                            leading: selecting
+                                ? Checkbox(
+                                    value: selected.contains(entry.path),
+                                    onChanged: busy
+                                        ? null
+                                        : (_) => setState(() {
+                                            if (!selected.remove(entry.path)) {
+                                              selected.add(entry.path);
+                                            }
+                                          }),
+                                  )
+                                : Icon(
+                                    entry.isDirectory
+                                        ? Icons.folder_outlined
+                                        : entry.isSymlink
+                                        ? Icons.link
+                                        : Icons.insert_drive_file_outlined,
+                                    size: 21,
+                                    color: entry.isDirectory
+                                        ? Theme.of(context).colorScheme.primary
+                                        : null,
+                                  ),
                             title: Text(
                               entry.name,
                               maxLines: 1,
@@ -1024,9 +1162,15 @@ class FilesPaneState extends State<FilesPane> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 11),
                             ),
-                            onTap: () => entry.isDirectory
-                                ? load(entry.path)
-                                : preview(entry),
+                            onTap: selecting
+                                ? () => setState(() {
+                                    if (!selected.remove(entry.path)) {
+                                      selected.add(entry.path);
+                                    }
+                                  })
+                                : () => entry.isDirectory
+                                      ? load(entry.path)
+                                      : preview(entry),
                             trailing: RemoteEntryActions(
                               enabled: !busy,
                               isDirectory: entry.isDirectory,
