@@ -1420,8 +1420,22 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       await _closePane(tab.activeSessionId);
     } else if (choice == 'close') {
       await closeTab(tab);
+    } else if (choice == 'close-left') {
+      await _closeTabs(tabs.sublist(0, tabs.indexOf(tab)));
+    } else if (choice == 'close-right') {
+      await _closeTabs(tabs.sublist(tabs.indexOf(tab) + 1));
     } else if (choice == 'close-others') {
       await _closeOtherTabs(tab);
+    } else if (choice == 'close-disconnected') {
+      await _closeTabs(
+        tabs
+            .where(
+              (item) =>
+                  sessionIds(item.root)
+                      .every((id) => _sessionById(id)?.connected != true),
+            )
+            .toList(),
+      );
     } else if (choice == 'new') {
       await connect();
     }
@@ -1452,6 +1466,48 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       tab.activeSessionId,
       choice == 'horizontal' ? SplitEdge.right : SplitEdge.bottom,
     );
+  }
+
+  Future<void> _closeTabs(List<WorkspaceTab> doomedTabs) async {
+    if (doomedTabs.isEmpty) return;
+    final ids = doomedTabs.expand((tab) => sessionIds(tab.root)).toSet();
+    final doomed = ids.map(_sessionById).whereType<_Session>().toList();
+    final connected = doomed.where((session) => session.connected).length;
+    if (connected > 0) {
+      final close = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('关闭 ${doomedTabs.length} 个标签并断开 $connected 个会话？'),
+          content: const Text('这些标签中的窗格、文件传输和转发将结束。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('断开'),
+            ),
+          ],
+        ),
+      );
+      if (close != true || !mounted) return;
+    }
+    final selectedId = _activeTabIndex >= 0 ? tabs[selected].id : null;
+    setState(() {
+      tabs.removeWhere(doomedTabs.contains);
+      sessions.removeWhere((session) => ids.contains(session.id));
+      if (tabs.isEmpty) {
+        selected = -1;
+      } else {
+        final index = selectedId == null
+            ? -1
+            : tabs.indexWhere((tab) => tab.id == selectedId);
+        selected = index >= 0 ? index : 0;
+      }
+    });
+    _scheduleLayoutSave();
+    await _disposeSessions(doomed);
   }
 
   Future<void> _closeOtherTabs(WorkspaceTab keep) async {
