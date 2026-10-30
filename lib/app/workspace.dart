@@ -21,10 +21,12 @@ import '../features/vault_settings.dart';
 import '../features/hosts_page.dart';
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../features/connect_dialog.dart';
 import '../features/files_pane.dart';
@@ -86,6 +88,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
+  Timer? _layoutSaveTimer;
+  bool _restoredLayout = false;
   String status = '';
   String? pending;
   String? activeOperationId, connectionRootId;
@@ -93,11 +97,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_restoreLayout());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _layoutSaveTimer?.cancel();
+    unawaited(_saveLayout());
     attempt++;
     final operation = activeOperationId;
     if (operation != null && hostStore is ConnectionProxyStore) {
@@ -592,6 +599,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           (_) => replace.terminal.dispose(),
         );
       }
+      _scheduleLayoutSave();
       handedOff = true;
       activeOperationId = null;
       connectionRootId = null;
@@ -655,6 +663,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           : tabs.indexWhere((item) => item.id == activeId);
       selected = index >= 0 ? index : newIndex.clamp(0, tabs.length - 1);
     });
+    _scheduleLayoutSave();
   }
 
   Future<void> closeTab(WorkspaceTab tab) async {
@@ -702,6 +711,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           ? index
           : tabs.length - 1;
     });
+    _scheduleLayoutSave();
     await _disposeSessions(doomed);
   }
 
@@ -758,6 +768,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           ? index
           : tabs.length - 1;
     });
+    _scheduleLayoutSave();
     if (session != null) {
       await session.terminal.close();
       WidgetsBinding.instance.addPostFrameCallback(
@@ -785,6 +796,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
       selected = tabs.length - 1;
     });
+    _scheduleLayoutSave();
   }
 
   void _moveSessionToSplit(
@@ -822,6 +834,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       }
       selected = tabs.isEmpty ? -1 : (index >= 0 ? index : 0);
     });
+    _scheduleLayoutSave();
   }
 
   void _dropTab(String sourceTabId, String targetSessionId, SplitEdge edge) {
@@ -887,6 +900,133 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (session != null) unawaited(_reconnect(session));
   }
 
+  Future<File> _layoutFile() async => File(
+    '${(await getApplicationSupportDirectory()).path}/workspace-layout.json',
+  );
+
+  void _scheduleLayoutSave() {
+    _layoutSaveTimer?.cancel();
+    _layoutSaveTimer = Timer(
+      const Duration(milliseconds: 500),
+      () => unawaited(_saveLayout()),
+    );
+  }
+
+  Future<void> _saveLayout() async {
+    try {
+      final descriptors = <String, Map<String, Object?>>{};
+      for (final session in sessions) {
+        if (session.hostId.isEmpty || session.profile == null) continue;
+        descriptors[session.id] = {
+          'hostId': session.hostId,
+          'host': session.host,
+          'username': session.username,
+        };
+      }
+      final savedTabs = <Map<String, Object?>>[];
+      int? savedSelected;
+      for (var index = 0; index < tabs.length; index++) {
+        final tab = tabs[index];
+        final ids = sessionIdsOrdered(tab.root);
+        if (ids.any((id) => !descriptors.containsKey(id))) continue;
+        if (index == selected) savedSelected = savedTabs.length;
+        final active = descriptors[tab.activeSessionId];
+        savedTabs.add({
+          if (tab.customName != null && tab.customName!.isNotEmpty)
+            'name': tab.customName,
+          'activeHostId': active?['hostId'],
+          'root': encodePaneNode(tab.root, (id) => descriptors[id]!),
+        });
+      }
+      final file = await _layoutFile();
+      await file.parent.create(recursive: true);
+      final temporary = File('${file.path}.tmp');
+      await temporary.writeAsString(
+        jsonEncode({
+          'version': 1,
+          'tabs': savedTabs,
+          'selected': savedSelected ?? 0,
+        }),
+        flush: true,
+      );
+      await temporary.rename(file.path);
+    } catch (_) {
+      // Layout persistence is best-effort and never blocks the workspace.
+    }
+  }
+
+  Future<void> _restoreLayout() async {
+    if (_restoredLayout) return;
+    _restoredLayout = true;
+    try {
+      if (tabs.isNotEmpty || sessions.isNotEmpty) return;
+      final file = await _layoutFile();
+      if (!await file.exists()) return;
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map || decoded['version'] != 1) return;
+      final rawTabs = decoded['tabs'];
+      if (rawTabs is! List || rawTabs.isEmpty) return;
+      final hosts = await hostStore.read();
+      if (!mounted || tabs.isNotEmpty || sessions.isNotEmpty) return;
+      final byId = {for (final host in hosts) host.id: host};
+      final restoredSessions = <_Session>[];
+      final restoredTabs = <WorkspaceTab>[];
+      for (final raw in rawTabs) {
+        if (raw is! Map) continue;
+        final tabSessions = <_Session>[];
+        final root = decodePaneNode(raw['root'], (descriptor) {
+          final hostId = descriptor['hostId'];
+          final host = hostId is String ? byId[hostId] : null;
+          if (host == null) return null;
+          final terminal = TerminalSession.offline(
+            host: host.host,
+            username: host.username,
+            onEnded: () {},
+          );
+          final session = _Session(
+            terminal.connectionId,
+            host.host,
+            host.username,
+            host.id,
+            terminal,
+            profile: host,
+          );
+          tabSessions.add(session);
+          return session.id;
+        });
+        if (root == null) continue;
+        final ids = sessionIdsOrdered(root);
+        final activeHostId = raw['activeHostId'];
+        final active = tabSessions
+            .where(
+              (session) =>
+                  ids.contains(session.id) && session.hostId == activeHostId,
+            )
+            .firstOrNull;
+        restoredSessions.addAll(tabSessions);
+        restoredTabs.add(
+          WorkspaceTab(
+            id: HostProfile.newId(),
+            root: root,
+            activeSessionId: active?.id ?? ids.first,
+            customName: raw['name'] is String ? raw['name'] as String : null,
+          ),
+        );
+      }
+      if (restoredTabs.isEmpty || !mounted) return;
+      final selectedRaw = decoded['selected'];
+      setState(() {
+        sessions.addAll(restoredSessions);
+        tabs.addAll(restoredTabs);
+        selected = selectedRaw is num
+            ? selectedRaw.toInt().clamp(0, tabs.length - 1)
+            : 0;
+      });
+    } catch (_) {
+      // A corrupt or unavailable layout must not prevent manual use.
+    }
+  }
+
   void _handleShortcut(String action, int? index) {
     if (!mounted) return;
     if (action == 'new') {
@@ -896,11 +1036,13 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     } else if (action == 'tab' && index != null) {
       if (index >= 0 && index < tabs.length) {
         setState(() => selected = index);
+        _scheduleLayoutSave();
       }
     } else if (action == 'next-tab' || action == 'prev-tab') {
       if (tabs.length < 2) return;
       final step = action == 'next-tab' ? 1 : -1;
       setState(() => selected = (selected + step + tabs.length) % tabs.length);
+      _scheduleLayoutSave();
     } else if (action == 'sessions') {
       unawaited(showSessionPicker());
     }
@@ -961,6 +1103,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       selected = tabs.indexOf(tab);
       tab.activeSessionId = chosen;
     });
+    _scheduleLayoutSave();
   }
 
   Future<void> _setBroadcastScope(BroadcastScope scope) async {
@@ -1075,6 +1218,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       tab.activeSessionId = ordered.first;
       selected = tabs.indexOf(tab);
     });
+    _scheduleLayoutSave();
   }
 
   Future<List<String>?> _pickSessions(List<_Session> candidates, int need) {
@@ -1305,6 +1449,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       sessions.removeWhere((session) => ids.contains(session.id));
       selected = tabs.indexOf(keep);
     });
+    _scheduleLayoutSave();
     await _disposeSessions(doomed);
   }
 
@@ -1352,6 +1497,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       final value = name.trim();
       tab.customName = value.isEmpty ? null : value;
     });
+    _scheduleLayoutSave();
   }
 
   Future<void> showKnownHosts() async {
@@ -1694,7 +1840,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             _showTabMenu(tab, details.globalPosition),
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
-          onTap: () => setState(() => selected = index),
+          onTap: () {
+            setState(() => selected = index);
+            _scheduleLayoutSave();
+          },
           onDoubleTap: () => _renameTab(tab),
           child: Tooltip(
             message:
@@ -1812,6 +1961,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     onActivate: (sessionId) {
       if (tab.activeSessionId != sessionId) {
         setState(() => tab.activeSessionId = sessionId);
+        _scheduleLayoutSave();
       }
     },
     onSplit: _splitSession,

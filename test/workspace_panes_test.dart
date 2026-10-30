@@ -151,4 +151,39 @@ void main() {
       'c',
     ]);
   });
+
+  test('layout JSON round-trips without credentials', () {
+    final tree = SplitPane(
+      Axis.horizontal,
+      const SessionPane('a'),
+      SplitPane(
+        Axis.vertical,
+        const SessionPane('b'),
+        const SessionPane('c'),
+        fraction: .25,
+      ),
+      fraction: .6,
+    );
+    final encoded = encodePaneNode(
+      tree,
+      (id) => {'hostId': 'host-$id', 'host': '$id.example', 'username': 'u'},
+    );
+    final decoded = decodePaneNode(
+      encoded,
+      (data) => data['hostId']?.toString().replaceFirst('host-', ''),
+    )!;
+    expect(sessionIdsOrdered(decoded), ['a', 'b', 'c']);
+    final root = decoded as SplitPane;
+    expect(root.fraction, .6);
+    expect((root.second as SplitPane).fraction, .25);
+    expect(
+      decodePaneNode(encoded, (_) => null),
+      isNull,
+      reason: 'missing host must reject the whole tab',
+    );
+    expect(
+      decodePaneNode({'axis': 'x', 'first': {}, 'second': {}}, (_) => 'a'),
+      isNull,
+    );
+  });
 }

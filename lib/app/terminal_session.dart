@@ -16,20 +16,22 @@ class TerminalSession extends ChangeNotifier {
   final StreamController<List<int>> _bytes = StreamController<List<int>>(
     sync: true,
   );
-  late final StreamSubscription<String> _decoded;
+  StreamSubscription<String>? _decoded;
   StreamSubscription<Uint8List>? _output;
   Future<void> _writes = Future.value();
   Timer? _resizeTimer;
   bool _ended = false, _closed = false;
+  final bool _offline;
   String? _error;
   int? _lastColumns, _lastRows;
+  static int _offlineSequence = 0;
 
   TerminalSession({
     required this.connectionId,
     required this.host,
     required this.username,
     required this.onEnded,
-  }) {
+  }) : _offline = false {
     _decoded = utf8.decoder
         .bind(_bytes.stream)
         .listen(terminal.write, onError: (_) {});
@@ -50,6 +52,20 @@ class TerminalSession extends ChangeNotifier {
           onError: (Object error) => _finish(userFacingError(error)),
           onDone: () => _finish(null),
         );
+  }
+
+  /// A restorable placeholder for a disconnected pane. It never owns a native
+  /// connection; the pane's reconnect action replaces it with a live session.
+  TerminalSession.offline({
+    required this.host,
+    required this.username,
+    required this.onEnded,
+  }) : connectionId =
+           'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
+       _offline = true {
+    _ended = true;
+    terminal.onOutput = send;
+    terminal.write('\r\n\x1b[90m上次会话已断开，使用“重新连接”恢复。\x1b[0m\r\n');
   }
 
   bool get ended => _ended;
@@ -112,11 +128,13 @@ class TerminalSession extends ChangeNotifier {
     final output = _output;
     _output = null;
     await output?.cancel();
-    await _decoded.cancel();
-    await _bytes.close();
-    await native
-        .disconnect(connectionId: connectionId)
-        .catchError((Object _) {});
+    if (!_offline) {
+      await _decoded?.cancel();
+      await _bytes.close();
+      await native
+          .disconnect(connectionId: connectionId)
+          .catchError((Object _) {});
+    }
   }
 
   @override

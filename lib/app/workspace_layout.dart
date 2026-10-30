@@ -153,6 +153,49 @@ PaneNode splitAt(
 SplitEdge edgeForAxis(Axis axis) =>
     axis == Axis.horizontal ? SplitEdge.right : SplitEdge.bottom;
 
+typedef PaneSessionEncoder = Map<String, Object?> Function(String sessionId);
+typedef PaneSessionDecoder = String? Function(Map<String, Object?> data);
+
+/// Serializes a pane tree without credentials. Session descriptors are
+/// provided by the caller so the layout file can only contain safe metadata.
+Map<String, Object?> encodePaneNode(
+  PaneNode node,
+  PaneSessionEncoder encodeSession,
+) {
+  if (node is SessionPane) {
+    return {'session': encodeSession(node.sessionId)};
+  }
+  final split = node as SplitPane;
+  return {
+    'axis': split.axis == Axis.horizontal ? 'h' : 'v',
+    'fraction': split.fraction,
+    'first': encodePaneNode(split.first, encodeSession),
+    'second': encodePaneNode(split.second, encodeSession),
+  };
+}
+
+PaneNode? decodePaneNode(Object? raw, PaneSessionDecoder decodeSession) {
+  if (raw is! Map) return null;
+  final session = raw['session'];
+  if (session is Map) {
+    final id = decodeSession(Map<String, Object?>.from(session));
+    return id == null ? null : SessionPane(id);
+  }
+  final axis = raw['axis'];
+  final first = decodePaneNode(raw['first'], decodeSession);
+  final second = decodePaneNode(raw['second'], decodeSession);
+  if ((axis != 'h' && axis != 'v') || first == null || second == null) {
+    return null;
+  }
+  final fraction = raw['fraction'];
+  return SplitPane(
+    axis == 'h' ? Axis.horizontal : Axis.vertical,
+    first,
+    second,
+    fraction: fraction is num ? fraction.toDouble().clamp(.15, .85) : .5,
+  );
+}
+
 /// Picks the pane edge nearest to a drop position so a tab can be dropped
 /// anywhere in the pane instead of only on a narrow edge strip.
 SplitEdge nearestSplitEdge(Offset position, Size size) {

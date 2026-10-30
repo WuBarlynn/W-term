@@ -78,4 +78,10 @@ class MainFlutterWindow: NSWindow {
 
     super.awakeFromNib()
   }
+
+  /// Closing the last window keeps the process and SSH sessions alive. The
+  /// Dock icon (applicationShouldHandleReopen) brings the same window back.
+  override func close() {
+    orderOut(nil)
+  }
 }
