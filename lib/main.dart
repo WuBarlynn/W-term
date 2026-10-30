@@ -31,6 +31,10 @@ Future<void> main(List<String> args) async {
   if (Platform.isWindows) {
     try {
       await windowManager.ensureInitialized();
+    } catch (_) {
+      // The tray/window plugin is optional for the main window.
+    }
+    try {
       final controller = await WindowController.fromCurrentEngine();
       if (controller.arguments.isNotEmpty) {
         final decoded = jsonDecode(controller.arguments);
@@ -39,7 +43,7 @@ Future<void> main(List<String> args) async {
         }
       }
     } catch (_) {
-      // The main window may predate the multi-window plugin; stay usable.
+      // A normal window has no multi-window definition; keep the workspace.
     }
   }
   try {
