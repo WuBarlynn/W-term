@@ -111,6 +111,22 @@ class HostProfile {
     wiki: value,
     icon: icon,
   );
+  HostProfile withFavorite(bool value) => HostProfile(
+    id: id,
+    name: name,
+    host: host,
+    username: username,
+    port: port,
+    group: group,
+    tags: tags,
+    favorite: value,
+    identityId: identityId,
+    jumpHostIds: jumpHostIds,
+    startupCommand: startupCommand,
+    environment: environment,
+    wiki: wiki,
+    icon: icon,
+  );
   bool matches(String query) => [
     name,
     host,

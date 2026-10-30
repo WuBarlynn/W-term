@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/host_store.dart';
 import '../app/errors.dart';
@@ -31,7 +32,8 @@ class HostsPageState extends State<HostsPage> {
   List<String> folders = [];
   final collapsed = <String>{};
   String? error;
-  String? selectedHostId, hoveredHostId;
+  String? selectedHostId, hoveredHostId, anchorHostId;
+  final selectedIds = <String>{};
   @override
   void initState() {
     super.initState();
@@ -418,6 +420,64 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
+  void selectHost(HostProfile h) {
+    final keyboard = HardwareKeyboard.instance;
+    setState(() {
+      selectedHostId = h.id;
+      if (keyboard.isShiftPressed && anchorHostId != null) {
+        final anchor = hosts.indexWhere((item) => item.id == anchorHostId);
+        final target = hosts.indexWhere((item) => item.id == h.id);
+        if (anchor >= 0 && target >= 0) {
+          final start = anchor < target ? anchor : target;
+          final end = anchor < target ? target : anchor;
+          selectedIds.addAll(hosts.sublist(start, end + 1).map((i) => i.id));
+        }
+      } else if (keyboard.isMetaPressed || keyboard.isControlPressed) {
+        if (!selectedIds.remove(h.id)) selectedIds.add(h.id);
+        anchorHostId = h.id;
+      } else {
+        selectedIds
+          ..clear()
+          ..add(h.id);
+        anchorHostId = h.id;
+      }
+    });
+  }
+
+  Future<void> batchFavorite(bool value) async {
+    final ids = Set<String>.of(selectedIds);
+    if (ids.isEmpty) return;
+    await persist(
+      hosts.map((h) => ids.contains(h.id) ? h.withFavorite(value) : h).toList(),
+    );
+    if (mounted) setState(selectedIds.clear);
+  }
+
+  Future<void> batchDelete() async {
+    final ids = Set<String>.of(selectedIds);
+    if (ids.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('删除选中的 ${ids.length} 台主机？'),
+        content: const Text('正在运行的会话和已验证的服务器指纹仍会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await persist(hosts.where((h) => !ids.contains(h.id)).toList());
+    if (mounted) setState(selectedIds.clear);
+  }
+
   void connectHost(HostProfile h) {
     if (widget.onConnect != null) {
       widget.onConnect!(h);
@@ -445,7 +505,7 @@ class HostsPageState extends State<HostsPage> {
     },
     child: Material(
       key: ValueKey('host-row-${h.id}'),
-      color: selectedHostId == h.id
+      color: selectedIds.contains(h.id)
           ? Theme.of(context).colorScheme.primaryContainer
           : hoveredHostId == h.id && !saving
           ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .08)
@@ -454,13 +514,11 @@ class HostsPageState extends State<HostsPage> {
         children: [
           Expanded(
             child: InkWell(
-              onTap: saving
-                  ? null
-                  : () => setState(() => selectedHostId = h.id),
+              onTap: saving ? null : () => selectHost(h),
               onDoubleTap: saving
                   ? null
                   : () {
-                      setState(() => selectedHostId = h.id);
+                      selectHost(h);
                       connectHost(h);
                     },
               child: ListTile(
@@ -711,6 +769,36 @@ class HostsPageState extends State<HostsPage> {
             ],
           ),
         ),
+        if (selectedIds.length > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: Row(
+              children: [
+                Text(
+                  '已选 ${selectedIds.length} 台',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: ready ? () => batchFavorite(true) : null,
+                  child: const Text('收藏'),
+                ),
+                TextButton(
+                  onPressed: ready ? () => batchFavorite(false) : null,
+                  child: const Text('取消收藏'),
+                ),
+                TextButton(
+                  onPressed: ready ? batchDelete : null,
+                  child: const Text('删除'),
+                ),
+                IconButton(
+                  tooltip: '清除选择',
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: () => setState(selectedIds.clear),
+                ),
+              ],
+            ),
+          ),
         if (saving) const LinearProgressIndicator(minHeight: 2),
         Expanded(
           child: loading

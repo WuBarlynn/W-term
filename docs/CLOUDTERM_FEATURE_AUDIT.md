@@ -16,7 +16,7 @@
 - [~] 临时终端（快速连接表单；无独立“临时终端”入口）
 - [~] 启动命令、环境变量（已实现单行启动命令与 `KEY=VALUE` 环境导出；尚未使用 SSH env 静默请求）
 - [ ] Xshell / SecureCRT / MobaXterm / PuTTY / CSV / Excel 导入
-- [ ] 侧边栏 Shift/Ctrl 多选、批量打开/收藏/删除
+- [~] 侧边栏 Shift/Ctrl 多选、批量收藏/删除已实现；批量打开未接入
 
 ## 终端工作区
 
