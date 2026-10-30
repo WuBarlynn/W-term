@@ -3,6 +3,7 @@ import 'connection_route.dart';
 import 'forward_store.dart';
 import 'terminal_session.dart';
 import 'command_history.dart';
+import 'update_checker.dart';
 import 'workspace_layout.dart';
 import 'proxy_store.dart';
 import '../features/proxy_dialog.dart';
@@ -28,6 +29,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../features/connect_dialog.dart';
@@ -1085,6 +1087,45 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _checkUpdates() async {
+    final info = await checkForUpdate();
+    if (!mounted) return;
+    if (info == null) {
+      message('当前已是最新版本或无法连接更新服务（$appVersion）。');
+      return;
+    }
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('发现新版本 ${info.version}'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              info.notes.trim().isEmpty ? '请前往发布页查看更新内容。' : info.notes,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('打开发布页'),
+          ),
+        ],
+      ),
+    );
+    if (open == true) {
+      await launchUrl(
+        Uri.parse(info.url),
+        mode: LaunchMode.externalApplication,
+      );
+    }
+  }
+
   Future<void> showSessionPicker() async {
     if (sessions.isEmpty) {
       message('当前没有已打开的终端。');
@@ -1737,6 +1778,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           context: context,
           builder: (_) => CommandHistoryDialog(history: commandHistory),
         );
+      case 'update':
+        await _checkUpdates();
       case 'lock':
         widget.onLock?.call();
     }
@@ -1745,6 +1788,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   List<PopupMenuEntry<String>> _settingsItems() => [
     popupItem('sessions', Icons.list_alt, '已打开终端'),
     popupItem('history', Icons.history, '命令历史'),
+    popupItem('update', Icons.system_update, '检查更新'),
     if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
     if (hostStore is SyncStore) popupItem('sync', Icons.sync, 'GitHub 同步'),
     if (hostStore is ConnectionProxyStore)
