@@ -44,6 +44,17 @@ jobs:
           Get-ChildItem "build\windows\x64\runner\Release\*.dll" | Select-Object Name
       - shell: pwsh
         run: ./scripts/verify-windows-version.ps1
+      - name: Smoke start Windows app
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "build\windows\x64\runner\Release\wterm.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            throw "wterm.exe exited early with code $($p.ExitCode)"
+          }
+          Write-Host "wterm.exe started successfully (PID $($p.Id))"
+          Stop-Process -Id $p.Id -Force
       - name: Upload native asset logs
         if: failure()
         uses: actions/upload-artifact@v4
