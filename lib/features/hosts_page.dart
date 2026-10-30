@@ -18,11 +18,13 @@ class HostsPage extends StatefulWidget {
   final HostStore store;
   final bool embedded;
   final ValueChanged<HostProfile>? onConnect;
+  final ValueChanged<List<HostProfile>>? onBatchConnect;
   const HostsPage({
     super.key,
     required this.store,
     this.embedded = false,
     this.onConnect,
+    this.onBatchConnect,
   });
   @override
   State<HostsPage> createState() => HostsPageState();
@@ -834,6 +836,20 @@ class HostsPageState extends State<HostsPage> {
                   style: const TextStyle(fontSize: 11),
                 ),
                 const Spacer(),
+                if (widget.onBatchConnect != null)
+                  TextButton(
+                    onPressed: ready
+                        ? () {
+                            final selected = hosts
+                                .where((host) => selectedIds.contains(host.id))
+                                .toList();
+                            if (selected.isEmpty) return;
+                            widget.onBatchConnect!(selected);
+                            setState(selectedIds.clear);
+                          }
+                        : null,
+                    child: const Text('连接'),
+                  ),
                 TextButton(
                   onPressed: ready ? () => batchFavorite(true) : null,
                   child: const Text('收藏'),

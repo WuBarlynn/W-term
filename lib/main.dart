@@ -11,6 +11,7 @@ import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
 import 'app/deep_links.dart';
+import 'app/system_notifications.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
@@ -61,6 +62,9 @@ Future<void> main(List<String> args) async {
     );
     if (detached == null) {
       unawaited(deepLinkService.start());
+      if (pluginSettings.taskNotifications) {
+        unawaited(systemNotifications.setup());
+      }
       if (!Platform.isAndroid && !Platform.isIOS) {
         unawaited(desktopTray.setup());
       }

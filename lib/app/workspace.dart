@@ -1,6 +1,7 @@
 import 'interactive_auth.dart';
 import 'connection_route.dart';
 import 'forward_store.dart';
+import 'plugins.dart';
 import 'terminal_session.dart';
 import 'command_history.dart';
 import 'update_checker.dart';
@@ -23,6 +24,7 @@ import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
 import 'task_notifications.dart';
 import 'auto_backup.dart';
+import 'system_notifications.dart';
 import 'deep_links.dart';
 import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
@@ -822,9 +824,18 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void _taskCompleted() {
     if (!mounted) return;
     for (final completion in taskMonitor.drain()) {
-      final command = completion.command.length > 48
-          ? '${completion.command.substring(0, 48)}…'
-          : completion.command;
+      final fullCommand = completion.command;
+      final command = fullCommand.length > 48
+          ? '${fullCommand.substring(0, 48)}…'
+          : fullCommand;
+      if (pluginSettings.taskNotifications) {
+        unawaited(
+          systemNotifications.showTask(
+            title: completion.title,
+            body: '$fullCommand（${completion.elapsed.inSeconds} 秒）',
+          ),
+        );
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1118,6 +1129,23 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     final command = profile.startupCommand.trim();
     if (command.isNotEmpty) {
       session.terminal.send(' $command\n', record: false);
+    }
+  }
+
+  final List<HostProfile> _batchQueue = [];
+  bool _batchConnecting = false;
+
+  Future<void> _queueBatchConnections(List<HostProfile> profiles) async {
+    _batchQueue.addAll(profiles);
+    if (_batchConnecting) return;
+    _batchConnecting = true;
+    try {
+      while (_batchQueue.isNotEmpty && mounted) {
+        final next = _batchQueue.removeAt(0);
+        await connect(next);
+      }
+    } finally {
+      _batchConnecting = false;
     }
   }
 
@@ -2142,6 +2170,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         );
       case 'update':
         await _checkUpdates();
+      case 'temporary':
+        await connect();
       case 'lock':
         widget.onLock?.call();
       case 'focus':
@@ -2165,6 +2195,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (hostStore is VaultMaintenance)
       popupItem('vault', Icons.security_outlined, '保险库与备份'),
     popupItem('known', Icons.verified_user_outlined, '服务器指纹'),
+    popupItem('temporary', Icons.bolt, '临时终端'),
     if (widget.onLock != null) popupItem('lock', Icons.lock_outline, '锁定保险库'),
   ];
 
@@ -2284,6 +2315,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                       onConnect: (profile) {
                         if (drawer) scaffoldKey.currentState?.closeDrawer();
                         connect(profile);
+                      },
+                      onBatchConnect: (profiles) {
+                        if (drawer) scaffoldKey.currentState?.closeDrawer();
+                        unawaited(_queueBatchConnections(profiles));
                       },
                     ),
             ),

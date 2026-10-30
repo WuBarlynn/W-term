@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/errors.dart';
 import '../app/plugins.dart';
+import '../app/system_notifications.dart';
 
 class PluginSettingsDialog extends StatefulWidget {
   const PluginSettingsDialog({super.key});
@@ -31,6 +34,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         completion: completion,
         notifications: notifications,
       );
+      if (notifications) unawaited(systemNotifications.setup());
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
