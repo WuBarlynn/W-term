@@ -34,11 +34,21 @@ void main() {
 
   test('UI theme mode round-trips', () async {
     final settings = TerminalAppearance(file: () async => file);
-    await settings.save('dracula', 16, nextUiTheme: 'dark');
+    await settings.save(
+      'dracula',
+      16,
+      nextUiTheme: 'dark',
+      nextUiFont: 'UI Font',
+      nextTerminalFont: 'Term Font',
+      nextCjkFont: 'CJK Font',
+    );
     final restored = TerminalAppearance(file: () async => file);
     await restored.load();
     expect(restored.palette, 'dracula');
     expect(restored.uiTheme, 'dark');
+    expect(restored.uiFont, 'UI Font');
+    expect(restored.terminalFont, 'Term Font');
+    expect(restored.cjkFont, 'CJK Font');
     expect(restored.fontSize, 16);
     settings.dispose();
     restored.dispose();

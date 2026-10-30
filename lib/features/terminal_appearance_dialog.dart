@@ -15,12 +15,33 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String palette = widget.store.palette;
   late int size = widget.store.fontSize;
   late String uiTheme = widget.store.uiTheme;
+  late final uiFont = TextEditingController(text: widget.store.uiFont);
+  late final terminalFont = TextEditingController(
+    text: widget.store.terminalFont,
+  );
+  late final cjkFont = TextEditingController(text: widget.store.cjkFont);
+
+  @override
+  void dispose() {
+    uiFont.dispose();
+    terminalFont.dispose();
+    cjkFont.dispose();
+    super.dispose();
+  }
+
   bool busy = false;
   String? error;
   Future<void> save() async {
     setState(() => busy = true);
     try {
-      await widget.store.save(palette, size, nextUiTheme: uiTheme);
+      await widget.store.save(
+        palette,
+        size,
+        nextUiTheme: uiTheme,
+        nextUiFont: uiFont.text.trim(),
+        nextTerminalFont: terminalFont.text.trim(),
+        nextCjkFont: cjkFont.text.trim(),
+      );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -68,6 +89,33 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 onChanged: busy
                     ? null
                     : (value) => setState(() => uiTheme = value ?? 'system'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: uiFont,
+                enabled: !busy,
+                decoration: const InputDecoration(
+                  labelText: '界面字体（留空使用系统默认）',
+                  hintText: 'Microsoft YaHei',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: terminalFont,
+                enabled: !busy,
+                decoration: const InputDecoration(
+                  labelText: '终端字体（留空使用平台默认）',
+                  hintText: 'Menlo / Cascadia Mono',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: cjkFont,
+                enabled: !busy,
+                decoration: const InputDecoration(
+                  labelText: 'CJK 回退字体（可选）',
+                  hintText: 'Microsoft YaHei',
+                ),
               ),
               const SizedBox(height: 20),
               Text('字号：$size'),

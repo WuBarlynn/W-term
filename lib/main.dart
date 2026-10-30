@@ -44,7 +44,9 @@ class WTermApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: scheme,
       brightness: brightness,
-      fontFamily: windows ? 'Microsoft YaHei' : null,
+      fontFamily: terminalAppearance.uiFont.trim().isNotEmpty
+          ? terminalAppearance.uiFont.trim()
+          : (windows ? 'Microsoft YaHei' : null),
       scaffoldBackgroundColor: brightness == Brightness.light
           ? const Color(0xfffafbfc)
           : const Color(0xff171c22),

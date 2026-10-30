@@ -27,6 +27,7 @@ class TerminalAppearance extends ChangeNotifier {
   };
   String palette = 'dark';
   String uiTheme = 'system';
+  String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
   Future<void> _pending = Future.value();
 
@@ -177,6 +178,12 @@ class TerminalAppearance extends ChangeNotifier {
       final storedPalette = value['palette'];
       final storedSize = value['fontSize'];
       final storedTheme = value['uiTheme'];
+      final storedUiFont = value['uiFont'];
+      final storedTerminalFont = value['terminalFont'];
+      final storedCjkFont = value['cjkFont'];
+      if (storedUiFont is String) uiFont = storedUiFont;
+      if (storedTerminalFont is String) terminalFont = storedTerminalFont;
+      if (storedCjkFont is String) cjkFont = storedCjkFont;
       if (storedTheme is String &&
           {'system', 'dark', 'light'}.contains(storedTheme)) {
         uiTheme = storedTheme;
@@ -195,7 +202,14 @@ class TerminalAppearance extends ChangeNotifier {
     }
   }
 
-  Future<void> save(String nextPalette, int nextSize, {String? nextUiTheme}) {
+  Future<void> save(
+    String nextPalette,
+    int nextSize, {
+    String? nextUiTheme,
+    String? nextUiFont,
+    String? nextTerminalFont,
+    String? nextCjkFont,
+  }) {
     final nextMode = nextUiTheme ?? uiTheme;
     if (!names.containsKey(nextPalette) ||
         nextSize < 10 ||
@@ -212,6 +226,9 @@ class TerminalAppearance extends ChangeNotifier {
           'palette': nextPalette,
           'fontSize': nextSize,
           'uiTheme': nextMode,
+          'uiFont': nextUiFont ?? uiFont,
+          'terminalFont': nextTerminalFont ?? terminalFont,
+          'cjkFont': nextCjkFont ?? cjkFont,
         }),
         flush: true,
       );
@@ -219,6 +236,9 @@ class TerminalAppearance extends ChangeNotifier {
       palette = nextPalette;
       fontSize = nextSize;
       uiTheme = nextMode;
+      uiFont = nextUiFont ?? uiFont;
+      terminalFont = nextTerminalFont ?? terminalFont;
+      cjkFont = nextCjkFont ?? cjkFont;
       notifyListeners();
     });
     _pending = operation;
