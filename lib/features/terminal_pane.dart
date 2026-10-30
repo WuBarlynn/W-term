@@ -6,6 +6,7 @@ import 'terminal_appearance_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'tmux_dialog.dart';
 import 'ai_assistant_dialog.dart';
+import 'plugin_settings_dialog.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -21,6 +22,8 @@ import 'package:xterm/xterm.dart';
 
 import '../app/terminal_session.dart';
 import '../app/pinned_commands.dart';
+import '../app/plugins.dart';
+import '../app/errors.dart';
 import '../app/workspace_layout.dart';
 
 /// A view over a [TerminalSession]. Multiple panes never own the SSH session;
@@ -165,6 +168,47 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (validateSnippetCommand(command) != null) return;
     widget.session.terminal.paste(command);
     _focus();
+  }
+
+  Future<void> lookupSelectedIp() async {
+    final selection = controller.selection;
+    if (selection == null) return;
+    final ip = widget.session.terminal.buffer.getText(selection).trim();
+    if (!isIpv4(ip)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请选中有效的 IPv4 地址')));
+      return;
+    }
+    try {
+      final result = await lookupIp(ip);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('IP 归属 · $ip'),
+          content: SelectableText(
+            '国家/地区：${result.country}\n'
+            '省/州：${result.region}\n'
+            '城市：${result.city}\n'
+            '运营商：${result.isp}\n'
+            '组织：${result.org}\n'
+            '时区：${result.timezone}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('查询失败：${userFacingError(e)}')));
+      }
+    }
   }
 
   Future<void> pinSelection() async {
@@ -686,9 +730,23 @@ class _TerminalPaneState extends State<TerminalPane> {
                             value: 'files',
                             child: Text('打开文件面板'),
                           ),
+                        if (pluginSettings.jsonFormatter)
+                          const PopupMenuItem(
+                            value: 'json',
+                            child: Text('格式化选中 JSON'),
+                          ),
+                        if (pluginSettings.ipLookup)
+                          const PopupMenuItem(
+                            value: 'ip',
+                            child: Text('查询选中 IP 归属'),
+                          ),
                         const PopupMenuItem(
-                          value: 'json',
-                          child: Text('格式化选中 JSON'),
+                          value: 'pin',
+                          child: Text('固定选中命令'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'plugins',
+                          child: Text('插件设置'),
                         ),
                       ],
                     );
@@ -702,6 +760,16 @@ class _TerminalPaneState extends State<TerminalPane> {
                       widget.onOpenFiles?.call();
                     } else if (selected == 'json') {
                       await formatJson();
+                    } else if (selected == 'ip') {
+                      await lookupSelectedIp();
+                    } else if (selected == 'pin') {
+                      await pinSelection();
+                    } else if (selected == 'plugins') {
+                      if (!context.mounted) return;
+                      await showDialog<void>(
+                        context: context,
+                        builder: (_) => const PluginSettingsDialog(),
+                      );
                     }
                   },
                 ),

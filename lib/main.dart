@@ -5,6 +5,7 @@ import 'src/rust/frb_generated.dart';
 import 'features/vault_gate.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
+import 'app/plugins.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,7 @@ Future<void> main() async {
     await RustLib.init();
     await terminalAppearance.load();
     await pinnedCommands.load();
+    await pluginSettings.load();
     runApp(const WTermApp());
   } catch (error) {
     runApp(
