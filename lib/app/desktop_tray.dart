@@ -29,6 +29,14 @@ class DesktopTray with TrayListener {
           items: [
             MenuItem(key: 'show', label: '显示 W Term', onClick: _clicked),
             MenuItem(key: 'new', label: '新建连接', onClick: _clicked),
+            if (Platform.isMacOS || Platform.isWindows)
+              MenuItem(
+                key: 'shortcut',
+                label: Platform.isMacOS
+                    ? '显示快捷键：⌘ ⇧ Space'
+                    : '显示快捷键：Ctrl + Alt + Space',
+                disabled: true,
+              ),
             MenuItem.separator(),
             MenuItem(key: 'quit', label: '退出 W Term', onClick: _clicked),
           ],

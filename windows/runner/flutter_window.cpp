@@ -32,6 +32,9 @@ bool FlutterWindow::OnCreate() {
     RegisterPlugins(flutter_view_controller->engine());
   });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  // Fixed global shortcut; a second registration (detached window) fails
+  // harmlessly because the main window owns the shortcut.
+  RegisterHotKey(GetHandle(), 1, MOD_CONTROL | MOD_ALT, VK_SPACE);
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -46,6 +49,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  UnregisterHotKey(GetHandle(), 1);
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -65,6 +69,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     if (result) {
       return *result;
     }
+  }
+
+  if (message == WM_HOTKEY && wparam == 1) {
+    ShowWindow(hwnd, SW_RESTORE);
+    SetForegroundWindow(hwnd);
+    return 0;
   }
 
   switch (message) {

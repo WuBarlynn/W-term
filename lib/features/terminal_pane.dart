@@ -1,5 +1,7 @@
 import '../app/snippet_store.dart';
 import '../app/command_completion.dart';
+import '../app/keyword_highlights.dart';
+import 'keyword_highlight_dialog.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
 import '../app/terminal_appearance.dart';
@@ -76,6 +78,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   Timer? _copyTimer;
   String? _autoCopied;
   final _inputTracker = TerminalInputTracker();
+  Timer? _highlightTimer;
   List<CommandCompletion> _completions = const [];
   String _completionSignature = '';
   @override
@@ -86,10 +89,14 @@ class _TerminalPaneState extends State<TerminalPane> {
     pinnedCommands.addListener(sessionChanged);
     controller.addListener(_selectionForCopy);
     pluginSettings.addListener(_pluginSettingsChanged);
+    keywordHighlights.addListener(_highlightSettingsChanged);
     widget.session.terminal.onOutput = _output;
     _wasActive = widget.active;
     if (widget.active) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focus();
+        _applyHighlights();
+      });
     }
   }
 
@@ -117,6 +124,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     }
     _inputTracker.feed(text);
     _refreshCompletions();
+    _scheduleHighlights();
   }
 
   void _refreshCompletions() {
@@ -136,6 +144,53 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   void _pluginSettingsChanged() {
     if (!pluginSettings.commandCompletion) _refreshCompletions();
+  }
+
+  void _highlightSettingsChanged() {
+    _applyHighlights();
+  }
+
+  void _scheduleHighlights() {
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(
+      const Duration(milliseconds: 500),
+      _applyHighlights,
+    );
+  }
+
+  void _applyHighlights() {
+    try {
+      for (final highlight in List.of(controller.highlights)) {
+        highlight.dispose();
+      }
+      if (!keywordHighlights.enabled || keywordHighlights.keywords.isEmpty) {
+        return;
+      }
+      final lines = widget.session.terminal.buffer.lines;
+      final start = (lines.length - 3000).clamp(0, lines.length);
+      final texts = [
+        for (var index = start; index < lines.length; index++)
+          lines[index].getText(),
+      ];
+      final matches = findKeywordMatches(texts, keywordHighlights.keywords);
+      for (final match in matches) {
+        final first = widget.session.terminal.buffer.createAnchor(
+          match.start,
+          match.line + start,
+        );
+        final last = widget.session.terminal.buffer.createAnchor(
+          match.end - 1,
+          match.line + start,
+        );
+        controller.highlight(
+          p1: first,
+          p2: last,
+          color: Color(keywordHighlights.colorArgb),
+        );
+      }
+    } catch (_) {
+      // Highlights are best-effort; buffer edits can invalidate anchors.
+    }
   }
 
   void _applyCompletion(CommandCompletion completion) {
@@ -770,6 +825,11 @@ class _TerminalPaneState extends State<TerminalPane> {
       await zmodemUpload();
     } else if (value == 'zmodem-download') {
       await zmodemDownload();
+    } else if (value == 'highlight') {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => const KeywordHighlightDialog(),
+      );
     }
   }
 
@@ -908,6 +968,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                   const PopupMenuItem(value: 'snippets', child: Text('命令片段')),
                 const PopupMenuItem(value: 'theme', child: Text('终端外观')),
                 const PopupMenuItem(value: 'search', child: Text('搜索终端历史')),
+                const PopupMenuItem(value: 'highlight', child: Text('关键字高亮')),
                 const PopupMenuDivider(),
               ],
               if (!ended) ...[
@@ -921,6 +982,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                 ),
                 const PopupMenuDivider(),
               ],
+              const PopupMenuItem(value: 'highlight', child: Text('关键字高亮…')),
+              const PopupMenuDivider(),
               const PopupMenuItem(value: 'horizontal', child: Text('水平分屏')),
               const PopupMenuItem(value: 'vertical', child: Text('垂直分屏')),
               if (widget.onSplitBack != null)
@@ -939,8 +1002,13 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.removeListener(sessionChanged);
     pinnedCommands.removeListener(sessionChanged);
     _copyTimer?.cancel();
+    _highlightTimer?.cancel();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
+    keywordHighlights.removeListener(_highlightSettingsChanged);
+    for (final highlight in List.of(controller.highlights)) {
+      highlight.dispose();
+    }
     widget.session.terminal.onOutput = widget.session.send;
     focus.dispose();
     controller.dispose();

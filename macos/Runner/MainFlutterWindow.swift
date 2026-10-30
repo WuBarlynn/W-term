@@ -1,4 +1,5 @@
 import LocalAuthentication
+import Carbon
 import Cocoa
 import FlutterMacOS
 
@@ -6,6 +7,8 @@ class MainFlutterWindow: NSWindow {
   private let quickUnlockQueue = DispatchQueue(label: "dev.wterm.quick-unlock", qos: .userInitiated)
   private var detachedWindows: [NSWindow] = []
   private var detachedChannels: [FlutterMethodChannel] = []
+  private var showHotKeyRef: EventHotKeyRef?
+  private var showHotKeyHandler: EventHandlerRef?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -88,7 +91,37 @@ class MainFlutterWindow: NSWindow {
     }
 
 
+    registerShowHotKey()
     super.awakeFromNib()
+  }
+
+  private func registerShowHotKey() {
+    guard showHotKeyRef == nil else { return }
+    var hotKeyID = EventHotKeyID(signature: OSType(0x57544552), id: 1)
+    let status = RegisterEventHotKey(
+      UInt32(kVK_Space), UInt32(cmdKey | shiftKey), hotKeyID,
+      GetApplicationEventTarget(), 0, &showHotKeyRef)
+    guard status == noErr else {
+      showHotKeyRef = nil
+      return
+    }
+    var eventType = EventTypeSpec(
+      eventClass: OSType(kEventClassKeyboard),
+      eventKind: UInt32(kEventHotKeyPressed))
+    let context = Unmanaged.passUnretained(self).toOpaque()
+    InstallEventHandler(
+      GetApplicationEventTarget(),
+      { _, _, userData -> OSStatus in
+        guard let userData else { return noErr }
+        DispatchQueue.main.async {
+          let window = Unmanaged<MainFlutterWindow>
+            .fromOpaque(userData).takeUnretainedValue()
+          window.makeKeyAndOrderFront(nil)
+          NSApp.activate(ignoringOtherApps: true)
+        }
+        return noErr
+      },
+      1, &eventType, context, &showHotKeyHandler)
   }
 
   private func openDetachedWindow(payload: String, title: String) -> Bool {
