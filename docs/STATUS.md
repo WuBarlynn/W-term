@@ -1,6 +1,13 @@
 # 开发与验证记录
 
-更新日期：2026-10-30。当前版本：1.0.8 (61) 三端开发预览。继续补齐 Cloud Term：macOS 独立终端窗口、输出交接、更新校验等；**仍不是已通过 P2 真机日用验收的最终版**，Windows/iPad 多窗口与窗口收回尚未交付。
+更新日期：2026-10-30。当前版本：1.0.9 (62) 三端开发预览。继续补齐 Cloud Term：Windows 独立终端窗口与多引擎插件注册；**仍不是已通过 P2 真机日用验收的最终版**，iPad 多窗口与窗口收回尚未交付。
+
+## 1.0.9 Windows 独立终端窗口（2026-10-30）
+
+- Windows 独立窗口：`desktop_multi_window` 创建新 Flutter 引擎，传入连接 ID、主机、用户和滚屏快照；SSH 输出仍由 Rust handoff 交接，不重连。
+- Windows 子引擎插件：在 runner 中注册 `DesktopMultiWindowSetWindowCreatedCallback` 并为每个新窗口注册全部生成插件；关闭按钮使用 `window_manager` 关闭窗口，`WindowListener` 在窗口关闭时断开该会话。
+- 主窗口/子窗口初始化解耦：普通窗口没有多窗口定义时仍进入工作区；Windows 独立窗口无法建立时回退主窗口重新接入。
+- 验证：Windows CI 41111237179 构建、启动冒烟、Rust 测试通过；macOS 自签名构建通过。Windows 多窗口的实际交互未在 Windows 桌面验证。
 
 ## 1.0.8 独立终端窗口与更新校验（2026-10-30）
 
