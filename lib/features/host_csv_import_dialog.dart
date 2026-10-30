@@ -1,7 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
-import '../app/host_csv.dart';
+import '../app/host_import.dart';
 import '../app/host_store.dart';
 
 class HostCsvImportDialog extends StatefulWidget {
@@ -14,6 +14,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
   final text = TextEditingController();
   String? error;
   int count = 0;
+  String fileName = 'pasted.csv';
 
   @override
   void dispose() {
@@ -29,6 +30,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
       if (!mounted) return;
       setState(() {
         text.text = content;
+        fileName = file.name;
         error = null;
       });
     } catch (e) {
@@ -38,7 +40,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
 
   void parse() {
     try {
-      final hosts = parseHostCsv(text.text);
+      final hosts = parseHostImport(fileName, text.text);
       setState(() {
         count = hosts.length;
         error = null;
@@ -53,7 +55,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('批量导入 CSV'),
+    title: const Text('从其他平台导入'),
     content: SizedBox(
       width: 640,
       height: 460,
@@ -63,7 +65,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
             children: [
               const Expanded(
                 child: Text(
-                  '列：name,host,port,username,group,tags（可选表头；支持 CSV/TSV）',
+                  '支持 CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini；也可粘贴 CSV',
                   style: TextStyle(fontSize: 12),
                 ),
               ),
@@ -118,7 +120,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
       FilledButton(
         onPressed: () {
           try {
-            final hosts = parseHostCsv(text.text);
+            final hosts = parseHostImport(fileName, text.text);
             Navigator.pop<List<HostProfile>>(context, hosts);
           } on FormatException catch (e) {
             setState(() => error = e.message);

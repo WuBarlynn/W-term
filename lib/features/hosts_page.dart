@@ -733,7 +733,7 @@ class HostsPageState extends State<HostsPage> {
                 ),
               ),
               IconButton(
-                tooltip: '批量导入 CSV',
+                tooltip: '从其他平台导入',
                 icon: const Icon(Icons.upload_file_outlined, size: 18),
                 onPressed: ready ? importCsv : null,
               ),
