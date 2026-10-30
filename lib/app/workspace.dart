@@ -45,7 +45,15 @@ class Workspace extends StatefulWidget {
 class _Session {
   final String id, host, username, hostId;
   final TerminalSession terminal;
-  _Session(this.id, this.host, this.username, this.hostId, this.terminal);
+  final HostProfile? profile;
+  _Session(
+    this.id,
+    this.host,
+    this.username,
+    this.hostId,
+    this.terminal, {
+    this.profile,
+  });
   bool get connected => !terminal.ended;
 }
 
@@ -276,7 +284,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> connect([HostProfile? profile]) async {
+  Future<void> connect([HostProfile? profile, _Session? replace]) async {
     if (connecting) return;
     final currentAttempt = ++attempt;
     bool active() => mounted && currentAttempt == attempt;
@@ -550,18 +558,40 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         connectedUsername,
         hops.last.hostId,
         terminal,
+        profile: profile,
       );
+      final replacedTab = replace == null ? null : _tabForSession(replace.id);
       setState(() {
-        sessions.add(session);
-        tabs.add(
-          WorkspaceTab(
-            id: HostProfile.newId(),
-            root: SessionPane(session.id),
-            activeSessionId: session.id,
-          ),
-        );
-        selected = tabs.length - 1;
+        if (replace != null && replacedTab != null) {
+          sessions.remove(replace);
+          sessions.add(session);
+          replacedTab.root = replaceSession(
+            replacedTab.root,
+            replace.id,
+            session.id,
+          );
+          if (replacedTab.activeSessionId == replace.id) {
+            replacedTab.activeSessionId = session.id;
+          }
+          selected = tabs.indexOf(replacedTab);
+        } else {
+          sessions.add(session);
+          tabs.add(
+            WorkspaceTab(
+              id: HostProfile.newId(),
+              root: SessionPane(session.id),
+              activeSessionId: session.id,
+            ),
+          );
+          selected = tabs.length - 1;
+        }
       });
+      if (replace != null && replacedTab != null) {
+        await replace.terminal.close();
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => replace.terminal.dispose(),
+        );
+      }
       handedOff = true;
       activeOperationId = null;
       connectionRootId = null;
@@ -827,6 +857,34 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       return;
     }
     _dropTab(sourceTabId, targetSessionId, edge);
+  }
+
+  Future<void> _reconnect(_Session session) async {
+    if (session.connected) return;
+    final stored = session.profile;
+    if (stored == null) {
+      message('临时连接不保存凭据，请通过“新建连接”重新输入。');
+      return;
+    }
+    HostProfile? latest;
+    try {
+      latest = (await hostStore.read())
+          .where((host) => host.id == stored.id)
+          .firstOrNull;
+    } catch (e) {
+      message('无法读取主机配置：${userFacingError(e)}');
+      return;
+    }
+    if (latest == null) {
+      message('主机「${stored.name}」已被删除，无法重连。');
+      return;
+    }
+    await connect(latest, session);
+  }
+
+  void _reconnectById(String id) {
+    final session = _sessionById(id);
+    if (session != null) unawaited(_reconnect(session));
   }
 
   void _handleShortcut(String action, int? index) {
@@ -1750,6 +1808,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     broadcastScope: broadcastScope,
     onBroadcastChanged: _setBroadcastScope,
     onShortcut: _handleShortcut,
+    onReconnect: _reconnectById,
     onActivate: (sessionId) {
       if (tab.activeSessionId != sessionId) {
         setState(() => tab.activeSessionId = sessionId);
@@ -1975,6 +2034,7 @@ class _TabView extends StatefulWidget {
   final BroadcastScope broadcastScope;
   final ValueChanged<BroadcastScope> onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
+  final ValueChanged<String> onReconnect;
   final ValueChanged<String> onActivate;
   final void Function(String sessionId, Axis axis) onSplit;
   final ValueChanged<String> onSplitBack;
@@ -1995,6 +2055,7 @@ class _TabView extends StatefulWidget {
     required this.broadcastScope,
     required this.onBroadcastChanged,
     this.onShortcut,
+    required this.onReconnect,
     required this.onActivate,
     required this.onSplit,
     required this.onSplitBack,
@@ -2098,6 +2159,7 @@ class _TabViewState extends State<_TabView> {
           broadcastScope: widget.broadcastScope,
           onBroadcastChanged: widget.onBroadcastChanged,
           onShortcut: widget.onShortcut,
+          onReconnect: widget.onReconnect,
           onActivate: widget.onActivate,
           onSplit: widget.onSplit,
           onSplitBack: widget.onSplitBack,
@@ -2201,6 +2263,7 @@ class _PaneTree extends StatelessWidget {
   final BroadcastScope broadcastScope;
   final ValueChanged<BroadcastScope> onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
+  final ValueChanged<String> onReconnect;
   final ValueChanged<String> onActivate;
   final void Function(String sessionId, Axis axis) onSplit;
   final ValueChanged<String> onSplitBack;
@@ -2221,6 +2284,7 @@ class _PaneTree extends StatelessWidget {
     required this.broadcastScope,
     required this.onBroadcastChanged,
     this.onShortcut,
+    required this.onReconnect,
     required this.onActivate,
     required this.onSplit,
     required this.onSplitBack,
@@ -2252,6 +2316,7 @@ class _PaneTree extends StatelessWidget {
         if (byId[id] != null) byId[id]!.terminal,
     ];
     final pane = TerminalPane(
+      key: ValueKey(session.id),
       session: session.terminal,
       snippets: snippets,
       active: active && tab.activeSessionId == session.id,
@@ -2259,6 +2324,7 @@ class _PaneTree extends StatelessWidget {
       broadcastTargets: targets,
       onBroadcastChanged: onBroadcastChanged,
       onShortcut: onShortcut,
+      onReconnect: () => onReconnect(session.id),
       onActivate: () => onActivate(session.id),
       onSplitHorizontal: () => onSplit(session.id, Axis.horizontal),
       onSplitVertical: () => onSplit(session.id, Axis.vertical),
@@ -2336,6 +2402,7 @@ class _PaneTree extends StatelessWidget {
             broadcastScope: broadcastScope,
             onBroadcastChanged: onBroadcastChanged,
             onShortcut: onShortcut,
+            onReconnect: onReconnect,
             onActivate: onActivate,
             onSplit: onSplit,
             onSplitBack: onSplitBack,
@@ -2355,6 +2422,7 @@ class _PaneTree extends StatelessWidget {
             broadcastScope: broadcastScope,
             onBroadcastChanged: onBroadcastChanged,
             onShortcut: onShortcut,
+            onReconnect: onReconnect,
             onActivate: onActivate,
             onSplit: onSplit,
             onSplitBack: onSplitBack,

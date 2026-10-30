@@ -60,15 +60,13 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 // Version
 //
 
+#define WTERM_STRINGIFY_(value) #value
+#define WTERM_STRINGIFY(value) WTERM_STRINGIFY_(value)
 #if defined(FLUTTER_VERSION_MAJOR) && defined(FLUTTER_VERSION_MINOR) && defined(FLUTTER_VERSION_PATCH) && defined(FLUTTER_VERSION_BUILD)
 #define VERSION_AS_NUMBER FLUTTER_VERSION_MAJOR,FLUTTER_VERSION_MINOR,FLUTTER_VERSION_PATCH,FLUTTER_VERSION_BUILD
+#define VERSION_AS_STRING WTERM_STRINGIFY(FLUTTER_VERSION_MAJOR) "." WTERM_STRINGIFY(FLUTTER_VERSION_MINOR) "." WTERM_STRINGIFY(FLUTTER_VERSION_PATCH) " (" WTERM_STRINGIFY(FLUTTER_VERSION_BUILD) ")"
 #else
 #define VERSION_AS_NUMBER 1,0,0,0
-#endif
-
-#if defined(FLUTTER_VERSION)
-#define VERSION_AS_STRING FLUTTER_VERSION
-#else
 #define VERSION_AS_STRING "1.0.0"
 #endif
 
@@ -93,7 +91,7 @@ BEGIN
             VALUE "FileDescription", "W Term" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "wterm" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.wterm. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 W Term contributors. MIT License." "\0"
             VALUE "OriginalFilename", "wterm.exe" "\0"
             VALUE "ProductName", "W Term" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

@@ -320,27 +320,26 @@ bash scripts/package-ios-unsigned.sh
 
 ## 10. 交接时的验证证据
 
-以下是**本轮 2026-10-30（0.1.49）实际执行结果**，日志位于本机 `build/`：
+以下是**本轮 2026-10-30（0.1.50）实际执行结果**，日志位于本机 `build/`：
 
 | 证据 | 留存结果 |
 | --- | --- |
-| `build/p149-tests-0.1.49.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；7 项真实桥接（转发×3、MFA×2、代理、三层跳板路线）通过 |
-| `build/flutter-tests-0.1.49.log` | 199 项 Flutter 全量测试通过 |
-| `build/vault-bridge-0.1.49.log` | 1 项真实保险库桥接通过 |
-| `build/analyze-0.1.49.log` | Flutter analyze 无问题 |
-| `build/clippy-0.1.49.log`、`build/fmt-0.1.49.log` | Rust 格式检查与 Clippy 通过 |
-| `build/macos-signing-0.1.49.log` | 自签名构建、严格签名验证通过 |
-| `build/ios-build-0.1.49.log` | iOS Release 与 IPA 打包完成 |
-| `.github/workflows/windows.yml` | Windows Runner 与 Rust 核心在 Windows CI 编译；本机 macOS 不能直接验证 |
+| `build/p150-tests-0.1.50.log` | 118 项普通 Rust 通过；19 项 ignored fixture 通过；7 项真实桥接（转发×3、MFA×2、代理、三层跳板路线）通过 |
+| `build/flutter-tests-0.1.50.log` | 200 项 Flutter 全量测试通过 |
+| `build/vault-bridge-0.1.50.log` | 1 项真实保险库桥接通过 |
+| `build/clippy-0.1.50.log`、`build/fmt-0.1.50.log` | Rust 格式检查与 Clippy 通过 |
+| `build/macos-signing-0.1.50.log` | 自签名构建、严格签名验证通过 |
+| `build/ios-build-0.1.50.log` | iOS Release 与 IPA 打包完成 |
+| `.github/workflows/windows.yml` | Windows vendored OpenSSL 构建；macOS 主机不能直接验证，以 Windows CI 结果为准 |
 
-2026-10-30 核对 Apple 产物版本均为 **0.1.49（50）**，当前存在：
+2026-10-30 核对 Apple 产物版本均为 **0.1.50（51）**，当前存在：
 
 ```text
 build/macos-signed/Build/Products/Release/W Term.app
-build/ios/wterm-ios-0.1.49-50-unsigned.ipa
+build/ios/wterm-ios-0.1.50-51-unsigned.ipa
 ```
 
-macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库晚于 Rust 源码及与构建目录字节一致均已核对。**本轮没有在模拟器/真机实际操作连接后的整标签拖动、右键菜单、四宫格选择或窗格落点**；Flutter 测试覆盖布局与落点计算，真实鼠标/触控手势仍需签名设备复核。Windows 构建是否成功以 GitHub Actions 的 `Windows preview` 结果为准，不能从 macOS 本地构建推断。未发现真实 GitHub 双端、真实 OpenSSH/代理/转发或四周日用已经通过的记录；0.1.48 及更早日志仅作历史证据。
+macOS 严格签名、IPA ZIP 完整性、iPhoneOS 平台标志、包内原生库晚于 Rust 源码及与构建目录 SHA256 一致均已核对。**本轮没有在真机实际操作广播输入、快捷键或终端选择器**；Flutter 测试覆盖广播目标选择与布局逻辑，真实键盘/触控仍需签名设备复核。Windows 构建是否成功以 GitHub Actions 的 `Windows preview` 结果为准，不能从 macOS 本地构建推断。0.1.49 及更早日志仅作历史证据。
 
 ## 11. 下一步如何推进
 

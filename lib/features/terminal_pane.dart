@@ -24,6 +24,7 @@ class TerminalPane extends StatefulWidget {
   final List<TerminalSession> broadcastTargets;
   final ValueChanged<BroadcastScope>? onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
+  final VoidCallback? onReconnect;
   final VoidCallback onActivate;
   final VoidCallback? onSplitHorizontal;
   final VoidCallback? onSplitVertical;
@@ -38,6 +39,7 @@ class TerminalPane extends StatefulWidget {
     this.broadcastTargets = const [],
     this.onBroadcastChanged,
     this.onShortcut,
+    this.onReconnect,
     required this.onActivate,
     this.onSplitHorizontal,
     this.onSplitVertical,
@@ -201,7 +203,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   Future<void> paneMenu(String value) async {
-    if (value == 'horizontal') {
+    if (value == 'reconnect') {
+      widget.onReconnect?.call();
+    } else if (value == 'horizontal') {
       widget.onSplitHorizontal?.call();
     } else if (value == 'vertical') {
       widget.onSplitVertical?.call();
@@ -248,6 +252,16 @@ class _TerminalPaneState extends State<TerminalPane> {
               ),
             ),
           ),
+          if (ended && widget.onReconnect != null)
+            IconButton(
+              tooltip: '重新连接',
+              onPressed: widget.onReconnect,
+              icon: const Icon(
+                Icons.refresh,
+                color: Color(0xff71cba2),
+                size: 17,
+              ),
+            ),
           if (widget.onBroadcastChanged != null)
             PopupMenuButton<BroadcastScope>(
               tooltip: '广播输入',
@@ -335,6 +349,8 @@ class _TerminalPaneState extends State<TerminalPane> {
             ),
             onSelected: paneMenu,
             itemBuilder: (_) => [
+              if (ended && widget.onReconnect != null)
+                const PopupMenuItem(value: 'reconnect', child: Text('重新连接')),
               if (compact) ...[
                 const PopupMenuItem(value: 'copy', child: Text('复制选中内容')),
                 if (!ended)

@@ -126,4 +126,29 @@ void main() {
       expect(targets(BroadcastScope.all, {'a', 'c'}), ['c']);
     },
   );
+
+  test('replacing a pane keeps the split tree and proportions', () {
+    final tree = SplitPane(
+      Axis.horizontal,
+      const SessionPane('a'),
+      SplitPane(
+        Axis.vertical,
+        const SessionPane('b'),
+        const SessionPane('c'),
+        fraction: .3,
+      ),
+      fraction: .4,
+    );
+    final replaced = replaceSession(tree, 'b', 'reconnected') as SplitPane;
+    expect(replaced.fraction, .4);
+    expect(sessionIdsOrdered(replaced), ['a', 'reconnected', 'c']);
+    final nested = replaced.second as SplitPane;
+    expect(nested.axis, Axis.vertical);
+    expect(nested.fraction, .3);
+    expect(sessionIdsOrdered(replaceSession(tree, 'missing', 'x')), [
+      'a',
+      'b',
+      'c',
+    ]);
+  });
 }

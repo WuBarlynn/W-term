@@ -94,6 +94,24 @@ PaneNode? removeSession(PaneNode node, String sessionId) {
   return SplitPane(split.axis, first, second, fraction: split.fraction);
 }
 
+/// Swaps a pane's session id without changing the split tree or proportions.
+PaneNode replaceSession(
+  PaneNode node,
+  String oldSessionId,
+  String newSessionId,
+) {
+  if (node is SessionPane) {
+    return node.sessionId == oldSessionId ? SessionPane(newSessionId) : node;
+  }
+  final split = node as SplitPane;
+  return SplitPane(
+    split.axis,
+    replaceSession(split.first, oldSessionId, newSessionId),
+    replaceSession(split.second, oldSessionId, newSessionId),
+    fraction: split.fraction,
+  );
+}
+
 /// Splits the pane showing [targetSessionId] at [edge] and inserts [incoming].
 /// The tree is returned unchanged when the target is not present.
 PaneNode splitAt(

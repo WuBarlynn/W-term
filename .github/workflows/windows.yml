@@ -25,6 +25,8 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: cargo test --manifest-path rust/Cargo.toml --locked
       - run: flutter build windows --release
+      - shell: pwsh
+        run: ./scripts/verify-windows-version.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: wterm-windows-release
