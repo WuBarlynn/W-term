@@ -14,6 +14,21 @@ void main() {
     expect(isIpv4(''), isFalse);
   });
 
+  test('preview path resolution and image detection', () {
+    expect(
+      resolveRemotePath('/var/log/app.log', '/home/a'),
+      '/var/log/app.log',
+    );
+    expect(
+      resolveRemotePath('screenshot.PNG', '/home/a/'),
+      '/home/a/screenshot.PNG',
+    );
+    expect(resolveRemotePath('a.txt', null), isNull);
+    expect(resolveRemotePath('a\nb.txt', '/tmp'), isNull);
+    expect(isImagePath('/tmp/a.webp'), isTrue);
+    expect(isImagePath('/tmp/a.log'), isFalse);
+  });
+
   test('plugin switches persist', () async {
     final dir = await Directory.systemTemp.createTemp('wterm-plugins-');
     final file = File('${dir.path}/plugins.json');
@@ -21,11 +36,12 @@ void main() {
       final store = PluginSettings(file: () async => file);
       await store.load();
       expect(store.jsonFormatter, isTrue);
-      await store.save(json: false, ip: true);
+      await store.save(json: false, ip: true, preview: false);
       final restored = PluginSettings(file: () async => file);
       await restored.load();
       expect(restored.jsonFormatter, isFalse);
       expect(restored.ipLookup, isTrue);
+      expect(restored.filePreview, isFalse);
     } finally {
       await dir.delete(recursive: true);
     }

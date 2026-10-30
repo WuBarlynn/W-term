@@ -171,6 +171,84 @@ class _TerminalPaneState extends State<TerminalPane> {
     _focus();
   }
 
+  Future<void> previewSelectedFile() async {
+    final selection = controller.selection;
+    if (selection == null) return;
+    final selected = widget.session.terminal.buffer.getText(selection);
+    final path = resolveRemotePath(selected, widget.session.currentDirectory);
+    if (path == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请选中绝对路径，或等待终端上报当前目录')));
+      return;
+    }
+    try {
+      if (isImagePath(path)) {
+        final file = File(
+          '${(await getTemporaryDirectory()).path}/wterm-preview-${DateTime.now().microsecondsSinceEpoch}${path.substring(path.lastIndexOf("."))}',
+        );
+        await native.downloadFile(
+          connectionId: widget.session.connectionId,
+          remotePath: path,
+          localPath: file.path,
+        );
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(path.split('/').last),
+            content: InteractiveViewer(
+              child: Image.file(
+                file,
+                errorBuilder: (_, _, _) => const Text('无法解码图片'),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+        await file.delete().catchError((Object _) => file);
+      } else {
+        final text = await native.previewText(
+          connectionId: widget.session.connectionId,
+          path: path,
+        );
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(path.split('/').last),
+            content: SizedBox(
+              width: 680,
+              height: 460,
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  text,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('无法预览：${userFacingError(e)}')));
+      }
+    }
+  }
+
   Future<void> lookupSelectedIp() async {
     final selection = controller.selection;
     if (selection == null) return;
@@ -765,6 +843,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                       await formatJson();
                     } else if (selected == 'ip') {
                       await lookupSelectedIp();
+                    } else if (selected == 'preview-file') {
+                      await previewSelectedFile();
                     } else if (selected == 'pin') {
                       await pinSelection();
                     } else if (selected == 'plugins') {

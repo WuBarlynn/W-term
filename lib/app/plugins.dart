@@ -18,7 +18,7 @@ bool isIpv4(String value) {
 
 class PluginSettings extends ChangeNotifier {
   final Future<File> Function() _file;
-  bool jsonFormatter = true, ipLookup = true;
+  bool jsonFormatter = true, ipLookup = true, filePreview = true;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -36,6 +36,7 @@ class PluginSettings extends ChangeNotifier {
         if (value is Map) {
           jsonFormatter = value['jsonFormatter'] != false;
           ipLookup = value['ipLookup'] != false;
+          filePreview = value['filePreview'] != false;
         }
       }
     } catch (_) {
@@ -46,15 +47,25 @@ class PluginSettings extends ChangeNotifier {
     }
   }
 
-  Future<void> save({required bool json, required bool ip}) async {
+  Future<void> save({
+    required bool json,
+    required bool ip,
+    required bool preview,
+  }) async {
     jsonFormatter = json;
     ipLookup = ip;
+    filePreview = preview;
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp');
     await temporary.writeAsString(
-      jsonEncode({'version': 1, 'jsonFormatter': json, 'ipLookup': ip}),
+      jsonEncode({
+        'version': 1,
+        'jsonFormatter': json,
+        'ipLookup': ip,
+        'filePreview': preview,
+      }),
       flush: true,
     );
     await temporary.rename(file.path);
@@ -108,4 +119,28 @@ Future<IpLookupResult> lookupIp(String ip) async {
   } finally {
     client.close(force: true);
   }
+}
+
+bool isImagePath(String path) {
+  final lower = path.toLowerCase().split('?').first;
+  return const [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.bmp',
+  ].any(lower.endsWith);
+}
+
+String? resolveRemotePath(String selected, String? cwd) {
+  var value = selected.trim();
+  if (value.isEmpty || value.contains('\n')) return null;
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.substring(1, value.length - 1);
+  }
+  if (value.startsWith('/')) return value;
+  if (cwd == null || cwd.isEmpty) return null;
+  return '${cwd.replaceAll(RegExp(r'/+$'), '')}/$value';
 }

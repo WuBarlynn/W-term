@@ -12,6 +12,7 @@ class PluginSettingsDialog extends StatefulWidget {
 class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool json = pluginSettings.jsonFormatter;
   late bool ip = pluginSettings.ipLookup;
+  late bool preview = pluginSettings.filePreview;
   bool saving = false;
   String? error;
 
@@ -21,7 +22,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
       error = null;
     });
     try {
-      await pluginSettings.save(json: json, ip: ip);
+      await pluginSettings.save(json: json, ip: ip, preview: preview);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -45,6 +46,14 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             subtitle: const Text('选中 JSON 后从终端右键菜单格式化'),
           ),
           SwitchListTile(
+            value: preview,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => preview = value),
+            title: const Text('文件预览'),
+            subtitle: const Text('选中远程路径后预览文本或图片'),
+          ),
+          SwitchListTile(
             value: ip,
             onChanged: saving ? null : (value) => setState(() => ip = value),
             title: const Text('IP 归属查询'),
@@ -53,7 +62,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '命令补全、文件预览和任务完成通知尚未接入；本开关只控制已实现的插件。',
+              '命令补全和任务完成通知尚未接入；本开关只控制已实现的插件。',
               style: TextStyle(fontSize: 11),
             ),
           ),
