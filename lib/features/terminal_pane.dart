@@ -20,6 +20,7 @@ import 'package:flutter/rendering.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/terminal_session.dart';
+import '../app/pinned_commands.dart';
 import '../app/workspace_layout.dart';
 
 /// A view over a [TerminalSession]. Multiple panes never own the SSH session;
@@ -70,6 +71,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     super.initState();
     terminalAppearance.addListener(appearanceChanged);
     widget.session.addListener(sessionChanged);
+    pinnedCommands.addListener(sessionChanged);
     widget.session.terminal.onOutput = _output;
     _wasActive = widget.active;
     if (widget.active) {
@@ -163,6 +165,31 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (validateSnippetCommand(command) != null) return;
     widget.session.terminal.paste(command);
     _focus();
+  }
+
+  Future<void> pinSelection() async {
+    final selection = controller.selection;
+    if (selection == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先在终端中选中命令')));
+      return;
+    }
+    final command = widget.session.terminal.buffer.getText(selection).trim();
+    if (validateSnippetCommand(command) != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('只能固定单行命令')));
+      return;
+    }
+    await pinnedCommands.pin(
+      PinnedCommand(
+        name: command.length > 32 ? '${command.substring(0, 32)}…' : command,
+        command: command,
+      ),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已固定到终端底部')));
+    }
   }
 
   Future<void> shareImage() async {
@@ -500,6 +527,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   void dispose() {
     terminalAppearance.removeListener(appearanceChanged);
     widget.session.removeListener(sessionChanged);
+    pinnedCommands.removeListener(sessionChanged);
     widget.session.terminal.onOutput = widget.session.send;
     focus.dispose();
     controller.dispose();
@@ -679,6 +707,43 @@ class _TerminalPaneState extends State<TerminalPane> {
                 ),
               ),
             ),
+          ),
+          ListenableBuilder(
+            listenable: pinnedCommands,
+            builder: (context, _) {
+              final pins = pinnedCommands.forHost('');
+              if (pins.isEmpty) return const SizedBox.shrink();
+              return Container(
+                height: 40,
+                color: const Color(0xff161c24),
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    for (final pin in pins)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6, top: 5),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InputChip(
+                            label: Text(
+                              pin.name,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            onPressed: ended
+                                ? null
+                                : () {
+                                    _sendInput('${pin.command}\n');
+                                    _focus();
+                                  },
+                            onDeleted: () => pinnedCommands.unpin(pin),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
           if (MediaQuery.sizeOf(context).width < 900)
             Container(

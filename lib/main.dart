@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'src/rust/frb_generated.dart';
 import 'features/vault_gate.dart';
 import 'app/terminal_appearance.dart';
+import 'app/pinned_commands.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await RustLib.init();
     await terminalAppearance.load();
+    await pinnedCommands.load();
     runApp(const WTermApp());
   } catch (error) {
     runApp(

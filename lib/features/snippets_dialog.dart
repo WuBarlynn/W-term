@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/snippet_store.dart';
 import '../app/errors.dart';
 import '../app/snippet_catalog.dart';
+import '../app/pinned_commands.dart';
 
 class SnippetsDialog extends StatefulWidget {
   final SnippetStore store;
@@ -231,6 +232,13 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                                     edit(entry);
                                   } else if (v == 'copy') {
                                     copy(entry);
+                                  } else if (v == 'pin') {
+                                    pinnedCommands.pin(
+                                      PinnedCommand(
+                                        name: entry.name,
+                                        command: entry.command,
+                                      ),
+                                    );
                                   } else {
                                     remove(entry);
                                   }
@@ -239,6 +247,10 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                                   PopupMenuItem(
                                     value: 'copy',
                                     child: Text('复制命令'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'pin',
+                                    child: Text('固定到命令条'),
                                   ),
                                   PopupMenuItem(
                                     value: 'edit',
