@@ -14,12 +14,13 @@ class TerminalAppearanceDialog extends StatefulWidget {
 class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String palette = widget.store.palette;
   late int size = widget.store.fontSize;
+  late String uiTheme = widget.store.uiTheme;
   bool busy = false;
   String? error;
   Future<void> save() async {
     setState(() => busy = true);
     try {
-      await widget.store.save(palette, size);
+      await widget.store.save(palette, size, nextUiTheme: uiTheme);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -41,15 +42,32 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SegmentedButton<String>(
-                segments: [
+              DropdownButtonFormField<String>(
+                initialValue: palette,
+                decoration: const InputDecoration(labelText: '终端配色'),
+                items: [
                   for (final entry in TerminalAppearance.names.entries)
-                    ButtonSegment(value: entry.key, label: Text(entry.value)),
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
                 ],
-                selected: {palette},
-                onSelectionChanged: busy
+                onChanged: busy
                     ? null
-                    : (v) => setState(() => palette = v.first),
+                    : (value) => setState(() => palette = value ?? 'dark'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: uiTheme,
+                decoration: const InputDecoration(labelText: '界面主题'),
+                items: const [
+                  DropdownMenuItem(value: 'system', child: Text('跟随系统')),
+                  DropdownMenuItem(value: 'dark', child: Text('深色')),
+                  DropdownMenuItem(value: 'light', child: Text('浅色')),
+                ],
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => uiTheme = value ?? 'system'),
               ),
               const SizedBox(height: 20),
               Text('字号：$size'),

@@ -16,13 +16,130 @@ class TerminalAppearance extends ChangeNotifier {
             '${(await getApplicationSupportDirectory()).path}/terminal-appearance.json',
           ));
 
-  static const names = {'dark': '深灰', 'black': '纯黑', 'light': '浅色'};
+  static const names = {
+    'dark': '深灰',
+    'black': '纯黑',
+    'light': '浅色',
+    'dracula': 'Dracula',
+    'nord': 'Nord',
+    'solarized': 'Solarized Dark',
+    'onelight': 'One Light',
+  };
   String palette = 'dark';
+  String uiTheme = 'system';
   int fontSize = 13;
   Future<void> _pending = Future.value();
 
   static TerminalTheme themeFor(String palette) {
     if (palette == 'black') return TerminalThemes.whiteOnBlack;
+    if (palette == 'dracula') {
+      return const TerminalTheme(
+        cursor: Color(0xfff8f8f2),
+        selection: Color(0x554bd5e0),
+        foreground: Color(0xfff8f8f2),
+        background: Color(0xff282a36),
+        black: Color(0xff21222c),
+        red: Color(0xffff5555),
+        green: Color(0xff50fa7b),
+        yellow: Color(0xfff1fa8c),
+        blue: Color(0xffbd93f9),
+        magenta: Color(0xffff79c6),
+        cyan: Color(0xff8be9fd),
+        white: Color(0xfff8f8f2),
+        brightBlack: Color(0xff6272a4),
+        brightRed: Color(0xffff6e6e),
+        brightGreen: Color(0xff69ff94),
+        brightYellow: Color(0xffffffa5),
+        brightBlue: Color(0xffd6acff),
+        brightMagenta: Color(0xffff92df),
+        brightCyan: Color(0xffa4ffff),
+        brightWhite: Color(0xffffffff),
+        searchHitBackground: Color(0xffffdf80),
+        searchHitBackgroundCurrent: Color(0xffa1e4be),
+        searchHitForeground: Color(0xff202830),
+      );
+    }
+    if (palette == 'nord') {
+      return const TerminalTheme(
+        cursor: Color(0xffd8dee9),
+        selection: Color(0x5588c0d0),
+        foreground: Color(0xffd8dee9),
+        background: Color(0xff2e3440),
+        black: Color(0xff3b4252),
+        red: Color(0xffbf616a),
+        green: Color(0xffa3be8c),
+        yellow: Color(0xffebcb8b),
+        blue: Color(0xff81a1c1),
+        magenta: Color(0xffb48ead),
+        cyan: Color(0xff88c0d0),
+        white: Color(0xffe5e9f0),
+        brightBlack: Color(0xff4c566a),
+        brightRed: Color(0xffbf616a),
+        brightGreen: Color(0xffa3be8c),
+        brightYellow: Color(0xffebcb8b),
+        brightBlue: Color(0xff81a1c1),
+        brightMagenta: Color(0xffb48ead),
+        brightCyan: Color(0xff8fbcbb),
+        brightWhite: Color(0xffeceff4),
+        searchHitBackground: Color(0xffffdf80),
+        searchHitBackgroundCurrent: Color(0xffa1e4be),
+        searchHitForeground: Color(0xff202830),
+      );
+    }
+    if (palette == 'solarized') {
+      return const TerminalTheme(
+        cursor: Color(0xff93a1a1),
+        selection: Color(0x55268bd2),
+        foreground: Color(0xff93a1a1),
+        background: Color(0xff002b36),
+        black: Color(0xff073642),
+        red: Color(0xffdc322f),
+        green: Color(0xff859900),
+        yellow: Color(0xffb58900),
+        blue: Color(0xff268bd2),
+        magenta: Color(0xffd33682),
+        cyan: Color(0xff2aa198),
+        white: Color(0xffeee8d5),
+        brightBlack: Color(0xff586e75),
+        brightRed: Color(0xffcb4b16),
+        brightGreen: Color(0xff586e75),
+        brightYellow: Color(0xff657b83),
+        brightBlue: Color(0xff839496),
+        brightMagenta: Color(0xff6c71c4),
+        brightCyan: Color(0xff93a1a1),
+        brightWhite: Color(0xfffdf6e3),
+        searchHitBackground: Color(0xffffdf80),
+        searchHitBackgroundCurrent: Color(0xffa1e4be),
+        searchHitForeground: Color(0xff202830),
+      );
+    }
+    if (palette == 'onelight') {
+      return const TerminalTheme(
+        cursor: Color(0xff526fff),
+        selection: Color(0x5538384a),
+        foreground: Color(0xff383a42),
+        background: Color(0xfffafafa),
+        black: Color(0xff383a42),
+        red: Color(0xffe45649),
+        green: Color(0xff50a14f),
+        yellow: Color(0xffc18401),
+        blue: Color(0xff0184bc),
+        magenta: Color(0xffa626a4),
+        cyan: Color(0xff0997b3),
+        white: Color(0xffd3d3d3),
+        brightBlack: Color(0xff696c77),
+        brightRed: Color(0xffe45649),
+        brightGreen: Color(0xff50a14f),
+        brightYellow: Color(0xffc18401),
+        brightBlue: Color(0xff0184bc),
+        brightMagenta: Color(0xffa626a4),
+        brightCyan: Color(0xff0997b3),
+        brightWhite: Color(0xffffffff),
+        searchHitBackground: Color(0xffffdf80),
+        searchHitBackgroundCurrent: Color(0xffa1e4be),
+        searchHitForeground: Color(0xff202830),
+      );
+    }
     if (palette != 'light') return TerminalThemes.defaultTheme;
     return const TerminalTheme(
       cursor: Color(0xff243447),
@@ -59,6 +176,11 @@ class TerminalAppearance extends ChangeNotifier {
       if (value is! Map) return;
       final storedPalette = value['palette'];
       final storedSize = value['fontSize'];
+      final storedTheme = value['uiTheme'];
+      if (storedTheme is String &&
+          {'system', 'dark', 'light'}.contains(storedTheme)) {
+        uiTheme = storedTheme;
+      }
       if (storedPalette is String && names.containsKey(storedPalette)) {
         palette = storedPalette;
       }
@@ -73,8 +195,12 @@ class TerminalAppearance extends ChangeNotifier {
     }
   }
 
-  Future<void> save(String nextPalette, int nextSize) {
-    if (!names.containsKey(nextPalette) || nextSize < 10 || nextSize > 28) {
+  Future<void> save(String nextPalette, int nextSize, {String? nextUiTheme}) {
+    final nextMode = nextUiTheme ?? uiTheme;
+    if (!names.containsKey(nextPalette) ||
+        nextSize < 10 ||
+        nextSize > 28 ||
+        !{'system', 'dark', 'light'}.contains(nextMode)) {
       return Future.error(ArgumentError('无效的终端外观设置'));
     }
     final operation = _pending.catchError((Object _) {}).then((_) async {
@@ -82,12 +208,17 @@ class TerminalAppearance extends ChangeNotifier {
       await file.parent.create(recursive: true);
       final temporary = File('${file.path}.tmp');
       await temporary.writeAsString(
-        jsonEncode({'palette': nextPalette, 'fontSize': nextSize}),
+        jsonEncode({
+          'palette': nextPalette,
+          'fontSize': nextSize,
+          'uiTheme': nextMode,
+        }),
         flush: true,
       );
       await temporary.rename(file.path);
       palette = nextPalette;
       fontSize = nextSize;
+      uiTheme = nextMode;
       notifyListeners();
     });
     _pending = operation;

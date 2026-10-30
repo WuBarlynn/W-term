@@ -61,12 +61,20 @@ class WTermApp extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'W Term',
-    builder: (context, child) => VaultPrivacyShield(child: child!),
-    debugShowCheckedModeBanner: false,
-    theme: theme(Brightness.light),
-    darkTheme: theme(Brightness.dark),
-    home: home ?? const VaultGate(),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: terminalAppearance,
+    builder: (context, _) => MaterialApp(
+      title: 'W Term',
+      builder: (context, child) => VaultPrivacyShield(child: child!),
+      debugShowCheckedModeBanner: false,
+      theme: theme(Brightness.light),
+      darkTheme: theme(Brightness.dark),
+      themeMode: switch (terminalAppearance.uiTheme) {
+        'dark' => ThemeMode.dark,
+        'light' => ThemeMode.light,
+        _ => ThemeMode.system,
+      },
+      home: home ?? const VaultGate(),
+    ),
   );
 }

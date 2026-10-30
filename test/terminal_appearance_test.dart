@@ -32,6 +32,18 @@ void main() {
     },
   );
 
+  test('UI theme mode round-trips', () async {
+    final settings = TerminalAppearance(file: () async => file);
+    await settings.save('dracula', 16, nextUiTheme: 'dark');
+    final restored = TerminalAppearance(file: () async => file);
+    await restored.load();
+    expect(restored.palette, 'dracula');
+    expect(restored.uiTheme, 'dark');
+    expect(restored.fontSize, 16);
+    settings.dispose();
+    restored.dispose();
+  });
+
   test('damaged or out of range preferences fall back to defaults', () async {
     for (final content in [
       '{broken',
