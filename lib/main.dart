@@ -1,20 +1,40 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'src/rust/frb_generated.dart';
+import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
 import 'app/terminal_appearance.dart';
 import 'app/pinned_commands.dart';
 import 'app/plugins.dart';
 
-Future<void> main() async {
+Map<String, String>? detachedPayload(List<String> args) {
+  final index = args.indexOf('--wterm-detached');
+  if (index < 0 || index + 1 >= args.length) return null;
+  try {
+    final decoded = jsonDecode(args[index + 1]);
+    if (decoded is! Map) return null;
+    return decoded.map((key, value) => MapEntry('$key', '$value'));
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await RustLib.init();
     await terminalAppearance.load();
     await pinnedCommands.load();
     await pluginSettings.load();
-    runApp(const WTermApp());
+    final detached = detachedPayload(args);
+    runApp(
+      detached == null
+          ? const WTermApp()
+          : DetachedTerminalApp(payload: detached),
+    );
   } catch (error) {
     runApp(
       MaterialApp(

@@ -82,19 +82,49 @@ pub async fn terminal_output(connection_id: String, sink: StreamSink<Vec<u8>>) -
         .take()
         .context("Output already subscribed")?;
     let mut stop = live.stop.subscribe();
+    let mut handoff = live.handoff.subscribe();
     loop {
-        let data = tokio::select! { biased; _ = stop.changed() => break, data = rx.recv() => data };
+        let data = tokio::select! { biased;
+            _ = handoff.changed() => {
+                *live.output.lock().await = Some(rx);
+                return Ok(());
+            }
+            _ = stop.changed() => break,
+            data = rx.recv() => data
+        };
         let Some(data) = data else { break };
         if sink.add(data).is_err() {
             break;
         }
         // One unacknowledged frame across FFI; no unbounded Dart message queue.
-        match tokio::time::timeout(Duration::from_secs(60), live.ack.acquire()).await {
+        let permit = tokio::select! { biased;
+            _ = handoff.changed() => {
+                *live.output.lock().await = Some(rx);
+                return Ok(());
+            }
+            permit = tokio::time::timeout(Duration::from_secs(60), live.ack.acquire()) => permit,
+        };
+        match permit {
             Ok(Ok(permit)) => permit.forget(),
             _ => break,
         }
     }
     session::disconnect(&connection_id).await
+}
+
+/// Stops the current output subscriber without disconnecting, returning the
+/// receiver to the live session so a second Flutter engine can attach.
+pub async fn handoff_terminal_output(connection_id: String) -> Result<()> {
+    let live = session::live(&connection_id).await?;
+    live.handoff
+        .send_modify(|version| *version = version.wrapping_add(1));
+    for _ in 0..100 {
+        if live.output.lock().await.is_some() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    bail!("Output handoff timed out")
 }
 /// Runs one non-interactive command over the existing authenticated session.
 /// Output is bounded and the command has a hard timeout; callers must build

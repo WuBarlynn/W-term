@@ -4,6 +4,8 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private let quickUnlockQueue = DispatchQueue(label: "dev.wterm.quick-unlock", qos: .userInitiated)
+  private var detachedWindows: [NSWindow] = []
+  private var detachedChannels: [FlutterMethodChannel] = []
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -19,6 +21,16 @@ class MainFlutterWindow: NSWindow {
       name: "dev.wterm/biometrics",
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     biometricChannel.setMethodCallHandler { call, result in
+      if call.method == "openTerminalWindow" {
+        guard let args = call.arguments as? [String: Any],
+              let payload = args["payload"] as? String else {
+          result(false)
+          return
+        }
+        let title = args["title"] as? String ?? "W Term"
+        result(self.openDetachedWindow(payload: payload, title: title))
+        return
+      }
       if call.method == "keychainAccessIssue" {
         DispatchQueue.global(qos: .userInitiated).async {
           let issue = BiometricSigningPolicy.currentIssue()
@@ -77,6 +89,41 @@ class MainFlutterWindow: NSWindow {
 
 
     super.awakeFromNib()
+  }
+
+  private func openDetachedWindow(payload: String, title: String) -> Bool {
+    let project = FlutterDartProject()
+    project.dartEntrypointArguments = ["--wterm-detached", payload]
+    let controller = FlutterViewController(project: project)
+    RegisterGeneratedPlugins(registry: controller)
+
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
+      styleMask: [.titled, .miniaturizable, .resizable],
+      backing: .buffered,
+      defer: false)
+    window.title = title
+    window.contentViewController = controller
+    window.minSize = NSSize(width: 520, height: 360)
+    window.isReleasedWhenClosed = false
+    window.center()
+
+    let channel = FlutterMethodChannel(
+      name: "dev.wterm/detached-window",
+      binaryMessenger: controller.engine.binaryMessenger)
+    channel.setMethodCallHandler { [weak window] call, result in
+      if call.method == "close" {
+        DispatchQueue.main.async { window?.close() }
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    detachedWindows.append(window)
+    detachedChannels.append(channel)
+    window.makeKeyAndOrderFront(nil)
+    return true
   }
 
   /// Closing the last window keeps the process and SSH sessions alive. The

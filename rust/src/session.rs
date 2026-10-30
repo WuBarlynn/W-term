@@ -144,6 +144,8 @@ pub struct Live {
     pub output: Mutex<Option<mpsc::Receiver<Vec<u8>>>>,
     pub ack: Semaphore,
     pub stop: watch::Sender<bool>,
+    /// Bumped when the active Dart subscriber hands output to another engine.
+    pub handoff: watch::Sender<u64>,
     pub sftp: Mutex<Option<Arc<SftpSession>>>,
     pub remote_targets: RemoteTargets,
     parent: Option<String>,
@@ -454,6 +456,7 @@ async fn authenticate_inner(
     let (input, input_rx) = mpsc::channel(64);
     let (output, output_rx) = mpsc::channel(32);
     let (stop, stop_rx) = watch::channel(false);
+    let (handoff, _) = watch::channel(0u64);
     let remote_targets = pending.remote_targets.clone();
     let live = Arc::new(Live {
         handle,
@@ -466,6 +469,7 @@ async fn authenticate_inner(
         }),
         ack: Semaphore::new(0),
         stop,
+        handoff,
         sftp: Mutex::new(None),
         forwards: Mutex::new(HashMap::new()),
         remote_targets,

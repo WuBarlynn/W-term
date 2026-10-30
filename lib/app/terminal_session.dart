@@ -29,7 +29,7 @@ class TerminalSession extends ChangeNotifier {
   StreamSubscription<Uint8List>? _output;
   Future<void> _writes = Future.value();
   Timer? _resizeTimer;
-  bool _ended = false, _closed = false;
+  bool _ended = false, _closed = false, _handedOff = false, _handingOff = false;
   final bool _offline;
   String? _error;
   int? _lastColumns, _lastRows;
@@ -47,6 +47,28 @@ class TerminalSession extends ChangeNotifier {
     this.onZmodemRequest,
     this.hostId = '',
   }) : _offline = false {
+    _startLive();
+  }
+
+  /// Reattaches to a connection whose output receiver was handed off by
+  /// another engine. The snapshot restores scrollback for the new view.
+  TerminalSession.attach({
+    required this.connectionId,
+    required this.host,
+    required this.username,
+    required String snapshot,
+    required this.onEnded,
+    this.onCommand,
+    this.onActivity,
+    this.onZmodemOffer,
+    this.onZmodemRequest,
+    this.hostId = '',
+  }) : _offline = false {
+    if (snapshot.isNotEmpty) terminal.write(snapshot);
+    _startLive();
+  }
+
+  void _startLive() {
     final mux = ZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
       ..onTerminalInput = terminal.write
       ..onFileOffer = (offer) {
@@ -92,8 +114,12 @@ class TerminalSession extends ChangeNotifier {
                   .catchError((Object _) {}),
             );
           },
-          onError: (Object error) => _finish(userFacingError(error)),
-          onDone: () => _finish(null),
+          onError: (Object error) {
+            if (!_handingOff) _finish(userFacingError(error));
+          },
+          onDone: () {
+            if (!_handingOff) _finish(null);
+          },
         );
   }
 
@@ -119,6 +145,55 @@ class TerminalSession extends ChangeNotifier {
   bool get ended => _ended;
   String? get error => _error;
   String get title => username.isEmpty ? host : '$username@$host';
+
+  String _bufferText() {
+    final lines = <String>[];
+    for (var i = 0; i < terminal.buffer.lines.length; i++) {
+      final line = terminal.buffer.lines[i];
+      if (line.isWrapped && lines.isNotEmpty) {
+        lines[lines.length - 1] += line.getText();
+      } else {
+        lines.add(line.getText());
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /// Hands the Rust output receiver to another engine without disconnecting.
+  /// Returns the scrollback snapshot for the new view.
+  Future<String> detachForHandoff() async {
+    if (_handedOff || _closed || _offline) {
+      throw StateError('该会话不能转移到新窗口');
+    }
+    final snapshot = _bufferText();
+    _handingOff = true;
+    try {
+      await native.handoffTerminalOutput(connectionId: connectionId);
+    } catch (_) {
+      _handingOff = false;
+      rethrow;
+    }
+    _handedOff = true;
+    _closed = true;
+    await _stopLocalOutput();
+    return snapshot;
+  }
+
+  Future<void> _stopLocalOutput() async {
+    _resizeTimer?.cancel();
+    terminal.onOutput = null;
+    terminal.onResize = null;
+    terminal.onPrivateOSC = null;
+    final output = _output;
+    _output = null;
+    await output?.cancel();
+    _zmodem
+      ?..onFileOffer = null
+      ..onFileRequest = null;
+    _zmodem = null;
+    await _zmodemInput.close();
+    await _wire.close();
+  }
 
   void send(String text, {bool record = true}) {
     if (_ended || _closed) return;
@@ -175,23 +250,19 @@ class TerminalSession extends ChangeNotifier {
       _ended = true;
       terminal.write('\r\n\x1b[90m连接已结束\x1b[0m\r\n');
     }
-    _resizeTimer?.cancel();
-    terminal.onOutput = null;
-    terminal.onResize = null;
-    terminal.onPrivateOSC = null;
-    final output = _output;
-    _output = null;
-    await output?.cancel();
     if (!_offline) {
-      _zmodem
-        ?..onFileOffer = null
-        ..onFileRequest = null;
-      _zmodem = null;
-      await _zmodemInput.close();
-      await _wire.close();
+      // Disconnect first: it closes the Rust output/ack channels, which lets a
+      // pending terminalOutput stream subscription cancel instead of waiting
+      // for its 60-second acknowledgement timeout.
       await native
           .disconnect(connectionId: connectionId)
           .catchError((Object _) {});
+      await _stopLocalOutput();
+    } else {
+      _resizeTimer?.cancel();
+      terminal.onOutput = null;
+      terminal.onResize = null;
+      terminal.onPrivateOSC = null;
     }
   }
 

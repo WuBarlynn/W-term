@@ -1092,6 +1092,103 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _detachToWindow(String id) async {
+    if (!Platform.isMacOS) {
+      message('独立终端窗口目前仅支持 macOS。');
+      return;
+    }
+    final session = _sessionById(id);
+    final tab = _tabForSession(id);
+    if (session == null || tab == null || !session.connected) return;
+
+    String snapshot;
+    try {
+      snapshot = await session.terminal.detachForHandoff();
+    } catch (e) {
+      message('无法转移终端：${userFacingError(e)}');
+      return;
+    }
+    if (!mounted) {
+      session.terminal.dispose();
+      return;
+    }
+
+    final title = '${session.username}@${session.host}';
+    var opened = false;
+    try {
+      opened =
+          await const MethodChannel('dev.wterm/biometrics')
+              .invokeMethod<bool>('openTerminalWindow', {
+                'payload': jsonEncode({
+                  'connectionId': session.id,
+                  'host': session.host,
+                  'username': session.username,
+                  'snapshot': snapshot,
+                  'title': title,
+                }),
+                'title': title,
+              }) ??
+          false;
+    } catch (e) {
+      message('无法打开独立窗口：${userFacingError(e)}');
+    }
+
+    if (!opened) {
+      final replacement = TerminalSession.attach(
+        connectionId: session.id,
+        host: session.host,
+        username: session.username,
+        hostId: session.hostId,
+        snapshot: snapshot,
+        onEnded: () => _terminalEnded(session.id),
+        onActivity: () => taskMonitor.activity(session.id),
+        onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
+        onZmodemRequest: _requestZmodemFiles,
+        onCommand: (command) {
+          unawaited(
+            commandHistory.record(
+              command: command,
+              host: session.host,
+              username: session.username,
+            ),
+          );
+          taskMonitor.commandSubmitted(session.id, command, title: title);
+        },
+      );
+      final next = _Session(
+        session.id,
+        session.host,
+        session.username,
+        session.hostId,
+        replacement,
+        profile: session.profile,
+      );
+      setState(() {
+        final index = sessions.indexOf(session);
+        if (index >= 0) sessions[index] = next;
+      });
+      session.terminal.dispose();
+      message('无法打开独立窗口，终端已保留在当前窗口。');
+      return;
+    }
+
+    setState(() {
+      sessions.remove(session);
+      final remaining = removeSession(tab.root, id);
+      if (remaining == null) {
+        tabs.remove(tab);
+        selected = tabs.isEmpty ? -1 : selected.clamp(0, tabs.length - 1);
+      } else {
+        tab.root = remaining;
+        if (tab.activeSessionId == id) {
+          tab.activeSessionId = firstSession(remaining)!;
+        }
+      }
+    });
+    session.terminal.dispose();
+    _scheduleLayoutSave();
+  }
+
   Future<File> _layoutFile() async => File(
     '${(await getApplicationSupportDirectory()).path}/workspace-layout.json',
   );
@@ -1630,6 +1727,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           value: 'locate',
           child: _menuRow(Icons.my_location, '定位当前连接'),
         ),
+        if (Platform.isMacOS)
+          PopupMenuItem(
+            value: 'detach',
+            child: _menuRow(Icons.open_in_new, '在新窗口打开'),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'split',
@@ -1662,6 +1764,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (!mounted || choice == null) return;
     if (choice == 'rename') {
       await _renameTab(tab);
+    } else if (choice == 'detach') {
+      await _detachToWindow(tab.activeSessionId);
     } else if (choice == 'locate') {
       final hostId = _sessionById(tab.activeSessionId)?.hostId ?? '';
       if (hostId.isEmpty) {
