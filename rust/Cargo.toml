@@ -24,10 +24,11 @@ reqwest = { version = "=0.12.28", default-features = false, features = ["json", 
 argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
 base64ct = { version = "=1.8.3", features = ["alloc"] }
 
-# SQLCipher needs OpenSSL on Windows; vendor it so the Windows build is
-# self-contained. Apple targets keep using the platform crypto path.
+# SQLCipher needs OpenSSL on Windows. CI points OPENSSL_DIR/LIB/INCLUDE at the
+# runner-provided OpenSSL and bundles its DLLs with the app; Apple targets use
+# the platform crypto path without setting those variables.
 [target.'cfg(windows)'.dependencies]
-rusqlite = { version = "0.38", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.38", features = ["bundled-sqlcipher"] }
 
 [target.'cfg(not(windows))'.dependencies]
 rusqlite = { version = "0.38", features = ["bundled-sqlcipher"] }

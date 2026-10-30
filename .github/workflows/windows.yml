@@ -11,6 +11,10 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      OPENSSL_DIR: 'C:\Program Files\OpenSSL'
+      OPENSSL_INCLUDE_DIR: 'C:\Program Files\OpenSSL\include'
+      OPENSSL_LIB_DIR: 'C:\Program Files\OpenSSL\lib\VC\x64\MD'
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -24,6 +28,15 @@ jobs:
           components: rustfmt, clippy
       - run: flutter pub get --enforce-lockfile
       - run: flutter build windows --release --verbose
+      - shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:OPENSSL_LIB_DIR\libcrypto.lib")) {
+            Get-ChildItem "$env:OPENSSL_DIR" -Recurse -Filter libcrypto.lib | ForEach-Object { $_.FullName }
+            throw "OpenSSL libcrypto.lib not found at $env:OPENSSL_LIB_DIR"
+          }
+          Get-ChildItem "$env:OPENSSL_DIR\bin\*crypto*.dll", "$env:OPENSSL_DIR\bin\*ssl*.dll" |
+            Copy-Item -Destination "build\windows\x64\runner\Release"
+          Get-ChildItem "build\windows\x64\runner\Release\*.dll" | Select-Object Name
       - shell: pwsh
         run: ./scripts/verify-windows-version.ps1
       - name: Upload native asset logs
