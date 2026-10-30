@@ -15,6 +15,7 @@ import 'app/system_notifications.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
 import 'app/keyword_highlights.dart';
+import 'app/sync_automation.dart';
 import 'app/pinned_commands.dart';
 import 'app/plugins.dart';
 
@@ -56,6 +57,7 @@ Future<void> main(List<String> args) async {
     await terminalAppearance.load();
     await pinnedCommands.load();
     await keywordHighlights.load();
+    await syncAutomation.load();
     await pluginSettings.load();
     runApp(
       detached == null

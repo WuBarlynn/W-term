@@ -63,6 +63,8 @@ void main() {
       await tester.ensureVisible(find.byTooltip('设置与工具'));
       await tester.tap(find.byTooltip('设置与工具'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('连接代理'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('连接代理'));
       await tester.pumpAndSettle();
       expect(find.byType(ProxyDialog), findsOneWidget);

@@ -50,6 +50,12 @@ void main() {
     expect(parseUpdateChecksum('abc  a.dmg', 'a.dmg'), isNull);
   });
 
+  test('Windows installer runs silently and restarts the app', () {
+    expect(updateInstallerArguments, contains('/SILENT'));
+    expect(updateInstallerArguments, contains('/CLOSEAPPLICATIONS'));
+    expect(updateInstallerArguments, contains('/RESTARTAPPLICATIONS'));
+  });
+
   test('build-time version constant matches pubspec', () {
     final lines = File('pubspec.yaml').readAsLinesSync();
     final version = lines

@@ -25,6 +25,7 @@ import '../features/vault_settings.dart';
 import 'task_notifications.dart';
 import 'auto_backup.dart';
 import 'system_notifications.dart';
+import 'sync_automation.dart';
 import 'deep_links.dart';
 import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
@@ -103,7 +104,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
-  Timer? _layoutSaveTimer, _updateTimer;
+  Timer? _layoutSaveTimer, _updateTimer, _autoSyncTimer;
+  bool _autoSyncBusy = false;
   bool _restoredLayout = false;
   String status = '';
   String? pending;
@@ -116,6 +118,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (hostStore is VaultMaintenance) {
       unawaited(autoBackup.ensureRecent(hostStore as VaultMaintenance));
     }
+    _restartAutoSync();
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
     pendingDeepLink.addListener(_deepLinkReceived);
@@ -132,6 +135,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     pendingDeepLink.removeListener(_deepLinkReceived);
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
+    _autoSyncTimer?.cancel();
     unawaited(_saveLayout());
     attempt++;
     final operation = activeOperationId;
@@ -870,6 +874,60 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     unawaited(connect());
   }
 
+  void _restartAutoSync() {
+    _autoSyncTimer?.cancel();
+    if (!syncAutomation.enabled || hostStore is! SyncStore) return;
+    _autoSyncTimer = Timer.periodic(
+      Duration(minutes: syncAutomation.intervalMinutes),
+      (_) => unawaited(_runAutoSync()),
+    );
+    unawaited(_runAutoSync());
+  }
+
+  Future<void> _runAutoSync() async {
+    if (!mounted ||
+        _autoSyncBusy ||
+        !syncAutomation.enabled ||
+        hostStore is! SyncStore) {
+      return;
+    }
+    _autoSyncBusy = true;
+    try {
+      final store = hostStore as SyncStore;
+      final profile = await store.syncSettings();
+      if (!profile.configured ||
+          !profile.initialized ||
+          !profile.tokenSaved ||
+          profile.pending) {
+        return;
+      }
+      await store.runSync();
+      if (!mounted) return;
+      final review = await store.syncConflicts();
+      if (review != null && review.items.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('自动同步发现 ${review.items.length} 项冲突，需要手动审阅'),
+            action: SnackBarAction(
+              label: '审阅',
+              onPressed: () => unawaited(
+                showDialog<void>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => SyncDialog(store: store),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) message('自动同步失败：${userFacingError(e)}');
+    } finally {
+      _autoSyncBusy = false;
+    }
+  }
+
   void _taskCompleted() {
     if (!mounted) return;
     for (final completion in taskMonitor.drain()) {
@@ -1510,7 +1568,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           if (asset != null)
             FilledButton(
               onPressed: () => Navigator.pop(context, 'download'),
-              child: const Text('下载并打开'),
+              child: Text(Platform.isWindows ? '下载并安装' : '下载并打开'),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'open'),
@@ -1520,6 +1578,30 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       ),
     );
     if (choice == 'download' && asset != null) {
+      if (!mounted) return;
+      if (Platform.isWindows) {
+        final install = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('安装更新并重启？'),
+            content: const Text(
+              '安装程序将静默运行，W Term 会退出并在安装完成后重启。'
+              '请先保存正在填写的连接或编辑内容。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('安装并重启'),
+              ),
+            ],
+          ),
+        );
+        if (install != true) return;
+      }
       message('正在下载 ${asset.name}…');
       try {
         final file = await downloadUpdateAsset(asset);
@@ -1531,10 +1613,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         }
         if (Platform.isMacOS) {
           await Process.run('open', [file.path]);
+          message('安装包已下载并打开：${file.path}');
         } else if (Platform.isWindows) {
-          await Process.run('explorer', [file.path]);
+          await Process.start(file.path, updateInstallerArguments);
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+          exit(0);
         }
-        message('安装包已下载并打开：${file.path}');
       } catch (e) {
         if (mounted) message('下载更新失败：${userFacingError(e)}');
       }
@@ -2184,6 +2268,17 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             ),
           );
         }
+      case 'auto-sync':
+        if (hostStore is SyncStore) {
+          final profile = await (hostStore as SyncStore).syncSettings();
+          if (!profile.configured || !profile.initialized) {
+            message('请先在 GitHub 同步中完成初始化。');
+            return;
+          }
+          await syncAutomation.setEnabled(!syncAutomation.enabled);
+          _restartAutoSync();
+          message(syncAutomation.enabled ? '已启用自动同步' : '已关闭自动同步');
+        }
       case 'sync':
         if (hostStore is SyncStore) {
           await showDialog<void>(
@@ -2245,7 +2340,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     popupItem('history', Icons.history, '命令历史'),
     popupItem('update', Icons.system_update, '检查更新'),
     if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
-    if (hostStore is SyncStore) popupItem('sync', Icons.sync, 'GitHub 同步'),
+    if (hostStore is SyncStore) ...[
+      popupItem('sync', Icons.sync, 'GitHub 同步'),
+      CheckedPopupMenuItem(
+        value: 'auto-sync',
+        checked: syncAutomation.enabled,
+        child: const Text('自动同步（15 分钟）'),
+      ),
+    ],
     if (hostStore is ConnectionProxyStore)
       popupItem('proxy', Icons.route_outlined, '连接代理'),
     if (hostStore is VaultMaintenance)
