@@ -80,6 +80,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   String? _autoCopied;
   final _inputTracker = TerminalInputTracker();
   Timer? _highlightTimer;
+  static const _imeChannel = MethodChannel('dev.wterm/biometrics');
   List<CommandCompletion> _completions = const [];
   String _completionSignature = '';
   @override
@@ -91,6 +92,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     controller.addListener(_selectionForCopy);
     pluginSettings.addListener(_pluginSettingsChanged);
     keywordHighlights.addListener(_highlightSettingsChanged);
+    focus.addListener(_imeFocusChanged);
     widget.session.terminal.onOutput = _output;
     _wasActive = widget.active;
     if (widget.active) {
@@ -145,6 +147,23 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   void _pluginSettingsChanged() {
     if (!pluginSettings.commandCompletion) _refreshCompletions();
+    _applyImeState();
+  }
+
+  void _imeFocusChanged() {
+    _applyImeState();
+  }
+
+  void _applyImeState() {
+    if (!(Theme.of(context).platform == TargetPlatform.macOS)) return;
+    unawaited(
+      _imeChannel
+          .invokeMethod<void>(
+            'setAsciiInput',
+            focus.hasFocus && pluginSettings.imeAutoEnglish,
+          )
+          .catchError((Object _) {}),
+    );
   }
 
   void _highlightSettingsChanged() {
@@ -1044,6 +1063,14 @@ class _TerminalPaneState extends State<TerminalPane> {
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);
+    focus.removeListener(_imeFocusChanged);
+    if (pluginSettings.imeAutoEnglish) {
+      unawaited(
+        _imeChannel
+            .invokeMethod<void>('setAsciiInput', false)
+            .catchError((Object _) {}),
+      );
+    }
     for (final highlight in List.of(controller.highlights)) {
       highlight.dispose();
     }

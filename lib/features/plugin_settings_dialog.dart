@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/errors.dart';
@@ -18,6 +19,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool preview = pluginSettings.filePreview;
   late bool completion = pluginSettings.commandCompletion;
   late bool notifications = pluginSettings.taskNotifications;
+  late bool imeAutoEnglish = pluginSettings.imeAutoEnglish;
   bool saving = false;
   String? error;
 
@@ -33,6 +35,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         preview: preview,
         completion: completion,
         notifications: notifications,
+        imeAutoEnglishNext: imeAutoEnglish,
       );
       if (notifications) unawaited(systemNotifications.setup());
       if (mounted) Navigator.pop(context);
@@ -87,6 +90,15 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             title: const Text('任务完成通知'),
             subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
           ),
+          if (defaultTargetPlatform == TargetPlatform.macOS)
+            SwitchListTile(
+              value: imeAutoEnglish,
+              onChanged: saving
+                  ? null
+                  : (value) => setState(() => imeAutoEnglish = value),
+              title: const Text('终端自动切英文输入'),
+              subtitle: const Text('聚焦终端时切到 ASCII 键盘，离开时恢复原输入法'),
+            ),
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(

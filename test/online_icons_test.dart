@@ -28,7 +28,7 @@ void main() {
         'mdi:database',
         'bad',
         'mdi:server',
-        'mdi:' + 'x' * 200,
+        'mdi:${'x' * 200}',
       ],
     });
     final entries = parseOnlineIconSearch(body);

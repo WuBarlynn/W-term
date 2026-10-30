@@ -9,6 +9,7 @@ class MainFlutterWindow: NSWindow {
   private var detachedChannels: [FlutterMethodChannel] = []
   private var showHotKeyRef: EventHotKeyRef?
   private var showHotKeyHandler: EventHandlerRef?
+  private var previousInputSource: TISInputSource?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -32,6 +33,12 @@ class MainFlutterWindow: NSWindow {
         }
         let title = args["title"] as? String ?? "W Term"
         result(self.openDetachedWindow(payload: payload, title: title))
+        return
+      }
+      if call.method == "setAsciiInput" {
+        let ascii = (call.arguments as? Bool) ?? false
+        DispatchQueue.main.async { self.setAsciiInput(ascii) }
+        result(nil)
         return
       }
       if call.method == "keychainAccessIssue" {
@@ -93,6 +100,22 @@ class MainFlutterWindow: NSWindow {
 
     registerShowHotKey()
     super.awakeFromNib()
+  }
+
+  private func setAsciiInput(_ ascii: Bool) {
+    if ascii {
+      if previousInputSource == nil {
+        previousInputSource =
+          TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+      }
+      if let layout =
+        TISCopyCurrentASCIICapableKeyboardInputSource()?.takeRetainedValue() {
+        TISSelectInputSource(layout)
+      }
+    } else if let previous = previousInputSource {
+      TISSelectInputSource(previous)
+      previousInputSource = nil
+    }
   }
 
   private func registerShowHotKey() {
