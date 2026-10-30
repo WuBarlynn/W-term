@@ -1114,7 +1114,13 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       message('当前已是最新版本或无法连接更新服务（$appVersion）。');
       return;
     }
-    final open = await showDialog<bool>(
+    final platform = Platform.isWindows
+        ? 'windows'
+        : Platform.isMacOS
+        ? 'macos'
+        : null;
+    final asset = platform == null ? null : info.assetFor(platform);
+    final choice = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('发现新版本 ${info.version}'),
@@ -1128,17 +1134,36 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, 'later'),
             child: const Text('稍后'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+          if (asset != null)
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'download'),
+              child: const Text('下载并打开'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'open'),
             child: const Text('打开发布页'),
           ),
         ],
       ),
     );
-    if (open == true) {
+    if (choice == 'download' && asset != null) {
+      message('正在下载 ${asset.name}…');
+      try {
+        final file = await downloadUpdateAsset(asset);
+        if (!mounted) return;
+        if (Platform.isMacOS) {
+          await Process.run('open', [file.path]);
+        } else if (Platform.isWindows) {
+          await Process.run('explorer', [file.path]);
+        }
+        message('安装包已下载并打开：${file.path}');
+      } catch (e) {
+        if (mounted) message('下载更新失败：${userFacingError(e)}');
+      }
+    } else if (choice == 'open') {
       await launchUrl(
         Uri.parse(info.url),
         mode: LaunchMode.externalApplication,

@@ -12,6 +12,22 @@ void main() {
     expect(isNewerVersion('v2.0.0+9', '1.99.99'), isTrue);
   });
 
+  test('update asset selection follows the desktop platform', () {
+    const info = UpdateInfo(
+      version: 'v1.0.4',
+      url: 'https://example.com',
+      notes: '',
+      assets: [
+        UpdateAsset('a.dmg', 'https://example.com/a.dmg'),
+        UpdateAsset('a.exe', 'https://example.com/a.exe'),
+        UpdateAsset('a.ipa', 'https://example.com/a.ipa'),
+      ],
+    );
+    expect(info.assetFor('macos')?.name, 'a.dmg');
+    expect(info.assetFor('windows')?.name, 'a.exe');
+    expect(info.assetFor('ios'), isNull);
+  });
+
   test('build-time version constant matches pubspec', () {
     final lines = File('pubspec.yaml').readAsLinesSync();
     final version = lines
