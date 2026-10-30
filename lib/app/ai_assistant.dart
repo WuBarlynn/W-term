@@ -73,8 +73,44 @@ class AiSettings {
   }
 }
 
+class AiProfile {
+  final String id, name;
+  final AiSettings settings;
+  const AiProfile({
+    required this.id,
+    required this.name,
+    required this.settings,
+  });
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'settings': settings.toJson(),
+  };
+  static AiProfile? fromJson(Map<String, dynamic> value) {
+    final id = value['id'];
+    final name = value['name'];
+    final settings = value['settings'];
+    if (id is! String || name is! String || settings is! Map) return null;
+    return AiProfile(
+      id: id,
+      name: name,
+      settings: AiSettings.fromJson(Map<String, dynamic>.from(settings)),
+    );
+  }
+}
+
+class AiProfileSet {
+  final List<AiProfile> profiles;
+  final String activeId;
+  const AiProfileSet({required this.profiles, required this.activeId});
+  AiProfile? get active =>
+      profiles.where((profile) => profile.id == activeId).firstOrNull ??
+      profiles.firstOrNull;
+}
+
 class AiStore {
   static const _key = 'wterm.ai-settings.v1';
+  static const _profilesKey = 'wterm.ai-profiles.v1';
   final FlutterSecureStorage storage;
   const AiStore({
     this.storage = const FlutterSecureStorage(
@@ -85,21 +121,72 @@ class AiStore {
     ),
   });
 
-  Future<AiSettings> load() async {
-    final raw = await storage.read(key: _key);
-    if (raw == null) return const AiSettings();
-    try {
-      final value = jsonDecode(raw);
-      return value is Map
-          ? AiSettings.fromJson(Map<String, dynamic>.from(value))
-          : const AiSettings();
-    } catch (_) {
-      return const AiSettings();
+  Future<AiProfileSet> loadProfiles() async {
+    final raw = await storage.read(key: _profilesKey);
+    if (raw != null) {
+      try {
+        final value = jsonDecode(raw);
+        if (value is Map && value['profiles'] is List) {
+          final profiles = (value['profiles'] as List)
+              .whereType<Map>()
+              .map((row) => AiProfile.fromJson(Map<String, dynamic>.from(row)))
+              .whereType<AiProfile>()
+              .toList();
+          if (profiles.isNotEmpty) {
+            final active = value['activeId'] is String
+                ? value['activeId'] as String
+                : profiles.first.id;
+            return AiProfileSet(profiles: profiles, activeId: active);
+          }
+        }
+      } catch (_) {
+        // Fall through to the legacy single profile.
+      }
     }
+    AiSettings settings = const AiSettings();
+    final legacy = await storage.read(key: _key);
+    if (legacy != null) {
+      try {
+        final value = jsonDecode(legacy);
+        if (value is Map) {
+          settings = AiSettings.fromJson(Map<String, dynamic>.from(value));
+        }
+      } catch (_) {}
+    }
+    final profile = AiProfile(id: 'default', name: '默认环境', settings: settings);
+    return AiProfileSet(profiles: [profile], activeId: profile.id);
   }
 
-  Future<void> save(AiSettings settings) =>
-      storage.write(key: _key, value: jsonEncode(settings.toJson()));
+  Future<void> saveProfiles(AiProfileSet value) async {
+    await storage.write(
+      key: _profilesKey,
+      value: jsonEncode({
+        'version': 1,
+        'activeId': value.activeId,
+        'profiles': value.profiles.map((profile) => profile.toJson()).toList(),
+      }),
+    );
+  }
+
+  Future<AiSettings> load() async =>
+      (await loadProfiles()).active?.settings ?? const AiSettings();
+
+  Future<void> save(AiSettings settings) async {
+    final current = await loadProfiles();
+    final active = current.active;
+    final profiles = [
+      for (final profile in current.profiles)
+        profile.id == active?.id
+            ? AiProfile(id: profile.id, name: profile.name, settings: settings)
+            : profile,
+    ];
+    await saveProfiles(
+      AiProfileSet(
+        profiles: profiles,
+        activeId: active?.id ?? profiles.first.id,
+      ),
+    );
+  }
 }
 
 class AiReply {

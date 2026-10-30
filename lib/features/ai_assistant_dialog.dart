@@ -25,8 +25,116 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
     text: '${widget.settings.timeoutSeconds}',
   );
   late AiPermission permission = widget.settings.permission;
-  bool saving = false;
+  List<AiProfile> profiles = [];
+  late String activeId = 'default';
+  bool profilesReady = false, saving = false;
   String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfiles();
+  }
+
+  Future<void> _loadProfiles() async {
+    final set = await const AiStore().loadProfiles();
+    if (!mounted) return;
+    setState(() {
+      profiles = set.profiles;
+      activeId = set.active?.id ?? profiles.first.id;
+      profilesReady = true;
+      _apply(set.active?.settings ?? widget.settings);
+    });
+  }
+
+  void _apply(AiSettings value) {
+    base.text = value.baseUrl;
+    model.text = value.model;
+    key.text = value.apiKey;
+    prompt.text = value.systemPrompt;
+    contextLines.text = '${value.contextLines}';
+    timeout.text = '${value.timeoutSeconds}';
+    permission = value.permission;
+  }
+
+  AiSettings _current() => AiSettings(
+    baseUrl: base.text.trim(),
+    model: model.text.trim(),
+    apiKey: key.text.trim(),
+    systemPrompt: prompt.text.trim().isEmpty
+        ? const AiSettings().systemPrompt
+        : prompt.text.trim(),
+    contextLines: int.tryParse(contextLines.text) ?? 120,
+    timeoutSeconds: int.tryParse(timeout.text) ?? 60,
+    permission: permission,
+  );
+
+  Future<void> _addProfile() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增 AI 环境'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '环境名称'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
+    final value = name?.trim() ?? '';
+    if (value.isEmpty || !mounted) return;
+    final profile = AiProfile(
+      id: 'ai-${DateTime.now().microsecondsSinceEpoch}',
+      name: value,
+      settings: _current(),
+    );
+    setState(() {
+      profiles = [...profiles, profile];
+      activeId = profile.id;
+    });
+  }
+
+  Future<void> _deleteProfile() async {
+    if (profiles.length <= 1) return;
+    final profile = profiles.where((item) => item.id == activeId).firstOrNull;
+    if (profile == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('删除 AI 环境 ${profile.name}？'),
+        content: const Text('只删除本机保存的接口配置和 API Key。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final remaining = profiles.where((item) => item.id != activeId).toList();
+    setState(() {
+      profiles = remaining;
+      activeId = remaining.first.id;
+      _apply(remaining.first.settings);
+    });
+  }
 
   @override
   void dispose() {
@@ -74,7 +182,23 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
       permission: permission,
     );
     try {
-      await const AiStore().save(next);
+      final updated = [
+        for (final profile in profiles)
+          profile.id == activeId
+              ? AiProfile(id: profile.id, name: profile.name, settings: next)
+              : profile,
+      ];
+      if (updated.isEmpty) {
+        updated.add(AiProfile(id: 'default', name: '默认环境', settings: next));
+      }
+      await const AiStore().saveProfiles(
+        AiProfileSet(
+          profiles: updated,
+          activeId: updated.any((profile) => profile.id == activeId)
+              ? activeId
+              : updated.first.id,
+        ),
+      );
       if (mounted) Navigator.pop(context, next);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -92,6 +216,49 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
       child: SingleChildScrollView(
         child: Column(
           children: [
+            if (profilesReady)
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: activeId,
+                      decoration: const InputDecoration(labelText: 'AI 环境'),
+                      items: [
+                        for (final profile in profiles)
+                          DropdownMenuItem(
+                            value: profile.id,
+                            child: Text(profile.name),
+                          ),
+                      ],
+                      onChanged: saving
+                          ? null
+                          : (value) {
+                              final profile = profiles
+                                  .where((item) => item.id == value)
+                                  .firstOrNull;
+                              if (profile == null) return;
+                              setState(() {
+                                activeId = profile.id;
+                                _apply(profile.settings);
+                              });
+                            },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '新增 AI 环境',
+                    onPressed: saving ? null : _addProfile,
+                    icon: const Icon(Icons.add, size: 18),
+                  ),
+                  IconButton(
+                    tooltip: '删除当前环境',
+                    onPressed: saving || profiles.length <= 1
+                        ? null
+                        : _deleteProfile,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 12),
             TextField(
               controller: base,
               decoration: const InputDecoration(
