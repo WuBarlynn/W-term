@@ -19,9 +19,9 @@ void main(List<String> args) async {
     await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: 'rust',
       extraCargoEnvironmentVariables: {
-        if (opensslDir != null) 'OPENSSL_DIR': opensslDir,
-        if (opensslLib != null) 'OPENSSL_LIB_DIR': opensslLib,
-        if (opensslInclude != null) 'OPENSSL_INCLUDE_DIR': opensslInclude,
+        'OPENSSL_DIR': ?opensslDir,
+        'OPENSSL_LIB_DIR': ?opensslLib,
+        'OPENSSL_INCLUDE_DIR': ?opensslInclude,
       },
     ).run(input: input, output: output);
   });
