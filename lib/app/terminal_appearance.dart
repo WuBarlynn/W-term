@@ -7,6 +7,88 @@ import 'package:xterm/xterm.dart';
 
 final terminalAppearance = TerminalAppearance();
 
+class SkinDefinition {
+  final String name, palette;
+  final bool dark;
+  final int seed;
+  final int top, bottom;
+  const SkinDefinition({
+    required this.name,
+    required this.palette,
+    required this.dark,
+    required this.seed,
+    required this.top,
+    required this.bottom,
+  });
+}
+
+const builtInSkins = <String, SkinDefinition>{
+  'emerald': SkinDefinition(
+    name: '翡翠林海',
+    palette: 'dark',
+    dark: true,
+    seed: 0xff167768,
+    top: 0xff071f1b,
+    bottom: 0xff145c4f,
+  ),
+  'sunset': SkinDefinition(
+    name: '落日沙丘',
+    palette: 'onelight',
+    dark: false,
+    seed: 0xffb85c38,
+    top: 0xffffe3c8,
+    bottom: 0xffe8a87c,
+  ),
+  'aurora': SkinDefinition(
+    name: '极光之夜',
+    palette: 'nord',
+    dark: true,
+    seed: 0xff3fc1c9,
+    top: 0xff061a2b,
+    bottom: 0xff123b4a,
+  ),
+  'sakura': SkinDefinition(
+    name: '樱花和风',
+    palette: 'light',
+    dark: false,
+    seed: 0xffc25b7c,
+    top: 0xfffff0f4,
+    bottom: 0xfff3c6d4,
+  ),
+  'neon': SkinDefinition(
+    name: '赛博霓虹',
+    palette: 'dracula',
+    dark: true,
+    seed: 0xffb34dff,
+    top: 0xff100724,
+    bottom: 0xff35104d,
+  ),
+  'ink': SkinDefinition(
+    name: '水墨青山',
+    palette: 'light',
+    dark: false,
+    seed: 0xff2f5d55,
+    top: 0xffedf2ef,
+    bottom: 0xffc9d9d3,
+  ),
+  'starry': SkinDefinition(
+    name: '午夜星河',
+    palette: 'dark',
+    dark: true,
+    seed: 0xff5b7cfa,
+    top: 0xff040817,
+    bottom: 0xff18294a,
+  ),
+  'coast': SkinDefinition(
+    name: '蔚蓝海岸',
+    palette: 'light',
+    dark: false,
+    seed: 0xff1677a8,
+    top: 0xffe8f8ff,
+    bottom: 0xffb7ddec,
+  ),
+};
+
 class TerminalAppearance extends ChangeNotifier {
   final Future<File> Function() _file;
   TerminalAppearance({Future<File> Function()? file})
@@ -27,6 +109,7 @@ class TerminalAppearance extends ChangeNotifier {
   };
   String palette = 'dark';
   String uiTheme = 'system';
+  String skin = 'none';
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
   Future<void> _pending = Future.value();
@@ -179,6 +262,11 @@ class TerminalAppearance extends ChangeNotifier {
       final storedSize = value['fontSize'];
       final storedTheme = value['uiTheme'];
       final storedUiFont = value['uiFont'];
+      final storedSkin = value['skin'];
+      if (storedSkin is String &&
+          (storedSkin == 'none' || builtInSkins.containsKey(storedSkin))) {
+        skin = storedSkin;
+      }
       final storedTerminalFont = value['terminalFont'];
       final storedCjkFont = value['cjkFont'];
       if (storedUiFont is String) uiFont = storedUiFont;
@@ -209,6 +297,7 @@ class TerminalAppearance extends ChangeNotifier {
     String? nextUiFont,
     String? nextTerminalFont,
     String? nextCjkFont,
+    String? nextSkin,
   }) {
     final nextMode = nextUiTheme ?? uiTheme;
     if (!names.containsKey(nextPalette) ||
@@ -229,6 +318,7 @@ class TerminalAppearance extends ChangeNotifier {
           'uiFont': nextUiFont ?? uiFont,
           'terminalFont': nextTerminalFont ?? terminalFont,
           'cjkFont': nextCjkFont ?? cjkFont,
+          'skin': nextSkin ?? skin,
         }),
         flush: true,
       );
@@ -239,6 +329,7 @@ class TerminalAppearance extends ChangeNotifier {
       uiFont = nextUiFont ?? uiFont;
       terminalFont = nextTerminalFont ?? terminalFont;
       cjkFont = nextCjkFont ?? cjkFont;
+      skin = nextSkin ?? skin;
       notifyListeners();
     });
     _pending = operation;

@@ -41,6 +41,7 @@ void main() {
       nextUiFont: 'UI Font',
       nextTerminalFont: 'Term Font',
       nextCjkFont: 'CJK Font',
+      nextSkin: 'emerald',
     );
     final restored = TerminalAppearance(file: () async => file);
     await restored.load();
@@ -49,6 +50,7 @@ void main() {
     expect(restored.uiFont, 'UI Font');
     expect(restored.terminalFont, 'Term Font');
     expect(restored.cjkFont, 'CJK Font');
+    expect(restored.skin, 'emerald');
     expect(restored.fontSize, 16);
     settings.dispose();
     restored.dispose();

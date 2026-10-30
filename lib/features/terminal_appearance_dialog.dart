@@ -15,6 +15,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String palette = widget.store.palette;
   late int size = widget.store.fontSize;
   late String uiTheme = widget.store.uiTheme;
+  late String skin = widget.store.skin;
   late final uiFont = TextEditingController(text: widget.store.uiFont);
   late final terminalFont = TextEditingController(
     text: widget.store.terminalFont,
@@ -41,6 +42,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextUiFont: uiFont.text.trim(),
         nextTerminalFont: terminalFont.text.trim(),
         nextCjkFont: cjkFont.text.trim(),
+        nextSkin: skin,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -63,6 +65,40 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '内置皮肤',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: const Text('无'),
+                    selected: skin == 'none',
+                    onSelected: busy
+                        ? null
+                        : (_) => setState(() => skin = 'none'),
+                  ),
+                  for (final entry in builtInSkins.entries)
+                    ChoiceChip(
+                      label: Text(entry.value.name),
+                      selected: skin == entry.key,
+                      onSelected: busy
+                          ? null
+                          : (_) => setState(() {
+                              skin = entry.key;
+                              palette = entry.value.palette;
+                              uiTheme = entry.value.dark ? 'dark' : 'light';
+                            }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: palette,
                 decoration: const InputDecoration(labelText: '终端配色'),

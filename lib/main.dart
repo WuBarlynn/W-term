@@ -38,8 +38,9 @@ class WTermApp extends StatelessWidget {
   const WTermApp({super.key, this.home});
   ThemeData theme(Brightness brightness) {
     final windows = defaultTargetPlatform == TargetPlatform.windows;
+    final skin = builtInSkins[terminalAppearance.skin];
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xff167768),
+      seedColor: Color(skin?.seed ?? 0xff167768),
       brightness: brightness,
     );
     return ThemeData(
@@ -49,9 +50,11 @@ class WTermApp extends StatelessWidget {
       fontFamily: terminalAppearance.uiFont.trim().isNotEmpty
           ? terminalAppearance.uiFont.trim()
           : (windows ? 'Microsoft YaHei' : null),
-      scaffoldBackgroundColor: brightness == Brightness.light
-          ? const Color(0xfffafbfc)
-          : const Color(0xff171c22),
+      scaffoldBackgroundColor: skin == null
+          ? brightness == Brightness.light
+                ? const Color(0xfffafbfc)
+                : const Color(0xff171c22)
+          : Colors.transparent,
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),
         isDense: true,
@@ -69,18 +72,41 @@ class WTermApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: terminalAppearance,
-    builder: (context, _) => MaterialApp(
-      title: 'W Term',
-      builder: (context, child) => VaultPrivacyShield(child: child!),
-      debugShowCheckedModeBanner: false,
-      theme: theme(Brightness.light),
-      darkTheme: theme(Brightness.dark),
-      themeMode: switch (terminalAppearance.uiTheme) {
-        'dark' => ThemeMode.dark,
-        'light' => ThemeMode.light,
-        _ => ThemeMode.system,
-      },
-      home: home ?? const VaultGate(),
-    ),
+    builder: (context, _) {
+      final skin = builtInSkins[terminalAppearance.skin];
+      final themeMode = skin == null
+          ? switch (terminalAppearance.uiTheme) {
+              'dark' => ThemeMode.dark,
+              'light' => ThemeMode.light,
+              _ => ThemeMode.system,
+            }
+          : skin.dark
+          ? ThemeMode.dark
+          : ThemeMode.light;
+      return MaterialApp(
+        title: 'W Term',
+        builder: (context, child) {
+          Widget content = VaultPrivacyShield(child: child!);
+          if (skin != null) {
+            content = DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(skin.top), Color(skin.bottom)],
+                ),
+              ),
+              child: content,
+            );
+          }
+          return content;
+        },
+        debugShowCheckedModeBanner: false,
+        theme: theme(Brightness.light),
+        darkTheme: theme(Brightness.dark),
+        themeMode: themeMode,
+        home: home ?? const VaultGate(),
+      );
+    },
   );
 }
