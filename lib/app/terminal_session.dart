@@ -11,7 +11,7 @@ import 'errors.dart';
 /// Owns the terminal model, SSH output and session lifetime independently of
 /// any widget. Views can attach, move and detach without reconnecting.
 class TerminalSession extends ChangeNotifier {
-  final String connectionId, host, username;
+  final String connectionId, host, username, hostId;
   final Terminal terminal = Terminal(maxLines: 5000);
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
@@ -36,6 +36,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.hostId = '',
   }) : _offline = false {
     _decoded = utf8.decoder
         .bind(_bytes.stream)
@@ -74,6 +75,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.hostId = '',
   }) : connectionId =
            'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
        _offline = true {

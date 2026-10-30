@@ -569,6 +569,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         connectionId: connectedId,
         host: hops.last.host,
         username: connectedUsername,
+        hostId: hops.last.hostId,
         onEnded: () => _terminalEnded(connectedId),
         onCommand: (command) => unawaited(
           commandHistory.record(
@@ -1022,6 +1023,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           final terminal = TerminalSession.offline(
             host: host.host,
             username: host.username,
+            hostId: host.id,
             onEnded: () {},
           );
           final session = _Session(

@@ -372,15 +372,18 @@ class _TerminalPaneState extends State<TerminalPane> {
           .showSnackBar(const SnackBar(content: Text('只能固定单行命令')));
       return;
     }
+    final hostScoped = widget.session.hostId.isNotEmpty;
     await pinnedCommands.pin(
       PinnedCommand(
         name: command.length > 32 ? '${command.substring(0, 32)}…' : command,
         command: command,
+        hostId: hostScoped ? widget.session.hostId : '',
       ),
     );
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已固定到终端底部')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(hostScoped ? '已固定到当前主机的命令条' : '已固定到终端底部')),
+      );
     }
   }
 
@@ -1044,7 +1047,7 @@ class _TerminalPaneState extends State<TerminalPane> {
           ListenableBuilder(
             listenable: pinnedCommands,
             builder: (context, _) {
-              final pins = pinnedCommands.forHost('');
+              final pins = pinnedCommands.forHost(widget.session.hostId);
               if (pins.isEmpty) return const SizedBox.shrink();
               return Container(
                 height: 40,

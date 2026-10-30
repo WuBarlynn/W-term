@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
@@ -15,6 +18,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
   String? error;
   int count = 0;
   String fileName = 'pasted.csv';
+  Uint8List? binaryBytes;
 
   @override
   void dispose() {
@@ -26,10 +30,33 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
     try {
       final file = await openFile();
       if (file == null) return;
-      final content = await file.readAsString();
+      final bytes = await file.readAsBytes();
       if (!mounted) return;
+      final lower = file.name.toLowerCase();
+      final archive =
+          lower.endsWith('.xts') ||
+          (bytes.length > 4 &&
+              bytes[0] == 0x50 &&
+              bytes[1] == 0x4b &&
+              bytes[2] == 0x03 &&
+              bytes[3] == 0x04);
+      if (archive) {
+        final hosts = parseHostImportBytes(file.name, bytes);
+        setState(() {
+          binaryBytes = bytes;
+          fileName = file.name;
+          text.text =
+              'Xshell 备份包：${file.name}\n\n'
+              '${hosts.take(50).map((host) => '· ${host.name}  ${host.username}@${host.host}:${host.port}').join('\n')}'
+              '${hosts.length > 50 ? '\n…' : ''}';
+          count = hosts.length;
+          error = null;
+        });
+        return;
+      }
       setState(() {
-        text.text = content;
+        binaryBytes = null;
+        text.text = utf8.decode(bytes, allowMalformed: true);
         fileName = file.name;
         error = null;
       });
@@ -38,9 +65,13 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
     }
   }
 
+  List<HostProfile> parseHosts() => binaryBytes != null
+      ? parseHostImportBytes(fileName, binaryBytes!)
+      : parseHostImport(fileName, text.text);
+
   void parse() {
     try {
-      final hosts = parseHostImport(fileName, text.text);
+      final hosts = parseHosts();
       setState(() {
         count = hosts.length;
         error = null;
@@ -65,7 +96,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
             children: [
               const Expanded(
                 child: Text(
-                  '支持 CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini；也可粘贴 CSV',
+                  '支持 CSV/TSV、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts；也可粘贴 CSV',
                   style: TextStyle(fontSize: 12),
                 ),
               ),
@@ -84,7 +115,10 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
               maxLines: null,
               minLines: null,
               autocorrect: false,
+              readOnly: binaryBytes != null,
               onChanged: (_) => setState(() {
+                binaryBytes = null;
+                fileName = 'pasted.csv';
                 count = 0;
                 error = null;
               }),
@@ -120,7 +154,7 @@ class _HostCsvImportDialogState extends State<HostCsvImportDialog> {
       FilledButton(
         onPressed: () {
           try {
-            final hosts = parseHostImport(fileName, text.text);
+            final hosts = parseHosts();
             Navigator.pop<List<HostProfile>>(context, hosts);
           } on FormatException catch (e) {
             setState(() => error = e.message);
