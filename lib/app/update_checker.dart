@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-const appVersion = '1.0.4';
-const appBuild = '57';
+const appVersion = '1.0.5';
+const appBuild = '58';
 
 class UpdateAsset {
   final String name, url;

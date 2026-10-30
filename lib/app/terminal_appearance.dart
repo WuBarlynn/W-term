@@ -106,13 +106,102 @@ class TerminalAppearance extends ChangeNotifier {
     'nord': 'Nord',
     'solarized': 'Solarized Dark',
     'onelight': 'One Light',
+    'custom': '自定义',
+  };
+  static const customColorLabels = {
+    'background': '背景',
+    'foreground': '前景',
+    'cursor': '光标',
+    'selection': '选区',
+    'black': '黑',
+    'red': '红',
+    'green': '绿',
+    'yellow': '黄',
+    'blue': '蓝',
+    'magenta': '洋红',
+    'cyan': '青',
+    'white': '白',
+    'brightBlack': '亮黑',
+    'brightRed': '亮红',
+    'brightGreen': '亮绿',
+    'brightYellow': '亮黄',
+    'brightBlue': '亮蓝',
+    'brightMagenta': '亮洋红',
+    'brightCyan': '亮青',
+    'brightWhite': '亮白',
   };
   String palette = 'dark';
   String uiTheme = 'system';
   String skin = 'none';
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
+  bool copyOnSelect = false;
+  Map<String, int> customColors = const {};
   Future<void> _pending = Future.value();
+
+  /// Seeds the editor from a built-in palette instead of starting blank.
+  static Map<String, int> defaultCustomColors([String palette = 'dark']) {
+    final theme = themeFor(palette == 'custom' ? 'dark' : palette);
+    return {
+      'background': theme.background.toARGB32(),
+      'foreground': theme.foreground.toARGB32(),
+      'cursor': theme.cursor.toARGB32(),
+      'selection': theme.selection.toARGB32(),
+      'black': theme.black.toARGB32(),
+      'red': theme.red.toARGB32(),
+      'green': theme.green.toARGB32(),
+      'yellow': theme.yellow.toARGB32(),
+      'blue': theme.blue.toARGB32(),
+      'magenta': theme.magenta.toARGB32(),
+      'cyan': theme.cyan.toARGB32(),
+      'white': theme.white.toARGB32(),
+      'brightBlack': theme.brightBlack.toARGB32(),
+      'brightRed': theme.brightRed.toARGB32(),
+      'brightGreen': theme.brightGreen.toARGB32(),
+      'brightYellow': theme.brightYellow.toARGB32(),
+      'brightBlue': theme.brightBlue.toARGB32(),
+      'brightMagenta': theme.brightMagenta.toARGB32(),
+      'brightCyan': theme.brightCyan.toARGB32(),
+      'brightWhite': theme.brightWhite.toARGB32(),
+    };
+  }
+
+  static TerminalTheme customTheme(Map<String, int> colors) {
+    final d = TerminalThemes.defaultTheme;
+    Color read(String key, Color fallback) {
+      final value = colors[key];
+      return value == null ? fallback : Color(value);
+    }
+
+    return TerminalTheme(
+      cursor: read('cursor', d.cursor),
+      selection: read('selection', d.selection),
+      foreground: read('foreground', d.foreground),
+      background: read('background', d.background),
+      black: read('black', d.black),
+      red: read('red', d.red),
+      green: read('green', d.green),
+      yellow: read('yellow', d.yellow),
+      blue: read('blue', d.blue),
+      magenta: read('magenta', d.magenta),
+      cyan: read('cyan', d.cyan),
+      white: read('white', d.white),
+      brightBlack: read('brightBlack', d.brightBlack),
+      brightRed: read('brightRed', d.brightRed),
+      brightGreen: read('brightGreen', d.brightGreen),
+      brightYellow: read('brightYellow', d.brightYellow),
+      brightBlue: read('brightBlue', d.brightBlue),
+      brightMagenta: read('brightMagenta', d.brightMagenta),
+      brightCyan: read('brightCyan', d.brightCyan),
+      brightWhite: read('brightWhite', d.brightWhite),
+      searchHitBackground: d.searchHitBackground,
+      searchHitBackgroundCurrent: d.searchHitBackgroundCurrent,
+      searchHitForeground: d.searchHitForeground,
+    );
+  }
+
+  TerminalTheme get activeTheme =>
+      palette == 'custom' ? customTheme(customColors) : themeFor(palette);
 
   static TerminalTheme themeFor(String palette) {
     if (palette == 'black') return TerminalThemes.whiteOnBlack;
@@ -272,6 +361,22 @@ class TerminalAppearance extends ChangeNotifier {
       if (storedUiFont is String) uiFont = storedUiFont;
       if (storedTerminalFont is String) terminalFont = storedTerminalFont;
       if (storedCjkFont is String) cjkFont = storedCjkFont;
+      final storedColors = value['customColors'];
+      if (storedColors is Map) {
+        final colors = <String, int>{};
+        for (final entry in storedColors.entries) {
+          final key = entry.key;
+          final color = entry.value;
+          if (key is String &&
+              customColorLabels.containsKey(key) &&
+              color is int &&
+              color >= 0 &&
+              color <= 0xffffffff) {
+            colors[key] = color;
+          }
+        }
+        if (colors.isNotEmpty) customColors = Map.unmodifiable(colors);
+      }
       if (storedTheme is String &&
           {'system', 'dark', 'light'}.contains(storedTheme)) {
         uiTheme = storedTheme;
@@ -282,6 +387,7 @@ class TerminalAppearance extends ChangeNotifier {
       if (storedSize is int && storedSize >= 10 && storedSize <= 28) {
         fontSize = storedSize;
       }
+      copyOnSelect = value['copyOnSelect'] == true;
       notifyListeners();
     } on FileSystemException {
       // Appearance is optional; an unreadable preference never blocks startup.
@@ -298,12 +404,24 @@ class TerminalAppearance extends ChangeNotifier {
     String? nextTerminalFont,
     String? nextCjkFont,
     String? nextSkin,
+    Map<String, int>? nextCustomColors,
+    bool? nextCopyOnSelect,
   }) {
     final nextMode = nextUiTheme ?? uiTheme;
+    final nextColors = nextCustomColors ?? customColors;
+    final validColors =
+        nextColors.isEmpty ||
+        nextColors.entries.every(
+          (entry) =>
+              customColorLabels.containsKey(entry.key) &&
+              entry.value >= 0 &&
+              entry.value <= 0xffffffff,
+        );
     if (!names.containsKey(nextPalette) ||
         nextSize < 10 ||
         nextSize > 28 ||
-        !{'system', 'dark', 'light'}.contains(nextMode)) {
+        !{'system', 'dark', 'light'}.contains(nextMode) ||
+        !validColors) {
       return Future.error(ArgumentError('无效的终端外观设置'));
     }
     final operation = _pending.catchError((Object _) {}).then((_) async {
@@ -319,6 +437,8 @@ class TerminalAppearance extends ChangeNotifier {
           'terminalFont': nextTerminalFont ?? terminalFont,
           'cjkFont': nextCjkFont ?? cjkFont,
           'skin': nextSkin ?? skin,
+          'customColors': nextColors,
+          'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
         }),
         flush: true,
       );
@@ -330,6 +450,8 @@ class TerminalAppearance extends ChangeNotifier {
       terminalFont = nextTerminalFont ?? terminalFont;
       cjkFont = nextCjkFont ?? cjkFont;
       skin = nextSkin ?? skin;
+      customColors = Map.unmodifiable(nextColors);
+      copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
       notifyListeners();
     });
     _pending = operation;

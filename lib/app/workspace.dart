@@ -84,7 +84,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   late final HostStore hostStore = widget.hostStore ?? KeychainHostStore();
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final hostPanelKey = GlobalKey<HostsPageState>();
-  bool showIdentities = false, sidebarCollapsed = false;
+  bool showIdentities = false, sidebarCollapsed = false, focusMode = false;
   double sidebarWidth = 272;
   int identitiesEpoch = 0;
   final sessions = <_Session>[];
@@ -1086,6 +1086,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       _scheduleLayoutSave();
     } else if (action == 'sessions') {
       unawaited(showSessionPicker());
+    } else if (action == 'focus') {
+      setState(() => focusMode = !focusMode);
     }
   }
 
@@ -1467,6 +1469,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           value: 'rename',
           child: _menuRow(Icons.edit_outlined, '重命名标签'),
         ),
+        PopupMenuItem(
+          value: 'locate',
+          child: _menuRow(Icons.my_location, '定位当前连接'),
+        ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'split',
@@ -1499,6 +1505,19 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (!mounted || choice == null) return;
     if (choice == 'rename') {
       await _renameTab(tab);
+    } else if (choice == 'locate') {
+      final hostId = _sessionById(tab.activeSessionId)?.hostId ?? '';
+      if (hostId.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('临时终端没有对应的主机记录')));
+        return;
+      }
+      setState(() {
+        focusMode = false;
+        showIdentities = false;
+        sidebarCollapsed = false;
+      });
+      await hostPanelKey.currentState?.locateHost(hostId);
     } else if (choice == 'split') {
       await _showSplitMenu(tab, position);
     } else if (choice == 'unsplit') {
@@ -1827,10 +1846,17 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         await _checkUpdates();
       case 'lock':
         widget.onLock?.call();
+      case 'focus':
+        if (mounted) setState(() => focusMode = !focusMode);
     }
   }
 
   List<PopupMenuEntry<String>> _settingsItems() => [
+    popupItem(
+      'focus',
+      focusMode ? Icons.fullscreen_exit : Icons.fullscreen,
+      focusMode ? '退出聚焦模式' : '聚焦模式',
+    ),
     popupItem('sessions', Icons.list_alt, '已打开终端'),
     popupItem('history', Icons.history, '命令历史'),
     popupItem('update', Icons.system_update, '检查更新'),
@@ -2156,6 +2182,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     onSplitBack: _splitBack,
     onClosePane: _closePane,
     onDropTab: _handleTabDrop,
+    focusMode: focusMode,
   );
 
   Widget sessionBar(bool wide) => SizedBox(
@@ -2311,7 +2338,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
               Expanded(
                 child: Row(
                   children: [
-                    if (wide) ...[
+                    if (wide && !focusMode) ...[
                       if (sidebarCollapsed)
                         _collapsedSidebar()
                       else ...[
@@ -2322,17 +2349,71 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                     Expanded(
                       child: Column(
                         children: [
-                          sessionBar(wide),
-                          const Divider(height: 1),
+                          if (!focusMode) ...[
+                            sessionBar(wide),
+                            const Divider(height: 1),
+                          ],
                           Expanded(
-                            child: tabs.isEmpty
-                                ? emptyState()
-                                : IndexedStack(
-                                    index: selected.clamp(0, tabs.length - 1),
-                                    children: [
-                                      for (final tab in tabs) _tabView(tab),
-                                    ],
+                            child: Stack(
+                              children: [
+                                tabs.isEmpty
+                                    ? emptyState()
+                                    : IndexedStack(
+                                        index: selected.clamp(
+                                          0,
+                                          tabs.length - 1,
+                                        ),
+                                        children: [
+                                          for (final tab in tabs) _tabView(tab),
+                                        ],
+                                      ),
+                                if (focusMode)
+                                  Positioned(
+                                    top: 8,
+                                    right: 12,
+                                    child: Tooltip(
+                                      message: '退出聚焦模式（F11）',
+                                      child: Material(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.45,
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          onTap: () =>
+                                              setState(() => focusMode = false),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.fullscreen_exit,
+                                                  size: 15,
+                                                  color: Colors.white,
+                                                ),
+                                                SizedBox(width: 5),
+                                                Text(
+                                                  '聚焦模式',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -2383,6 +2464,7 @@ class _TabView extends StatefulWidget {
     SplitEdge edge,
   )
   onDropTab;
+  final bool focusMode;
   const _TabView({
     super.key,
     required this.tab,
@@ -2399,6 +2481,7 @@ class _TabView extends StatefulWidget {
     required this.onSplitBack,
     required this.onClosePane,
     required this.onDropTab,
+    this.focusMode = false,
   });
   @override
   State<_TabView> createState() => _TabViewState();
@@ -2511,6 +2594,7 @@ class _TabViewState extends State<_TabView> {
             if (mounted) setState(() {});
           },
         );
+        if (widget.focusMode) return panes;
         final filesPane = FilesPane(
           key: _filesKey(active.id),
           connectionId: active.id,

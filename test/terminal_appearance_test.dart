@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wterm/app/terminal_appearance.dart';
 
@@ -52,6 +53,35 @@ void main() {
     expect(restored.cjkFont, 'CJK Font');
     expect(restored.skin, 'emerald');
     expect(restored.fontSize, 16);
+    settings.dispose();
+    restored.dispose();
+  });
+
+  test('custom terminal colors and copy-on-select round-trip', () async {
+    final settings = TerminalAppearance(file: () async => file);
+    final colors = TerminalAppearance.defaultCustomColors('nord');
+    colors['background'] = 0xff102030;
+    colors['selection'] = 0x44112233;
+    await settings.save(
+      'custom',
+      15,
+      nextCustomColors: colors,
+      nextCopyOnSelect: true,
+    );
+    expect(settings.activeTheme.background, const Color(0xff102030));
+    expect(settings.activeTheme.selection, const Color(0x44112233));
+
+    final restored = TerminalAppearance(file: () async => file);
+    await restored.load();
+    expect(restored.palette, 'custom');
+    expect(restored.copyOnSelect, isTrue);
+    expect(restored.customColors['background'], 0xff102030);
+    expect(restored.activeTheme.background, const Color(0xff102030));
+
+    await expectLater(
+      settings.save('custom', 15, nextCustomColors: const {'background': -1}),
+      throwsArgumentError,
+    );
     settings.dispose();
     restored.dispose();
   });

@@ -1,4 +1,5 @@
 import '../app/snippet_store.dart';
+import '../app/command_completion.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
 import '../app/terminal_appearance.dart';
@@ -71,12 +72,19 @@ class _TerminalPaneState extends State<TerminalPane> {
   final focus = FocusNode();
   final _terminalBoundary = GlobalKey();
   bool _wasActive = false;
+  Timer? _copyTimer;
+  String? _autoCopied;
+  final _inputTracker = TerminalInputTracker();
+  List<CommandCompletion> _completions = const [];
+  String _completionSignature = '';
   @override
   void initState() {
     super.initState();
     terminalAppearance.addListener(appearanceChanged);
     widget.session.addListener(sessionChanged);
     pinnedCommands.addListener(sessionChanged);
+    controller.addListener(_selectionForCopy);
+    pluginSettings.addListener(_pluginSettingsChanged);
     widget.session.terminal.onOutput = _output;
     _wasActive = widget.active;
     if (widget.active) {
@@ -106,6 +114,36 @@ class _TerminalPaneState extends State<TerminalPane> {
     for (final target in widget.broadcastTargets) {
       target.send(text, record: false);
     }
+    _inputTracker.feed(text);
+    _refreshCompletions();
+  }
+
+  void _refreshCompletions() {
+    if (!mounted) return;
+    final next = pluginSettings.commandCompletion && !ended
+        ? commandSuggestions(_inputTracker.current)
+        : <CommandCompletion>[];
+    final signature = next
+        .map((entry) => '${entry.group}\u0000${entry.value}')
+        .join('\u0001');
+    if (signature == _completionSignature) return;
+    setState(() {
+      _completions = next;
+      _completionSignature = signature;
+    });
+  }
+
+  void _pluginSettingsChanged() {
+    if (!pluginSettings.commandCompletion) _refreshCompletions();
+  }
+
+  void _applyCompletion(CommandCompletion completion) {
+    final insertion = completionInsertion(_inputTracker.current, completion);
+    if (insertion.isEmpty) return;
+    _sendInput(insertion);
+    _inputTracker.feed(insertion);
+    _refreshCompletions();
+    focus.requestFocus();
   }
 
   void _sendInput(String text) {
@@ -117,6 +155,23 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   void _focus() {
     if (mounted && widget.active) focus.requestFocus();
+  }
+
+  void _selectionForCopy() {
+    if (!terminalAppearance.copyOnSelect || ended) return;
+    _copyTimer?.cancel();
+    _copyTimer = Timer(const Duration(milliseconds: 180), () async {
+      try {
+        final selection = controller.selection;
+        if (selection == null) return;
+        final text = widget.session.terminal.buffer.getText(selection);
+        if (text.isEmpty || text == _autoCopied) return;
+        _autoCopied = text;
+        await Clipboard.setData(ClipboardData(text: text));
+      } catch (_) {
+        // A selection can be released together with its buffer range.
+      }
+    });
   }
 
   bool get ended => widget.session.ended;
@@ -326,6 +381,67 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已固定到终端底部')));
+    }
+  }
+
+  Future<void> saveSelectionAsSnippet() async {
+    final store = widget.snippets;
+    if (store == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('未连接保险库，无法保存片段')));
+      return;
+    }
+    final selection = controller.selection;
+    if (selection == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先在终端中选中命令')));
+      return;
+    }
+    final command = widget.session.terminal.buffer.getText(selection).trim();
+    if (validateSnippetCommand(command) != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('只能保存单行命令（最多 16 KiB）')));
+      return;
+    }
+    final nameController = TextEditingController(
+      text: command.length > 24 ? command.substring(0, 24) : command,
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('存为命令片段'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '片段名称'),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, nameController.text),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    try {
+      await store.saveSnippet('', name.trim(), command);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('已保存到命令片段')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败：${userFacingError(e)}')));
+      }
     }
   }
 
@@ -667,6 +783,9 @@ class _TerminalPaneState extends State<TerminalPane> {
     terminalAppearance.removeListener(appearanceChanged);
     widget.session.removeListener(sessionChanged);
     pinnedCommands.removeListener(sessionChanged);
+    _copyTimer?.cancel();
+    controller.removeListener(_selectionForCopy);
+    pluginSettings.removeListener(_pluginSettingsChanged);
     widget.session.terminal.onOutput = widget.session.send;
     focus.dispose();
     controller.dispose();
@@ -698,8 +817,7 @@ class _TerminalPaneState extends State<TerminalPane> {
           ),
           Expanded(
             child: ColoredBox(
-              color: TerminalAppearance.themeFor(terminalAppearance.palette)
-                  .background,
+              color: terminalAppearance.activeTheme.background,
               child: RepaintBoundary(
                 key: _terminalBoundary,
                 child: TerminalView(
@@ -707,9 +825,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                       Theme.of(context).platform == TargetPlatform.iOS ||
                       Theme.of(context).platform == TargetPlatform.android,
                   widget.session.terminal,
-                  theme: TerminalAppearance.themeFor(
-                    terminalAppearance.palette,
-                  ),
+                  theme: terminalAppearance.activeTheme,
                   controller: controller,
                   focusNode: focus,
                   onKeyEvent: (_, event) {
@@ -722,6 +838,10 @@ class _TerminalPaneState extends State<TerminalPane> {
                           ? keyboard.isMetaPressed
                           : keyboard.isControlPressed &&
                                 keyboard.isShiftPressed;
+                      if (event.logicalKey == LogicalKeyboardKey.f11) {
+                        widget.onShortcut!('focus', null);
+                        return KeyEventResult.handled;
+                      }
                       if (primary) {
                         final key = event.logicalKey;
                         if (key == LogicalKeyboardKey.keyT) {
@@ -835,9 +955,27 @@ class _TerminalPaneState extends State<TerminalPane> {
                             value: 'ip',
                             child: Text('查询选中 IP 归属'),
                           ),
+                        if (pluginSettings.filePreview)
+                          const PopupMenuItem(
+                            value: 'preview-file',
+                            child: Text('预览选中文件'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'open-link',
+                          child: Text('打开选中链接'),
+                        ),
                         const PopupMenuItem(
                           value: 'pin',
                           child: Text('固定选中命令'),
+                        ),
+                        if (widget.snippets != null)
+                          const PopupMenuItem(
+                            value: 'save-snippet',
+                            child: Text('存为命令片段'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'share-image',
+                          child: Text('分享终端为图片'),
                         ),
                         const PopupMenuItem(
                           value: 'plugins',
@@ -863,6 +1001,10 @@ class _TerminalPaneState extends State<TerminalPane> {
                       await openSelectedLink();
                     } else if (selected == 'pin') {
                       await pinSelection();
+                    } else if (selected == 'save-snippet') {
+                      await saveSelectionAsSnippet();
+                    } else if (selected == 'share-image') {
+                      await shareImage();
                     } else if (selected == 'plugins') {
                       if (!context.mounted) return;
                       await showDialog<void>(
@@ -875,6 +1017,30 @@ class _TerminalPaneState extends State<TerminalPane> {
               ),
             ),
           ),
+          if (widget.active && !ended && _completions.isNotEmpty)
+            Container(
+              height: 38,
+              color: const Color(0xff141a21),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                children: [
+                  for (final completion in _completions)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        label: Text(
+                          '${completion.value} · ${completion.description}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        onPressed: () => _applyCompletion(completion),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ListenableBuilder(
             listenable: pinnedCommands,
             builder: (context, _) {

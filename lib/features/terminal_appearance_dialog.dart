@@ -16,6 +16,10 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late int size = widget.store.fontSize;
   late String uiTheme = widget.store.uiTheme;
   late String skin = widget.store.skin;
+  late bool copyOnSelect = widget.store.copyOnSelect;
+  late Map<String, int> customColors = widget.store.customColors.isEmpty
+      ? TerminalAppearance.defaultCustomColors(widget.store.palette)
+      : Map.of(widget.store.customColors);
   late final uiFont = TextEditingController(text: widget.store.uiFont);
   late final terminalFont = TextEditingController(
     text: widget.store.terminalFont,
@@ -28,6 +32,19 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
     terminalFont.dispose();
     cjkFont.dispose();
     super.dispose();
+  }
+
+  Future<void> editCustomTheme() async {
+    final result = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (_) => _ThemeEditorDialog(colors: customColors),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        customColors = result;
+        palette = 'custom';
+      });
+    }
   }
 
   bool busy = false;
@@ -43,6 +60,8 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextTerminalFont: terminalFont.text.trim(),
         nextCjkFont: cjkFont.text.trim(),
         nextSkin: skin,
+        nextCustomColors: customColors,
+        nextCopyOnSelect: copyOnSelect,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -54,7 +73,9 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = TerminalAppearance.themeFor(palette);
+    final theme = palette == 'custom'
+        ? TerminalAppearance.customTheme(customColors)
+        : TerminalAppearance.themeFor(palette);
     return PopScope(
       canPop: !busy,
       child: AlertDialog(
@@ -113,7 +134,16 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     ? null
                     : (value) => setState(() => palette = value ?? 'dark'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: busy ? null : editCustomTheme,
+                  icon: const Icon(Icons.tune, size: 16),
+                  label: Text(palette == 'custom' ? '编辑自定义配色' : '自定义终端主题'),
+                ),
+              ),
+              const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: uiTheme,
                 decoration: const InputDecoration(labelText: '界面主题'),
@@ -165,6 +195,15 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     ? null
                     : (v) => setState(() => size = v.round()),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('选中即复制'),
+                subtitle: const Text('在终端中划选文字后自动写入剪贴板'),
+                value: copyOnSelect,
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => copyOnSelect = value),
+              ),
               Container(
                 padding: const EdgeInsets.all(16),
                 color: theme.background,
@@ -198,6 +237,318 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
           ),
         ],
       ),
+    );
+  }
+}
+
+String _argbHex(int value) =>
+    '#${value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+
+int? _parseArgbHex(String value) {
+  final text = value.replaceFirst('#', '').trim();
+  if (!RegExp(r'^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$').hasMatch(text)) {
+    return null;
+  }
+  final parsed = int.parse(text, radix: 16);
+  return text.length == 6 ? 0xff000000 | parsed : parsed;
+}
+
+class _ThemeEditorDialog extends StatefulWidget {
+  final Map<String, int> colors;
+  const _ThemeEditorDialog({required this.colors});
+  @override
+  State<_ThemeEditorDialog> createState() => _ThemeEditorDialogState();
+}
+
+class _ThemeEditorDialogState extends State<_ThemeEditorDialog> {
+  late final Map<String, int> _colors = {
+    ...TerminalAppearance.defaultCustomColors('dark'),
+    ...widget.colors,
+  };
+  late final Map<String, TextEditingController> _controllers = {
+    for (final key in TerminalAppearance.customColorLabels.keys)
+      key: TextEditingController(text: _argbHex(_colors[key]!)),
+  };
+  String? error;
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _update(String key, int value) {
+    setState(() {
+      _colors[key] = value;
+      _controllers[key]!.text = _argbHex(value);
+    });
+  }
+
+  Future<void> _pick(String key) async {
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (_) => _ColorPickerDialog(initial: Color(_colors[key]!)),
+    );
+    if (picked != null && mounted) _update(key, picked.toARGB32());
+  }
+
+  void _loadPalette(String palette) {
+    final seed = TerminalAppearance.defaultCustomColors(palette);
+    setState(() {
+      _colors
+        ..clear()
+        ..addAll(seed);
+      for (final entry in _controllers.entries) {
+        entry.value.text = _argbHex(seed[entry.key]!);
+      }
+    });
+  }
+
+  void _save() {
+    final next = <String, int>{};
+    for (final entry in _controllers.entries) {
+      final value = _parseArgbHex(entry.value.text);
+      if (value == null) {
+        setState(
+          () => error =
+              '「${TerminalAppearance.customColorLabels[entry.key]}」颜色格式无效，应为 #RRGGBB 或 #AARRGGBB',
+        );
+        return;
+      }
+      next[entry.key] = value;
+    }
+    Navigator.pop(context, next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = TerminalAppearance.customTheme(_colors);
+    return AlertDialog(
+      title: const Text('自定义终端主题'),
+      content: SizedBox(
+        width: 460,
+        height: 520,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '调整 16 色与光标、选区和背景，保存后立即应用到所有终端。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: '载入内置配色作为起点',
+                  onSelected: _loadPalette,
+                  itemBuilder: (_) => [
+                    for (final entry in TerminalAppearance.names.entries)
+                      if (entry.key != 'custom')
+                        PopupMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                  ],
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Text('载入内置配色', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                children: [
+                  for (final key in TerminalAppearance.customColorLabels.keys)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 64,
+                            child: Text(
+                              TerminalAppearance.customColorLabels[key]!,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () => _pick(key),
+                            child: Container(
+                              width: 46,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: Color(_colors[key]!),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: SizedBox(
+                              height: 36,
+                              child: TextField(
+                                controller: _controllers[key],
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                ),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  final parsed = _parseArgbHex(value);
+                                  if (parsed != null) {
+                                    setState(() {
+                                      _colors[key] = parsed;
+                                      error = null;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                r'user@server ~ % ls'
+                '\n'
+                r'logs  notes.txt  project',
+                style: TextStyle(
+                  color: theme.foreground,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  error!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('使用此配色')),
+      ],
+    );
+  }
+}
+
+class _ColorPickerDialog extends StatefulWidget {
+  final Color initial;
+  const _ColorPickerDialog({required this.initial});
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  late HSVColor _color = HSVColor.fromColor(widget.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color.toColor();
+    return AlertDialog(
+      title: const Text('选择颜色'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _argbHex(color.toARGB32()),
+                style: TextStyle(
+                  color:
+                      ThemeData.estimateBrightnessForColor(color) ==
+                          Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('色相 ${_color.hue.round()}°'),
+            Slider(
+              max: 360,
+              value: _color.hue,
+              onChanged: (v) => setState(() => _color = _color.withHue(v)),
+            ),
+            Text('饱和度 ${(_color.saturation * 100).round()}%'),
+            Slider(
+              value: _color.saturation,
+              onChanged: (v) =>
+                  setState(() => _color = _color.withSaturation(v)),
+            ),
+            Text('明度 ${(_color.value * 100).round()}%'),
+            Slider(
+              value: _color.value,
+              onChanged: (v) => setState(() => _color = _color.withValue(v)),
+            ),
+            Text('不透明度 ${(_color.alpha * 100).round()}%'),
+            Slider(
+              value: _color.alpha,
+              onChanged: (v) => setState(() => _color = _color.withAlpha(v)),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _color.toColor()),
+          child: const Text('确定'),
+        ),
+      ],
     );
   }
 }

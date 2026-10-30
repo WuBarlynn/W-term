@@ -13,6 +13,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool json = pluginSettings.jsonFormatter;
   late bool ip = pluginSettings.ipLookup;
   late bool preview = pluginSettings.filePreview;
+  late bool completion = pluginSettings.commandCompletion;
   bool saving = false;
   String? error;
 
@@ -22,7 +23,12 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
       error = null;
     });
     try {
-      await pluginSettings.save(json: json, ip: ip, preview: preview);
+      await pluginSettings.save(
+        json: json,
+        ip: ip,
+        preview: preview,
+        completion: completion,
+      );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -59,10 +65,18 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             title: const Text('IP 归属查询'),
             subtitle: const Text('选中 IPv4 后查询国家、城市与运营商（需要网络）'),
           ),
+          SwitchListTile(
+            value: completion,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => completion = value),
+            title: const Text('命令补全'),
+            subtitle: const Text('输入 git、docker、kubectl 等命令时在终端底部显示参数提示'),
+          ),
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '命令补全和任务完成通知尚未接入；本开关只控制已实现的插件。',
+              '补全基于内置命令表，不会替代远端 shell 自身的 Tab 补全。',
               style: TextStyle(fontSize: 11),
             ),
           ),

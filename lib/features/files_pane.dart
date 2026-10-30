@@ -100,34 +100,93 @@ class FilesPaneState extends State<FilesPane> {
 
   Future<void> refresh() => load(listing?.path ?? '.');
 
+  String _safeLocalName(String name) {
+    final clean = name.replaceAll(RegExp(r'[/\\\x00]'), '_').trim();
+    if (clean.isEmpty || clean == '.' || clean == '..') return 'unnamed';
+    return clean;
+  }
+
   String _uniqueLocal(String directory, String name) {
-    var candidate = '$directory/$name';
+    final safe = _safeLocalName(name);
+    var candidate = '$directory/$safe';
+    final dot = safe.lastIndexOf('.');
+    final stem = dot > 0 ? safe.substring(0, dot) : safe;
+    final extension = dot > 0 ? safe.substring(dot) : '';
     var index = 1;
-    while (File(candidate).existsSync()) {
-      final dot = name.lastIndexOf('.');
-      final stem = dot > 0 ? name.substring(0, dot) : name;
-      final extension = dot > 0 ? name.substring(dot) : '';
+    while (FileSystemEntity.typeSync(candidate) !=
+        FileSystemEntityType.notFound) {
       candidate = '$directory/$stem ($index)$extension';
       index++;
     }
     return candidate;
   }
 
+  /// Downloads a remote directory tree, skipping symlinks so cycles cannot
+  /// escape the selected tree. Returns the number of files written.
+  Future<int> _downloadTree(
+    native.RemoteEntry root,
+    String destination, {
+    required void Function(String name, int count) onProgress,
+  }) async {
+    final localRoot = _uniqueLocal(destination, root.name);
+    await Directory(localRoot).create(recursive: true);
+    final queue = <(String, String)>[(root.path, localRoot)];
+    var downloaded = 0;
+    while (queue.isNotEmpty) {
+      final (remote, local) = queue.removeAt(0);
+      final listing = await native.listDirectory(
+        connectionId: widget.connectionId,
+        path: remote,
+      );
+      for (final entry in listing.entries) {
+        if (entry.name == '.' || entry.name == '..' || entry.isSymlink) {
+          continue;
+        }
+        final name = _safeLocalName(entry.name);
+        final target = '$local/$name';
+        if (entry.isDirectory) {
+          await Directory(target).create(recursive: true);
+          queue.add((entry.path, target));
+          continue;
+        }
+        if (downloaded >= 10000) {
+          throw StateError('目录内文件超过 10000 个，已停止下载');
+        }
+        onProgress(entry.name, downloaded);
+        await native.downloadFile(
+          connectionId: widget.connectionId,
+          remotePath: entry.path,
+          localPath: _uniqueLocal(local, entry.name),
+        );
+        downloaded++;
+      }
+    }
+    return downloaded;
+  }
+
   Future<void> downloadSelected() async {
-    final files = entries
+    final items = entries
         .where(
           (entry) =>
               selected.contains(entry.path) &&
-              !entry.isDirectory &&
-              !entry.isSymlink,
+              !entry.isSymlink &&
+              entry.name != '.' &&
+              entry.name != '..',
         )
         .toList();
-    if (files.isEmpty) {
+    final files = items.where((entry) => !entry.isDirectory).toList();
+    if (items.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('请选择要下载的文件')));
+          .showSnackBar(const SnackBar(content: Text('请选择要下载的文件或目录')));
       return;
     }
     if (Platform.isIOS) {
+      if (files.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('iOS 批量分享暂不支持文件夹，请选择文件')));
+        return;
+      }
       Directory temp = await createAppTemporaryDirectory('wterm-batch-');
       setState(() {
         busy = true;
@@ -174,30 +233,56 @@ class FilesPaneState extends State<FilesPane> {
       activity = '准备批量下载…';
       error = null;
     });
-    var completed = 0;
+    var completed = 0, directories = 0;
     try {
-      for (final entry in files) {
+      for (final entry in items) {
         if (!mounted) return;
-        setState(
-          () => activity = '下载 ${completed + 1}/${files.length}：${entry.name}',
-        );
-        await native.downloadFile(
-          connectionId: widget.connectionId,
-          remotePath: entry.path,
-          localPath: _uniqueLocal(directory, entry.name),
-        );
-        completed++;
+        if (entry.isDirectory) {
+          setState(() => activity = '扫描目录：${entry.name}');
+          completed += await _downloadTree(
+            entry,
+            directory,
+            onProgress: (name, count) {
+              if (!mounted) return;
+              setState(
+                () => activity =
+                    '下载目录 ${entry.name}：$name（已完成 $completed + $count 个文件）',
+              );
+            },
+          );
+          directories++;
+        } else {
+          setState(
+            () =>
+                activity = '下载 ${completed + 1}/${items.length}：${entry.name}',
+          );
+          await native.downloadFile(
+            connectionId: widget.connectionId,
+            remotePath: entry.path,
+            localPath: _uniqueLocal(directory, entry.name),
+          );
+          completed++;
+        }
       }
       if (mounted) {
         setState(() {
           selecting = false;
           selected.clear();
         });
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('已下载 $completed 个文件')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '已下载 $completed 个文件${directories == 0 ? '' : '（含 $directories 个目录）'}',
+            ),
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) setState(() => error = '批量下载失败：${userFacingError(e)}');
+      if (mounted) {
+        setState(() {
+          error = '批量下载失败：${userFacingError(e)}（已完成 $completed 个文件）';
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -1089,7 +1174,7 @@ class FilesPaneState extends State<FilesPane> {
                   child: Row(
                     children: [
                       Text(
-                        '已选 ${selected.length} 个文件',
+                        '已选 ${selected.length} 项',
                         style: const TextStyle(fontSize: 11),
                       ),
                       const Spacer(),
@@ -1099,15 +1184,11 @@ class FilesPaneState extends State<FilesPane> {
                             : () => setState(() {
                                 selected.addAll(
                                   entries
-                                      .where(
-                                        (entry) =>
-                                            !entry.isDirectory &&
-                                            !entry.isSymlink,
-                                      )
+                                      .where((entry) => !entry.isSymlink)
                                       .map((entry) => entry.path),
                                 );
                               }),
-                        child: const Text('全选文件'),
+                        child: const Text('全选'),
                       ),
                       FilledButton(
                         onPressed: busy ? null : downloadSelected,

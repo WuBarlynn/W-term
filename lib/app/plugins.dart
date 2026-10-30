@@ -19,6 +19,7 @@ bool isIpv4(String value) {
 class PluginSettings extends ChangeNotifier {
   final Future<File> Function() _file;
   bool jsonFormatter = true, ipLookup = true, filePreview = true;
+  bool commandCompletion = true;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -37,6 +38,7 @@ class PluginSettings extends ChangeNotifier {
           jsonFormatter = value['jsonFormatter'] != false;
           ipLookup = value['ipLookup'] != false;
           filePreview = value['filePreview'] != false;
+          commandCompletion = value['commandCompletion'] != false;
         }
       }
     } catch (_) {
@@ -51,10 +53,12 @@ class PluginSettings extends ChangeNotifier {
     required bool json,
     required bool ip,
     required bool preview,
+    bool? completion,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
     filePreview = preview;
+    commandCompletion = completion ?? commandCompletion;
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
@@ -65,6 +69,7 @@ class PluginSettings extends ChangeNotifier {
         'jsonFormatter': json,
         'ipLookup': ip,
         'filePreview': preview,
+        'commandCompletion': commandCompletion,
       }),
       flush: true,
     );

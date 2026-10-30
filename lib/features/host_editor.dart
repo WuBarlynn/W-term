@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/host_store.dart';
+import '../app/host_icons.dart';
 import '../app/identity_store.dart';
 import '../app/errors.dart';
 import '../app/proxy_store.dart';
@@ -252,6 +253,14 @@ class _HostEditorState extends State<HostEditor> {
     widget.profile?.group ?? widget.initialGroup,
     widget.profile?.tags.join(', ') ?? '',
   ].map((v) => TextEditingController(text: v)).toList();
+  Future<void> pickIcon() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _HostIconPickerDialog(selected: icon),
+    );
+    if (result != null && mounted) setState(() => icon = result);
+  }
+
   @override
   void dispose() {
     for (final field in fields) {
@@ -339,23 +348,27 @@ class _HostEditorState extends State<HostEditor> {
                     ),
                   ),
                 const Divider(height: 24),
-                DropdownButtonFormField<String>(
-                  initialValue: icon,
-                  decoration: const InputDecoration(labelText: '连接图标'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('默认服务器')),
-                    DropdownMenuItem(value: 'terminal', child: Text('终端')),
-                    DropdownMenuItem(value: 'database', child: Text('数据库')),
-                    DropdownMenuItem(value: 'cloud', child: Text('云主机')),
-                    DropdownMenuItem(value: 'code', child: Text('开发')),
-                    DropdownMenuItem(value: 'globe', child: Text('网络')),
-                    DropdownMenuItem(value: 'security', child: Text('安全')),
-                    DropdownMenuItem(value: 'web', child: Text('网站')),
-                    DropdownMenuItem(value: 'rocket', child: Text('构建')),
-                  ],
-                  onChanged: busy
-                      ? null
-                      : (value) => setState(() => icon = value ?? ''),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: busy ? null : pickIcon,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '连接图标',
+                      suffixIcon: Icon(Icons.search, size: 18),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(hostIconFor(icon), size: 20),
+                        const SizedBox(width: 10),
+                        Text(
+                          hostIconOption(icon)?.name ?? '默认服务器',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const Spacer(),
+                        const Text('搜索图标', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -629,4 +642,113 @@ class _HostEditorState extends State<HostEditor> {
       ],
     ),
   );
+}
+
+class _HostIconPickerDialog extends StatefulWidget {
+  final String selected;
+  const _HostIconPickerDialog({required this.selected});
+  @override
+  State<_HostIconPickerDialog> createState() => _HostIconPickerDialogState();
+}
+
+class _HostIconPickerDialogState extends State<_HostIconPickerDialog> {
+  final search = TextEditingController();
+  late List<HostIconOption> options = searchHostIcons('');
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('连接图标'),
+      content: SizedBox(
+        width: 480,
+        height: 420,
+        child: Column(
+          children: [
+            TextField(
+              controller: search,
+              autofocus: true,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search, size: 18),
+                hintText: '搜索图标名称或关键词，例如 数据库、docker、云',
+              ),
+              onChanged: (value) =>
+                  setState(() => options = searchHostIcons(value)),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: options.isEmpty
+                  ? const Center(child: Text('没有匹配的图标'))
+                  : GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 6,
+                            mainAxisExtent: 72,
+                          ),
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options[index];
+                        final active = option.key == widget.selected;
+                        return Tooltip(
+                          message: option.name,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => Navigator.pop(context, option.key),
+                            child: Container(
+                              margin: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                color: active
+                                    ? Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                    : null,
+                                border: Border.all(
+                                  color: active
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(option.icon, size: 22),
+                                  const SizedBox(height: 5),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    child: Text(
+                                      option.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ],
+    );
+  }
 }

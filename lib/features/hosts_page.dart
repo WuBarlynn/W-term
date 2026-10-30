@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/host_store.dart';
+import '../app/host_icons.dart';
 import '../app/errors.dart';
 import '../app/identity_store.dart';
 import '../app/proxy_store.dart';
@@ -434,6 +435,12 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
+  Future<void> locateHost(String hostId) async {
+    if (!hosts.any((host) => host.id == hostId)) await load();
+    final matches = hosts.where((host) => host.id == hostId);
+    if (matches.isNotEmpty && mounted) selectHost(matches.first);
+  }
+
   void selectHost(HostProfile h) {
     final keyboard = HardwareKeyboard.instance;
     setState(() {
@@ -500,17 +507,7 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
-  IconData hostIcon(String icon) => switch (icon) {
-    'terminal' => Icons.terminal,
-    'database' => Icons.storage_outlined,
-    'cloud' => Icons.cloud_outlined,
-    'code' => Icons.code,
-    'globe' => Icons.public,
-    'security' => Icons.security,
-    'web' => Icons.language,
-    'rocket' => Icons.rocket_launch_outlined,
-    _ => Icons.dns_outlined,
-  };
+  IconData hostIcon(String icon) => hostIconFor(icon);
 
   Widget hostTile(HostProfile h, int depth) => MouseRegion(
     onEnter: (_) => setState(() => hoveredHostId = h.id),

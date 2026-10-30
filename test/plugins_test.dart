@@ -36,12 +36,18 @@ void main() {
       final store = PluginSettings(file: () async => file);
       await store.load();
       expect(store.jsonFormatter, isTrue);
-      await store.save(json: false, ip: true, preview: false);
+      await store.save(
+        json: false,
+        ip: true,
+        preview: false,
+        completion: false,
+      );
       final restored = PluginSettings(file: () async => file);
       await restored.load();
       expect(restored.jsonFormatter, isFalse);
       expect(restored.ipLookup, isTrue);
       expect(restored.filePreview, isFalse);
+      expect(restored.commandCompletion, isFalse);
     } finally {
       await dir.delete(recursive: true);
     }
