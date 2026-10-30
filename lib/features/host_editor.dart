@@ -204,6 +204,7 @@ class _HostEditorState extends State<HostEditor> {
             .map((line) => line.trim())
             .where((line) => line.isNotEmpty && !line.startsWith('#'))
             .toList(),
+        wiki: widget.profile?.wiki ?? '',
       );
     } on FormatException catch (e) {
       setState(() => error = e.message);

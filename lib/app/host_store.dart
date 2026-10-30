@@ -11,6 +11,7 @@ class HostProfile {
   final List<String> jumpHostIds;
   final String startupCommand;
   final List<String> environment;
+  final String wiki;
   HostProfile({
     required this.id,
     required this.name,
@@ -24,6 +25,7 @@ class HostProfile {
     List<String> jumpHostIds = const [],
     this.startupCommand = '',
     List<String> environment = const [],
+    this.wiki = '',
   }) : tags = List.unmodifiable(tags),
        jumpHostIds = List.unmodifiable(jumpHostIds),
        environment = List.unmodifiable(environment) {
@@ -56,6 +58,7 @@ class HostProfile {
     jumpHostIds: List<String>.from(v['jumpHostIds'] as List? ?? const []),
     startupCommand: v['startupCommand'] as String? ?? '',
     environment: List<String>.from(v['environment'] as List? ?? const []),
+    wiki: v['wiki'] as String? ?? '',
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -70,6 +73,7 @@ class HostProfile {
     if (jumpHostIds.isNotEmpty) 'jumpHostIds': jumpHostIds,
     if (startupCommand.isNotEmpty) 'startupCommand': startupCommand,
     if (environment.isNotEmpty) 'environment': environment,
+    if (wiki.isNotEmpty) 'wiki': wiki,
   };
   HostProfile toggleFavorite() => HostProfile(
     id: id,
@@ -84,6 +88,22 @@ class HostProfile {
     jumpHostIds: jumpHostIds,
     startupCommand: startupCommand,
     environment: environment,
+    wiki: wiki,
+  );
+  HostProfile withWiki(String value) => HostProfile(
+    id: id,
+    name: name,
+    host: host,
+    username: username,
+    port: port,
+    group: group,
+    tags: tags,
+    favorite: favorite,
+    identityId: identityId,
+    jumpHostIds: jumpHostIds,
+    startupCommand: startupCommand,
+    environment: environment,
+    wiki: value,
   );
   bool matches(String query) => [
     name,

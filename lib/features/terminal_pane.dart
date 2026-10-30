@@ -86,14 +86,14 @@ class _TerminalPaneState extends State<TerminalPane> {
   void _output(String text) {
     widget.session.send(text);
     for (final target in widget.broadcastTargets) {
-      target.send(text);
+      target.send(text, record: false);
     }
   }
 
   void _sendInput(String text) {
     widget.session.send(text);
     for (final target in widget.broadcastTargets) {
-      target.send(text);
+      target.send(text, record: false);
     }
   }
 

@@ -54,6 +54,8 @@ void main() {
     expect(restored.environment, ['APP_ENV=prod', 'TOKEN=a b']);
     expect(restored.toJson()['environment'], ['APP_ENV=prod', 'TOKEN=a b']);
     expect(restored.toJson().containsKey('identityId'), isFalse);
+    expect(restored.withWiki('# Runbook').wiki, '# Runbook');
+    expect(restored.withWiki('# Runbook').startupCommand, 'cd /srv/app');
   });
   test('malformed and future data are not silently treated as empty', () async {
     for (final raw in [

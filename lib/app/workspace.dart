@@ -2,6 +2,7 @@ import 'interactive_auth.dart';
 import 'connection_route.dart';
 import 'forward_store.dart';
 import 'terminal_session.dart';
+import 'command_history.dart';
 import 'workspace_layout.dart';
 import 'proxy_store.dart';
 import '../features/proxy_dialog.dart';
@@ -15,6 +16,7 @@ import 'snippet_store.dart';
 import 'sync_store.dart';
 import '../features/sync_dialog.dart';
 import '../features/snippets_dialog.dart';
+import '../features/command_history_dialog.dart';
 import '../features/host_editor.dart';
 import '../features/identities_pane.dart';
 import '../features/vault_settings.dart';
@@ -84,6 +86,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   double sidebarWidth = 272;
   int identitiesEpoch = 0;
   final sessions = <_Session>[];
+  final commandHistory = CommandHistory();
   final tabs = <WorkspaceTab>[];
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
@@ -97,6 +100,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(commandHistory.load());
     unawaited(_restoreLayout());
   }
 
@@ -270,6 +274,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           jumpHostIds: profile?.jumpHostIds ?? const [],
           startupCommand: profile?.startupCommand ?? '',
           environment: profile?.environment ?? const [],
+          wiki: profile?.wiki ?? '',
         );
         final saved = await credentials.saveHost(
           host,
@@ -560,6 +565,13 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         host: hops.last.host,
         username: connectedUsername,
         onEnded: () => _terminalEnded(connectedId),
+        onCommand: (command) => unawaited(
+          commandHistory.record(
+            command: command,
+            host: hops.last.host,
+            username: connectedUsername,
+          ),
+        ),
       );
       final session = _Session(
         connectedId,
@@ -913,11 +925,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       if (separator <= 0) continue;
       final key = line.substring(0, separator);
       final value = line.substring(separator + 1);
-      session.terminal.send(' export $key=${_shellQuote(value)}\n');
+      session.terminal.send(
+        ' export $key=${_shellQuote(value)}\n',
+        record: false,
+      );
     }
     final command = profile.startupCommand.trim();
     if (command.isNotEmpty) {
-      session.terminal.send(' $command\n');
+      session.terminal.send(' $command\n', record: false);
     }
   }
 
@@ -1660,6 +1675,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         await showKnownHosts();
       case 'sessions':
         await showSessionPicker();
+      case 'history':
+        await showDialog<void>(
+          context: context,
+          builder: (_) => CommandHistoryDialog(history: commandHistory),
+        );
       case 'lock':
         widget.onLock?.call();
     }
@@ -1667,6 +1687,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
 
   List<PopupMenuEntry<String>> _settingsItems() => [
     popupItem('sessions', Icons.list_alt, '已打开终端'),
+    popupItem('history', Icons.history, '命令历史'),
     if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
     if (hostStore is SyncStore) popupItem('sync', Icons.sync, 'GitHub 同步'),
     if (hostStore is ConnectionProxyStore)

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../app/host_store.dart';
@@ -58,6 +60,52 @@ class HostsPageState extends State<HostsPage> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> editWiki(HostProfile host) async {
+    final controller = TextEditingController(text: host.wiki);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('服务器 Wiki · ${host.name}'),
+        content: SizedBox(
+          width: 560,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 8,
+            maxLines: 14,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              hintText: '记录部署说明、注意事项、常用命令…',
+              helperText: '纯文本 / Markdown，随主机配置保存',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
+    if (value == null || !mounted) return;
+    if (utf8.encode(value).length > 64 * 1024) {
+      setState(() => error = '服务器 Wiki 不能超过 64 KiB');
+      return;
+    }
+    await persist(
+      hosts
+          .map((item) => item.id == host.id ? item.withWiki(value) : item)
+          .toList(),
+    );
   }
 
   Future<void> persist(List<HostProfile> next) async {
@@ -451,6 +499,8 @@ class HostsPageState extends State<HostsPage> {
                 );
               } else if (v == 'edit') {
                 edit(h);
+              } else if (v == 'wiki') {
+                editWiki(h);
               } else {
                 remove(h);
               }
@@ -462,6 +512,7 @@ class HostsPageState extends State<HostsPage> {
                 child: Text(h.favorite ? '取消收藏' : '收藏主机'),
               ),
               const PopupMenuItem(value: 'edit', child: Text('编辑')),
+              const PopupMenuItem(value: 'wiki', child: Text('服务器 Wiki')),
               const PopupMenuItem(value: 'delete', child: Text('删除')),
             ],
           ),

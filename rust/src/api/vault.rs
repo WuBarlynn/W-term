@@ -236,6 +236,8 @@ pub(crate) struct Host {
     pub(crate) startup_command: String,
     #[serde(default, rename = "environment", skip_serializing_if = "Vec::is_empty")]
     pub(crate) environment: Vec<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(crate) wiki: String,
 }
 pub(crate) const MAX_JUMP_HOSTS: usize = 4;
 
@@ -303,6 +305,10 @@ pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
             ensure!(
                 h.environment.len() <= 64,
                 "环境变量最多 64 项"
+            );
+            ensure!(
+                h.wiki.len() <= 64 * 1024 && !h.wiki.contains('\0'),
+                "服务器 Wiki 过大或包含控制字符"
             );
             for item in &h.environment {
                 ensure!(

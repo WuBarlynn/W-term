@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 
 import '../src/rust/api/client.dart' as native;
+import 'command_history.dart';
 import 'errors.dart';
 
 /// Owns the terminal model, SSH output and session lifetime independently of
@@ -13,6 +14,8 @@ class TerminalSession extends ChangeNotifier {
   final String connectionId, host, username;
   final Terminal terminal = Terminal(maxLines: 5000);
   final VoidCallback onEnded;
+  final void Function(String command)? onCommand;
+  final CommandLineTracker _commandTracker = CommandLineTracker();
   final StreamController<List<int>> _bytes = StreamController<List<int>>(
     sync: true,
   );
@@ -31,6 +34,7 @@ class TerminalSession extends ChangeNotifier {
     required this.host,
     required this.username,
     required this.onEnded,
+    this.onCommand,
   }) : _offline = false {
     _decoded = utf8.decoder
         .bind(_bytes.stream)
@@ -60,6 +64,7 @@ class TerminalSession extends ChangeNotifier {
     required this.host,
     required this.username,
     required this.onEnded,
+    this.onCommand,
   }) : connectionId =
            'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
        _offline = true {
@@ -72,8 +77,13 @@ class TerminalSession extends ChangeNotifier {
   String? get error => _error;
   String get title => username.isEmpty ? host : '$username@$host';
 
-  void send(String text) {
+  void send(String text, {bool record = true}) {
     if (_ended || _closed) return;
+    if (record) {
+      for (final command in _commandTracker.feed(text)) {
+        onCommand?.call(command);
+      }
+    }
     _writes = _writes
         .then(
           (_) => native.writeTerminal(
