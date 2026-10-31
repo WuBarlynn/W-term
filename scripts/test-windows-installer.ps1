@@ -17,6 +17,11 @@ if (-not $process.HasExited) {
 if ($process.ExitCode -ne 0) {
   throw "Silent installer exited with $($process.ExitCode)"
 }
+$fileDeadline = (Get-Date).AddMinutes(2)
+while (-not (Test-Path (Join-Path $target 'wterm.exe')) -and
+       (Get-Date) -lt $fileDeadline) {
+  Start-Sleep -Milliseconds 500
+}
 if (-not (Test-Path (Join-Path $target 'wterm.exe'))) {
   throw 'Silent installer did not create wterm.exe'
 }
