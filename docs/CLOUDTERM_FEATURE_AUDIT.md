@@ -44,7 +44,7 @@
 - [x] SFTP 浏览、路径编辑、上传/下载、文本编辑、预览、冲突保护
 - [~] SFTP 多选/批量下载：桌面递归下载目录、自动改名；下载与上传队列均跨标签保留，可逐项查看/取消剩余/重试失败项；iOS 分享文件；缺字节级百分比进度
 - [~] SFTP 跟随终端目录：解析 OSC 7、一键开启跟随、终端菜单注入 bash/zsh 目录上报；支持 bash/zsh/fish；目录上报与通知钩子可 OSC 9 自动探测 `$SHELL`（登录 shell 不准时手动选择），失败提示手动
-- [~] ZMODEM rz/sz：已接入 xterm ZModemMux、菜单与保存/分享流程；缺真实 lrzsz 互操作验收
+- [~] ZMODEM rz/sz：已接入 xterm ZModemMux、菜单与保存/分享流程；真实 lrzsz 互操作仍失败，上游 zmodem 0.0.6 缺少 ZACK 流控，需替换协议实现后才能验收
 - [x] 拖拽上传（基础）
 - [~] 拖拽上传开关（macOS/Windows）、单文件大小上限、覆盖/保留自动重命名已实现；隐藏回显不适用 SFTP，未单独实现
 
@@ -91,7 +91,7 @@
 
 - 同步/协作：Gist/S3 后端、版本回滚、多端在线状态、Cloud Term 云账号、组织/团队共享与角色权限、SSH 公钥目录、审计日志、Web 端。
 - 终端/平台：iPad 多窗口、ZMODEM 真实 lrzsz 互操作、Office 原排版渲染、Linux 输入法、Windows/macOS 双架构发布、完整进程/端口操作实测。
-- 文件/片段：隐藏回显（当前 SFTP 上传路径不适用）、ZMODEM 实机收发、上传队列跨会话恢复。
+- 文件/片段：隐藏回显（当前 SFTP 上传路径不适用）、ZMODEM 实机收发（上游协议实现缺少 ZACK 流控）、上传队列跨会话恢复。
 - 插件/桌面：Windows 独立窗口/托盘/深链接/全局快捷键实测、Windows 输入与自动更新实测、macOS 收回实测。
 - 验收：Apple 真机 Touch ID/Face ID、双设备 GitHub、真实 OpenSSH/代理/转发、弱网/后台/外部键盘、Windows 桌面输入与安装、至少四周日用均未执行。
 
