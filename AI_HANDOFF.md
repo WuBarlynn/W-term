@@ -421,3 +421,10 @@ UI、实际桥接、测试、文档与双端构建。
 不得跳过指纹核验、代理失败回退直连、强推同步或清除未知发布结果。
 测试使用隔离 fixture，不访问真实保险库/服务器/仓库；没有真机证据就明确写待验收。
 ```
+
+
+## 13. 1.0.21 收尾审计（2026-10-31）
+
+- 三端版本 **1.0.21（74）**；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.21 ；本地产物 `build/release-1.0.21/`。
+- 验证：Flutter 267 项、Windows CI 41149755797、macOS 自签名严格校验、DMG、iOS IPA。截图/真机交互未验收。
+- 未完成项以 [CLOUDTERM_FEATURE_AUDIT.md](docs/CLOUDTERM_FEATURE_AUDIT.md) 的“1.0.21 仍未完成”为准；不得把当前构建称为 Cloud Term 全功能等价或最终 V1.0。下一步优先：真机/Windows 交互验收、iPad/Windows 多窗口收回、Gist/S3 与团队/云服务立项评估。
