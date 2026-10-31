@@ -124,11 +124,13 @@ Future<String> vaultAuthenticateIdentity({
   required String identityId,
   required String connectionId,
   required String approvedFingerprint,
+  required List<String> environment,
 }) => RustLib.instance.api.crateApiVaultVaultAuthenticateIdentity(
   token: token,
   identityId: identityId,
   connectionId: connectionId,
   approvedFingerprint: approvedFingerprint,
+  environment: environment,
 );
 
 /// Authenticates an intermediate route hop without opening a terminal.

@@ -42,8 +42,9 @@ class Library implements IdentityStore {
   Future<String> authenticateIdentity(
     String identityId,
     String connectionId,
-    String fingerprint,
-  ) async => 'tester';
+    String fingerprint, {
+    List<String> environment = const [],
+  }) async => 'tester';
   @override
   Future<String> authenticateJumpIdentity(
     String identityId,

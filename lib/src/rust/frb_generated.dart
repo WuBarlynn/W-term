@@ -104,6 +104,7 @@ abstract class RustLibApi extends BaseApi {
     required String password,
     required String privateKey,
     required String passphrase,
+    required List<String> environment,
   });
 
   Future<void> crateApiClientAuthenticateJump({
@@ -461,6 +462,7 @@ abstract class RustLibApi extends BaseApi {
     required String identityId,
     required String connectionId,
     required String approvedFingerprint,
+    required List<String> environment,
   });
 
   Future<String> crateApiVaultVaultAuthenticateJumpIdentity({
@@ -699,6 +701,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String password,
     required String privateKey,
     required String passphrase,
+    required List<String> environment,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -710,6 +713,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(password, serializer);
           sse_encode_String(privateKey, serializer);
           sse_encode_String(passphrase, serializer);
+          sse_encode_list_String(environment, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -729,6 +733,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           password,
           privateKey,
           passphrase,
+          environment,
         ],
         apiImpl: this,
       ),
@@ -744,6 +749,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       "password",
       "privateKey",
       "passphrase",
+      "environment",
     ],
   );
 
@@ -3144,6 +3150,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String identityId,
     required String connectionId,
     required String approvedFingerprint,
+    required List<String> environment,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -3153,6 +3160,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(identityId, serializer);
           sse_encode_String(connectionId, serializer);
           sse_encode_String(approvedFingerprint, serializer);
+          sse_encode_list_String(environment, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -3165,7 +3173,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiVaultVaultAuthenticateIdentityConstMeta,
-        argValues: [token, identityId, connectionId, approvedFingerprint],
+        argValues: [
+          token,
+          identityId,
+          connectionId,
+          approvedFingerprint,
+          environment,
+        ],
         apiImpl: this,
       ),
     );
@@ -3179,6 +3193,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "identityId",
           "connectionId",
           "approvedFingerprint",
+          "environment",
         ],
       );
 

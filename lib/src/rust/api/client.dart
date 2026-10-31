@@ -25,6 +25,7 @@ Future<void> authenticate({
   required String password,
   required String privateKey,
   required String passphrase,
+  required List<String> environment,
 }) => RustLib.instance.api.crateApiClientAuthenticate(
   connectionId: connectionId,
   approvedFingerprint: approvedFingerprint,
@@ -32,6 +33,7 @@ Future<void> authenticate({
   password: password,
   privateKey: privateKey,
   passphrase: passphrase,
+  environment: environment,
 );
 
 Future<void> authenticateJump({

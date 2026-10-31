@@ -14,7 +14,7 @@
 - [x] 服务器 Wiki（每主机 Markdown 文本，随主机保存）
 - [x] 连接图标/在线图标搜索
 - [x] 临时终端（快速连接表单 + 设置菜单独立入口）
-- [~] 启动命令、环境变量（已实现单行启动命令与 `KEY=VALUE` 环境导出；尚未使用 SSH env 静默请求）
+- [x] 启动命令、环境变量（单行启动命令、`KEY=VALUE` 环境导出、连接时静默 SSH `env` 请求；服务器拒绝时回退到 shell 导出）
 - [x] CSV/TSV（含密码列导入加密身份）、PuTTY .reg、SecureCRT/MobaXterm .ini、Xshell .xsh/.xts、Excel .xlsx
 - [x] 侧边栏 Shift/Ctrl 多选、批量收藏/删除、批量连接
 
@@ -92,9 +92,9 @@
 
 ## 验收边界
 
-本表只说明代码能力；真实 Apple 设备、Windows 桌面输入、真实 GitHub 双设备、真实 OpenSSH/代理/转发、弱网和四周日用仍需单独验收。当前 **1.0.63（116）** 构建有三端安装包、签名/版本核验和 Flutter 测试（含真实 lrzsz ZMODEM 双向测试），但仍不能称为 Cloud Term 全功能等价。
+本表只说明代码能力；真实 Apple 设备、Windows 桌面输入、真实 GitHub 双设备、真实 OpenSSH/代理/转发、弱网和四周日用仍需单独验收。当前 **1.0.64（117）** 构建有三端安装包、签名/版本核验和 Flutter 测试（含真实 lrzsz ZMODEM 双向测试），但仍不能称为 Cloud Term 全功能等价。
 
-### 1.0.63 仍未完成
+### 1.0.64 仍未完成
 
 - 同步/协作：Gist/S3 后端、多端在线状态、Cloud Term 云账号、组织/团队共享与角色权限、SSH 公钥目录、审计日志、Web 端。
 - 终端/平台：iPad 多窗口（单保险库进程级连接限制，需共享保险库架构改造）。

@@ -192,6 +192,7 @@ fn wire__crate__api__client__authenticate_impl(
             let api_password = <String>::sse_decode(&mut deserializer);
             let api_private_key = <String>::sse_decode(&mut deserializer);
             let api_passphrase = <String>::sse_decode(&mut deserializer);
+            let api_environment = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -203,6 +204,7 @@ fn wire__crate__api__client__authenticate_impl(
                             api_password,
                             api_private_key,
                             api_passphrase,
+                            api_environment,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -2917,6 +2919,7 @@ fn wire__crate__api__vault__vault_authenticate_identity_impl(
             let api_identity_id = <String>::sse_decode(&mut deserializer);
             let api_connection_id = <String>::sse_decode(&mut deserializer);
             let api_approved_fingerprint = <String>::sse_decode(&mut deserializer);
+            let api_environment = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -2926,6 +2929,7 @@ fn wire__crate__api__vault__vault_authenticate_identity_impl(
                             api_identity_id,
                             api_connection_id,
                             api_approved_fingerprint,
+                            api_environment,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)

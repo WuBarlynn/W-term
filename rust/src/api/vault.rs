@@ -804,15 +804,17 @@ pub async fn vault_authenticate_identity(
     identity_id: String,
     connection_id: String,
     approved_fingerprint: String,
+    environment: Vec<String>,
 ) -> Result<String> {
     let (username, mut secrets) = identity_secrets(&token, &identity_id)?;
-    crate::session::authenticate(
+    crate::session::authenticate_with_environment(
         &connection_id,
         &approved_fingerprint,
         username.clone(),
         std::mem::take(&mut *secrets.password),
         std::mem::take(&mut *secrets.private_key),
         std::mem::take(&mut *secrets.passphrase),
+        environment,
     )
     .await?;
     // A lock racing with authentication must not leave an authenticated session.
@@ -1563,6 +1565,7 @@ mod tests {
                 identity_id,
                 connection_id.clone(),
                 fingerprint,
+                Vec::new(),
             )
             .await?;
             assert_eq!(username, "wterm");
@@ -1638,7 +1641,14 @@ mod tests {
             let task_token = token.to_string();
             let task_identity = identity.to_string();
             let auth = tokio::spawn(async move {
-                vault_authenticate_identity(task_token, task_identity, task_id, fingerprint).await
+                vault_authenticate_identity(
+                    task_token,
+                    task_identity,
+                    task_id,
+                    fingerprint,
+                    Vec::new(),
+                )
+                .await
             });
             for _ in 0..2 {
                 let challenge = tokio::time::timeout(Duration::from_secs(5), async {

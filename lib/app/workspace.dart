@@ -680,6 +680,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                 savedIdentityId,
                 currentId!,
                 identity.fingerprint,
+                environment: profile?.environment ?? const [],
               );
             }
             final authentication = native.authenticate(
@@ -689,6 +690,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
               password: request.password,
               privateKey: request.privateKey,
               passphrase: request.passphrase,
+              environment: profile?.environment ?? const [],
             );
             request.clearSecrets();
             await authentication;

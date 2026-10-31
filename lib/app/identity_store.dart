@@ -39,8 +39,9 @@ abstract interface class IdentityStore {
   Future<String> authenticateIdentity(
     String identityId,
     String connectionId,
-    String fingerprint,
-  );
+    String fingerprint, {
+    List<String> environment = const [],
+  });
 
   /// Authenticates an intermediate hop without opening a terminal.
   Future<String> authenticateJumpIdentity(

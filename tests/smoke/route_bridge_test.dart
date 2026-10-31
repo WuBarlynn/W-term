@@ -123,6 +123,7 @@ void main() {
           password: 'wterm-test-only',
           privateKey: '',
           passphrase: '',
+          environment: const [],
         );
         final echoed = Completer<void>();
         var text = '';

@@ -24,6 +24,7 @@ void main() {
           password: 'wterm-test-only',
           privateKey: '',
           passphrase: '',
+          environment: const [],
         );
         final output = await client.runCommand(
           connectionId: id,

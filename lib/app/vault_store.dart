@@ -505,12 +505,14 @@ class NativeVaultSession
   Future<String> authenticateIdentity(
     String identityId,
     String connectionId,
-    String fingerprint,
-  ) => native.vaultAuthenticateIdentity(
+    String fingerprint, {
+    List<String> environment = const [],
+  }) => native.vaultAuthenticateIdentity(
     token: _token,
     identityId: identityId,
     connectionId: connectionId,
     approvedFingerprint: fingerprint,
+    environment: environment,
   );
   @override
   Future<String> authenticateJumpIdentity(

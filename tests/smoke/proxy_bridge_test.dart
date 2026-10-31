@@ -93,6 +93,7 @@ void main() {
             password: 'wterm-test-only',
             privateKey: '',
             passphrase: '',
+            environment: const [],
           ),
           throwsA(anything),
         );
@@ -111,6 +112,7 @@ void main() {
           password: 'wterm-test-only',
           privateKey: '',
           passphrase: '',
+          environment: const [],
         );
         final echoed = Completer<void>();
         var text = '';
@@ -201,6 +203,7 @@ void main() {
         password: 'wterm-test-only',
         privateKey: '',
         passphrase: '',
+        environment: const [],
       );
       await client.disconnect(connectionId: id);
       id = null;

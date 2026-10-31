@@ -8,7 +8,7 @@ use russh::{
 };
 use russh_sftp::client::SftpSession;
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{Arc, OnceLock},
     time::Duration,
 };
@@ -303,6 +303,7 @@ pub(crate) async fn cancel_probe(operation_id: &str) {
     }
 }
 
+#[cfg(test)]
 pub async fn authenticate(
     id: &str,
     approved: &str,
@@ -311,6 +312,27 @@ pub async fn authenticate(
     private_key: String,
     passphrase: String,
 ) -> Result<()> {
+    authenticate_with_environment(
+        id,
+        approved,
+        username,
+        password,
+        private_key,
+        passphrase,
+        Vec::new(),
+    )
+    .await
+}
+
+pub async fn authenticate_with_environment(
+    id: &str,
+    approved: &str,
+    username: String,
+    password: String,
+    private_key: String,
+    passphrase: String,
+    environment: Vec<String>,
+) -> Result<()> {
     authenticate_inner(
         id,
         approved,
@@ -318,6 +340,7 @@ pub async fn authenticate(
         password,
         private_key,
         passphrase,
+        environment,
         true,
     )
     .await
@@ -340,9 +363,37 @@ pub(crate) async fn authenticate_jump(
         password,
         private_key,
         passphrase,
+        Vec::new(),
         false,
     )
     .await
+}
+
+fn parse_environment(lines: &[String]) -> Vec<(String, String)> {
+    let mut seen = BTreeSet::new();
+    let mut result = Vec::new();
+    for raw in lines {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
+        let name = name.trim();
+        let valid_name = !name.is_empty()
+            && name.len() <= 128
+            && name.bytes().enumerate().all(|(index, byte)| {
+                byte.is_ascii_alphabetic() || byte == b'_' || (index > 0 && byte.is_ascii_digit())
+            });
+        if !valid_name || value.len() > 4096 || result.len() >= 128 {
+            continue;
+        }
+        if seen.insert(name.to_owned()) {
+            result.push((name.to_owned(), value.to_owned()));
+        }
+    }
+    result
 }
 
 /// Separates an OpenSSH private key from an optional certificate appended in
@@ -372,6 +423,7 @@ async fn authenticate_inner(
     password: String,
     private_key: String,
     passphrase: String,
+    environment: Vec<String>,
     open_terminal: bool,
 ) -> Result<()> {
     let mut password = Zeroizing::new(password);
@@ -462,6 +514,11 @@ async fn authenticate_inner(
                 .request_pty(true, "xterm-256color", 100, 30, 0, 0, &[])
                 .await?;
             await_success(&mut channel).await?;
+            for (name, value) in parse_environment(&environment) {
+                // Non-replying requests keep servers that reject env variables
+                // usable; the shell exports remain the functional fallback.
+                let _ = channel.set_env(false, name, value).await;
+            }
             channel.request_shell(true).await?;
             await_success(&mut channel).await?;
             Ok::<_, anyhow::Error>(Some(channel))
@@ -715,6 +772,7 @@ mod tests {
             "wterm-test-only".into(),
             "".into(),
             "".into(),
+            Vec::new(),
         )
         .await
         .unwrap();
@@ -775,6 +833,27 @@ mod tests {
         .await
         .is_err());
     }
+    #[test]
+    fn parses_safe_environment_variables_without_duplicates() {
+        let input = vec![
+            "LANG=en_US.UTF-8".to_string(),
+            " # comment".to_string(),
+            "bad name=value".to_string(),
+            "1BAD=value".to_string(),
+            "EMPTY=".to_string(),
+            "LANG=duplicate".to_string(),
+            "A=B=C".to_string(),
+        ];
+        assert_eq!(
+            parse_environment(&input),
+            vec![
+                ("LANG".to_string(), "en_US.UTF-8".to_string()),
+                ("EMPTY".to_string(), String::new()),
+                ("A".to_string(), "B=C".to_string()),
+            ]
+        );
+    }
+
     #[test]
     fn splits_openssh_certificate_from_private_key() {
         let key = "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----";

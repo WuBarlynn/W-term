@@ -74,14 +74,16 @@ pub async fn authenticate(
     password: String,
     private_key: String,
     passphrase: String,
+    environment: Vec<String>,
 ) -> Result<()> {
-    session::authenticate(
+    session::authenticate_with_environment(
         &connection_id,
         &approved_fingerprint,
         username,
         password,
         private_key,
         passphrase,
+        environment,
     )
     .await
 }

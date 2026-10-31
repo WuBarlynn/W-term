@@ -93,8 +93,9 @@ class MemoryLibrary
   Future<String> authenticateIdentity(
     String identityId,
     String connectionId,
-    String fingerprint,
-  ) async => saved.firstWhere((i) => i.id == identityId).username;
+    String fingerprint, {
+    List<String> environment = const [],
+  }) async => saved.firstWhere((i) => i.id == identityId).username;
 
   @override
   Future<String> authenticateJumpIdentity(

@@ -45,6 +45,7 @@ void main() {
           password: 'wterm-test-only',
           privateKey: '',
           passphrase: '',
+          environment: const [],
         );
         first = TerminalSession(
           connectionId: id,

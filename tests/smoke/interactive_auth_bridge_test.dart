@@ -27,6 +27,7 @@ void main() {
             password: '',
             privateKey: '',
             passphrase: '',
+            environment: const [],
           );
           return 'mfa';
         },
@@ -112,6 +113,7 @@ void main() {
             identityId: identityId,
             connectionId: current,
             approvedFingerprint: p.fingerprint,
+            environment: const [],
           ),
           poll: () => client.authChallenge(connectionId: current),
           reply: (challengeId, answers) => client.answerAuthChallenge(
@@ -146,6 +148,7 @@ void main() {
             identityId: identityId,
             connectionId: lockedProbe.connectionId,
             approvedFingerprint: lockedProbe.fingerprint,
+            environment: const [],
           ),
           throwsA(anything),
         );

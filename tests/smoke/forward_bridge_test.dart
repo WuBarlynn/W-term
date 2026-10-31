@@ -65,6 +65,7 @@ void main() {
         password: 'wterm-test-only',
         privateKey: '',
         passphrase: '',
+        environment: const [],
       );
       terminal = client.terminalOutput(connectionId: id).listen((_) {
         unawaited(
@@ -175,6 +176,7 @@ void main() {
         password: 'wterm-test-only',
         privateKey: '',
         passphrase: '',
+        environment: const [],
       );
       terminal = client.terminalOutput(connectionId: id).listen((_) {
         unawaited(client.acknowledgeOutput(connectionId: id!));

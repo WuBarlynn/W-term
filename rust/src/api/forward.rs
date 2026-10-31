@@ -600,6 +600,7 @@ mod tests {
             "wterm-test-only".into(),
             "".into(),
             "".into(),
+            Vec::new(),
         )
         .await
         .unwrap();
