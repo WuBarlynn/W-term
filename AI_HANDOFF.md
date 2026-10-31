@@ -548,3 +548,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 修复：自动探测/自动注入使用 `session.send` 而非广播输入，避免把设置命令发给广播目标。
 - 验证：`build/flutter-tests-1.0.36.log` **296 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.36（89）；Windows CI 41181756085 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：真实 bash/zsh/fish 远端 OSC 9 探测与钩子安装、Windows 实体机输入/自动更新。
+
+## 29. 1.0.37 片段标签（2026-10-31）
+
+- 三端版本 **1.0.37（90）**；本地产物 `build/release-1.0.37/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.37 。
+- Rust `Snippet` 新增 `tags`（`#[serde(default)]` 兼容旧记录），`vault_save_snippet` 接收标签并校验最多 20 个、单个 ≤48 字节、无控制字符；Flutter/Rust 绑定已用 FRB 2.13.0 重新生成。
+- Dart：`CommandSnippet.tags`、`SnippetStore.saveSnippet(tags:)`、保险库读写；片段编辑器新增逗号分隔标签；片段列表显示标签，可用当前主机标签或片段标签筛选。
+- 验证：`build/flutter-tests-1.0.37.log` **297 项** Flutter 测试通过，`flutter analyze` 无问题；Rust `snippets_are_encrypted_backed_up_and_reject_control_characters` 通过；macOS 自签名 Release + DMG；iOS IPA 1.0.37（90）；Windows CI 41183500739 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 全量测试）。
+- 未执行：真实多主机标签筛选、旧保险库升级后的标签显示、同步/备份跨设备标签一致性；Windows 实体机输入/自动更新仍待用户复测。
