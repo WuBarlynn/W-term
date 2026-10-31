@@ -31,6 +31,7 @@ class PluginSettings extends ChangeNotifier {
   bool restoreLayout = true;
   bool showStatusBar = true;
   bool rightClickPaste = false;
+  bool showComposeBar = false;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -65,6 +66,7 @@ class PluginSettings extends ChangeNotifier {
           restoreLayout = value['restoreLayout'] != false;
           showStatusBar = value['showStatusBar'] != false;
           rightClickPaste = value['rightClickPaste'] == true;
+          showComposeBar = value['showComposeBar'] == true;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -93,6 +95,7 @@ class PluginSettings extends ChangeNotifier {
     'restoreLayout': restoreLayout,
     'showStatusBar': showStatusBar,
     'rightClickPaste': rightClickPaste,
+    'showComposeBar': showComposeBar,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -119,6 +122,7 @@ class PluginSettings extends ChangeNotifier {
       restoreLayoutNext: data['restoreLayout'] != false,
       showStatusBarNext: data['showStatusBar'] != false,
       rightClickPasteNext: data['rightClickPaste'] == true,
+      showComposeBarNext: data['showComposeBar'] == true,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -141,6 +145,7 @@ class PluginSettings extends ChangeNotifier {
     bool? restoreLayoutNext,
     bool? showStatusBarNext,
     bool? rightClickPasteNext,
+    bool? showComposeBarNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -158,6 +163,7 @@ class PluginSettings extends ChangeNotifier {
     restoreLayout = restoreLayoutNext ?? restoreLayout;
     showStatusBar = showStatusBarNext ?? showStatusBar;
     rightClickPaste = rightClickPasteNext ?? rightClickPaste;
+    showComposeBar = showComposeBarNext ?? showComposeBar;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -181,6 +187,7 @@ class PluginSettings extends ChangeNotifier {
         'restoreLayout': restoreLayout,
         'showStatusBar': showStatusBar,
         'rightClickPaste': rightClickPaste,
+        'showComposeBar': showComposeBar,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

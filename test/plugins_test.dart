@@ -47,6 +47,7 @@ void main() {
       expect(store.restoreLayout, isTrue);
       expect(store.showStatusBar, isTrue);
       expect(store.rightClickPaste, isFalse);
+      expect(store.showComposeBar, isFalse);
       expect(store.maxUploadSizeMb, 0);
       expect(uploadTooLarge(101 * 1024 * 1024, 100), isTrue);
       expect(uploadTooLarge(100 * 1024 * 1024, 100), isFalse);
@@ -65,6 +66,7 @@ void main() {
         restoreLayoutNext: false,
         showStatusBarNext: false,
         rightClickPasteNext: true,
+        showComposeBarNext: true,
         maxUploadSizeMbNext: 500,
       );
       final restored = PluginSettings(file: () async => file);
@@ -82,6 +84,7 @@ void main() {
       expect(restored.restoreLayout, isFalse);
       expect(restored.showStatusBar, isFalse);
       expect(restored.rightClickPaste, isTrue);
+      expect(restored.showComposeBar, isTrue);
       expect(restored.maxUploadSizeMb, 500);
     } finally {
       await dir.delete(recursive: true);

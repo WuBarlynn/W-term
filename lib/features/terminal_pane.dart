@@ -81,6 +81,7 @@ class TerminalPane extends StatefulWidget {
 
 class _TerminalPaneState extends State<TerminalPane> {
   final controller = TerminalController();
+  final compose = TextEditingController();
   final focus = FocusNode();
   final _terminalBoundary = GlobalKey();
   final _terminalViewKey = GlobalKey<TerminalViewState>();
@@ -423,6 +424,15 @@ class _TerminalPaneState extends State<TerminalPane> {
         ? 13
         : (terminalAppearance.fontSize + delta).clamp(10, 28);
     await terminalAppearance.save(terminalAppearance.palette, next);
+  }
+
+  void _sendCompose() {
+    final text = compose.text;
+    if (text.trim().isEmpty) return;
+    _sendInput('$text\n');
+    compose.clear();
+    if (mounted) setState(() {});
+    _focus();
   }
 
   Future<void> _sampleStatus() async {
@@ -1503,6 +1513,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _highlightTimer?.cancel();
     _shellProbeTimer?.cancel();
     _statusTimer?.cancel();
+    compose.dispose();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);
@@ -2000,6 +2011,36 @@ class _TerminalPaneState extends State<TerminalPane> {
               );
             },
           ),
+          if (pluginSettings.showComposeBar && !ended)
+            Container(
+              key: const ValueKey('terminal-compose-bar'),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: compose,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: '撰写命令，发送到当前输入目标',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    tooltip: '发送撰写内容',
+                    onPressed: _sendCompose,
+                    icon: const Icon(Icons.send, size: 18),
+                  ),
+                ],
+              ),
+            ),
           if (MediaQuery.sizeOf(context).width < 900)
             Container(
               color: const Color(0xff161c24),

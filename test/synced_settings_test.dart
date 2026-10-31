@@ -56,6 +56,7 @@ void main() {
       'restoreLayout': false,
       'showStatusBar': false,
       'rightClickPaste': true,
+      'showComposeBar': true,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -70,6 +71,7 @@ void main() {
     expect(store.restoreLayout, isFalse);
     expect(store.showStatusBar, isFalse);
     expect(store.rightClickPaste, isTrue);
+    expect(store.showComposeBar, isTrue);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 

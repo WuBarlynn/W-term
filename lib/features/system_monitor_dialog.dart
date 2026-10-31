@@ -61,6 +61,8 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
   int get portIndex => _tabs.indexWhere((tab) => tab.$1 == '端口');
   final filter = TextEditingController();
   String processSort = 'cpu';
+  String portProtocol = 'all';
+  bool portLoopbackOnly = false;
 
   String _commandFor(int tab) {
     if (tab != processIndex) return _tabs[tab].$2;
@@ -72,10 +74,26 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
     final raw = output[index];
     if (raw == null) return '尚未获取数据';
     final query = filter.text.trim().toLowerCase();
-    if (query.isEmpty || (index != processIndex && index != portIndex)) {
-      return raw;
+    if (index != processIndex && index != portIndex) return raw;
+    var lines = raw.split('\n');
+    if (index == portIndex) {
+      if (portProtocol != 'all') {
+        lines = lines
+            .where((line) => line.toLowerCase().contains(portProtocol))
+            .toList();
+      }
+      if (portLoopbackOnly) {
+        lines = lines
+            .where(
+              (line) =>
+                  line.contains('127.0.0.1') ||
+                  line.contains('::1') ||
+                  line.contains('[::1]'),
+            )
+            .toList();
+      }
     }
-    final lines = raw.split('\n');
+    if (query.isEmpty) return lines.join('\n');
     final filtered = lines.where((line) => line.toLowerCase().contains(query));
     return filtered.isEmpty
         ? '没有匹配“${filter.text.trim()}”的行'
@@ -142,6 +160,46 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
       await _load();
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
+    }
+  }
+
+  Future<void> copyPid() async {
+    final controller = TextEditingController();
+    final pid = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('复制 PID'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'PID'),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('复制'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
+    final value = pid?.trim() ?? '';
+    if (!RegExp(r'^[1-9][0-9]{0,9}$').hasMatch(value)) {
+      if (value.isNotEmpty && mounted) {
+        setState(() => error = 'PID 必须是正整数');
+      }
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: value));
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('PID 已复制')));
     }
   }
 
@@ -506,6 +564,26 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                       label: const Text('重启'),
                     ),
                   ],
+                  if (index == portIndex) ...[
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: portProtocol,
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('全部协议')),
+                        DropdownMenuItem(value: 'tcp', child: Text('TCP')),
+                        DropdownMenuItem(value: 'udp', child: Text('UDP')),
+                      ],
+                      onChanged: (value) => setState(
+                        () => portProtocol = value ?? 'all',
+                      ),
+                    ),
+                    FilterChip(
+                      label: const Text('仅回环'),
+                      selected: portLoopbackOnly,
+                      onSelected: (value) =>
+                          setState(() => portLoopbackOnly = value),
+                    ),
+                  ],
                   if (index == processIndex) ...[
                     const SizedBox(width: 8),
                     DropdownButton<String>(
@@ -520,6 +598,12 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                               setState(() => processSort = value ?? 'cpu');
                               _load();
                             },
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: loading.contains(index) ? null : copyPid,
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('复制 PID'),
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton.icon(

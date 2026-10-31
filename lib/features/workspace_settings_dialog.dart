@@ -18,6 +18,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
   late bool restoreLayout = pluginSettings.restoreLayout;
   late bool showStatusBar = pluginSettings.showStatusBar;
   late bool rightClickPaste = pluginSettings.rightClickPaste;
+  late bool showComposeBar = pluginSettings.showComposeBar;
   bool saving = false;
   String error = '';
 
@@ -39,6 +40,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
         restoreLayoutNext: restoreLayout,
         showStatusBarNext: showStatusBar,
         rightClickPasteNext: rightClickPaste,
+        showComposeBarNext: showComposeBar,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -110,6 +112,15 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
                 : (value) => setState(() => rightClickPaste = value),
             title: const Text('右键直接粘贴'),
             subtitle: const Text('默认关闭右键菜单；开启后右键立即粘贴剪贴板。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showComposeBar,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => showComposeBar = value),
+            title: const Text('显示底部撰写栏'),
+            subtitle: const Text('在终端底部编辑多行命令，发送到当前输入目标。'),
           ),
           if (error.isNotEmpty)
             Text(
