@@ -516,3 +516,11 @@ UI、实际桥接、测试、文档与双端构建。
 - PDF：预览对话框按屏幕尺寸自适应（手机/iPad 不再固定 920×720）；PDFium 内嵌渲染与 100 MB 限制沿用 1.0.31。
 - 验证：`build/flutter-tests-1.0.32.log` **289 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.32（85）；Windows CI 41175238616 成功（pdfrx 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
 - 未执行：Windows 实体机正常输入与兼容模式、中文 IME、PDF 真机渲染、从旧版本自动更新端到端。
+
+## 25. 1.0.33 右侧固定命令 Dock（2026-10-31）
+
+- 三端版本 **1.0.33（86）**；本地产物 `build/release-1.0.33/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.33 。
+- 终端宽度 ≥1200 且当前主机/标签存在固定命令时，右侧显示纵向 Dock：点击发送命令，长按确认移除；窄窗口继续使用底部 chip 条，二者不重复显示。
+- 组件测试 `terminal_pane_input_route_test.dart` 覆盖宽窗口 Dock 渲染。
+- 验证：`build/flutter-tests-1.0.33.log` **290 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.33（86）；Windows CI 41177156729 成功（pdfrx 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
+- 未执行：真实窗口缩放、Dock 点击/长按、标签绑定的多主机切换。

@@ -5,7 +5,7 @@
 ## 1.0.33 右侧固定命令 Dock（2026-10-31）
 
 - 宽终端（≥1200 px）且存在固定命令时，在右侧显示纵向 Dock；按当前主机/标签过滤，点击发送命令，长按确认移除。窄窗口仍使用底部 chip 条。
-- 验证：Flutter 全量 **290 项**通过（含 Dock 组件测试）；三端构建与发布证据见 1.0.33 记录；真实窗口缩放/点击未在真机验收。
+- 验证：Flutter 全量 **290 项**通过（含 Dock 组件测试，`build/flutter-tests-1.0.33.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41177156729](https://github.com/WuBarlynn/W-term/actions/runs/41177156729) 成功（构建/启动冒烟/静默安装卸载冒烟/Rust 测试）。真实窗口缩放/点击未在真机验收。
 
 ## 1.0.32 Windows 输入兼容与 PDF 预览适配（2026-10-31）
 
