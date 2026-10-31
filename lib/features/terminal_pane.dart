@@ -418,6 +418,13 @@ class _TerminalPaneState extends State<TerminalPane> {
     _focus();
   }
 
+  Future<void> _zoom(int delta) async {
+    final next = delta == 0
+        ? 13
+        : (terminalAppearance.fontSize + delta).clamp(10, 28);
+    await terminalAppearance.save(terminalAppearance.palette, next);
+  }
+
   Future<void> _sampleStatus() async {
     if (!mounted || _statusSampling || !pluginSettings.showStatusBar) return;
     _statusSampling = true;
@@ -1700,10 +1707,35 @@ class _TerminalPaneState extends State<TerminalPane> {
                                                   keyboard.isAltPressed,
                                             );
                                         if (customAction != null) {
-                                          widget.onShortcut!(
-                                            customAction,
-                                            null,
-                                          );
+                                          if (customAction == 'search') {
+                                            unawaited(searchHistory());
+                                          } else if (customAction ==
+                                              'snippets') {
+                                            unawaited(openSnippets());
+                                          } else if (customAction ==
+                                              'files') {
+                                            widget.onOpenFiles?.call();
+                                          } else if (customAction ==
+                                              'clear') {
+                                            widget.session.terminal
+                                                .eraseDisplay();
+                                            widget.session.terminal
+                                                .eraseScrollbackOnly();
+                                          } else if (customAction ==
+                                              'zoom-in') {
+                                            unawaited(_zoom(1));
+                                          } else if (customAction ==
+                                              'zoom-out') {
+                                            unawaited(_zoom(-1));
+                                          } else if (customAction ==
+                                              'zoom-reset') {
+                                            unawaited(_zoom(0));
+                                          } else {
+                                            widget.onShortcut!(
+                                              customAction,
+                                              null,
+                                            );
+                                          }
                                           return KeyEventResult.handled;
                                         }
                                         if (primary) {
@@ -1725,21 +1757,6 @@ class _TerminalPaneState extends State<TerminalPane> {
                                             return KeyEventResult.handled;
                                           }
                                         }
-                                      }
-                                      if (event is KeyDownEvent &&
-                                          event.logicalKey ==
-                                              LogicalKeyboardKey.keyF &&
-                                          (HardwareKeyboard
-                                                  .instance
-                                                  .isMetaPressed ||
-                                              (HardwareKeyboard
-                                                      .instance
-                                                      .isControlPressed &&
-                                                  HardwareKeyboard
-                                                      .instance
-                                                      .isShiftPressed))) {
-                                        unawaited(searchHistory());
-                                        return KeyEventResult.handled;
                                       }
                                       if (event is KeyDownEvent &&
                                           HardwareKeyboard

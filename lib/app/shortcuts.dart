@@ -16,6 +16,16 @@ const shortcutActions = <ShortcutAction>[
   ShortcutAction('prev-tab', '上一个标签页'),
   ShortcutAction('next-tab', '下一个标签页'),
   ShortcutAction('sessions', '已打开终端'),
+  ShortcutAction('search', '终端内搜索'),
+  ShortcutAction('files', '打开/关闭文件传输'),
+  ShortcutAction('snippets', '显示/隐藏片段栏'),
+  ShortcutAction('history', '打开命令历史'),
+  ShortcutAction('settings', '打开设置'),
+  ShortcutAction('local-terminal', '新建本地终端'),
+  ShortcutAction('clear', '清空终端'),
+  ShortcutAction('zoom-in', '放大终端字号'),
+  ShortcutAction('zoom-out', '缩小终端字号'),
+  ShortcutAction('zoom-reset', '重置终端字号'),
 ];
 
 class ShortcutKey {
@@ -137,6 +147,66 @@ class ShortcutSettings extends ChangeNotifier {
       meta: apple,
       control: !apple,
       shift: true,
+    ),
+    'search': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyF.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'files': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyU.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'snippets': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyP.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'history': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyY.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'settings': ShortcutKey(
+      keyId: LogicalKeyboardKey.comma.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'local-terminal': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyN.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'clear': ShortcutKey(
+      keyId: LogicalKeyboardKey.keyK.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'zoom-in': ShortcutKey(
+      keyId: LogicalKeyboardKey.equal.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'zoom-out': ShortcutKey(
+      keyId: LogicalKeyboardKey.minus.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
+    ),
+    'zoom-reset': ShortcutKey(
+      keyId: LogicalKeyboardKey.digit0.keyId,
+      meta: apple,
+      control: !apple,
+      shift: !apple,
     ),
   };
 

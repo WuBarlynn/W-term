@@ -1766,7 +1766,18 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
 
   Map<ShortcutActivator, VoidCallback> _shortcutBindings() {
     final result = <ShortcutActivator, VoidCallback>{};
+    const globalActions = {
+      'new',
+      'close-tab',
+      'prev-tab',
+      'next-tab',
+      'sessions',
+      'history',
+      'settings',
+      'local-terminal',
+    };
     for (final action in shortcutActions) {
+      if (!globalActions.contains(action.id)) continue;
       final binding = shortcutSettings.bindings[action.id];
       if (binding == null || !binding.enabled) continue;
       final key = LogicalKeyboardKey.findKeyByKeyId(binding.keyId);
@@ -1815,6 +1826,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       unawaited(showSessionPicker());
     } else if (action == 'focus') {
       setState(() => focusMode = !focusMode);
+    } else if (action == 'history') {
+      unawaited(sidebarAction('history', false));
+    } else if (action == 'settings') {
+      unawaited(_openSettings(false));
+    } else if (action == 'local-terminal') {
+      unawaited(openLocalTerminal());
     }
   }
 
