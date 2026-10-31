@@ -9,6 +9,7 @@ import 'imported_fonts.dart';
 /// available even when the operating system has no CJK or coding font.
 const monoFontFallback = <String>[
   'Cascadia Mono',
+  'JetBrains Mono',
   'SF Mono',
   'Menlo',
   'Consolas',

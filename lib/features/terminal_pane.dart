@@ -274,10 +274,11 @@ class _TerminalPaneState extends State<TerminalPane> {
     return [
       if (cjk.isNotEmpty) cjk,
       if (windows) ...[
+        'JetBrains Mono',
+        'Consolas',
+        'Noto Sans SC',
         'Microsoft YaHei UI',
         'Microsoft YaHei',
-        'Noto Sans SC',
-        'Consolas',
       ] else if (Theme.of(context).platform == TargetPlatform.macOS ||
           Theme.of(context).platform == TargetPlatform.iOS) ...[
         'PingFang SC',
