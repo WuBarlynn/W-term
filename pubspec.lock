@@ -1107,12 +1107,11 @@ packages:
     source: hosted
     version: "3.1.4"
   zmodem:
-    dependency: transitive
+    dependency: "direct main"
     description:
-      name: zmodem
-      sha256: "3b7e5b29f3a7d8aee472029b05165a68438eff2f3f7766edf13daba1e297adbf"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/zmodem"
+      relative: true
+    source: path
     version: "0.0.6"
 sdks:
   dart: ">=3.13.3 <4.0.0"

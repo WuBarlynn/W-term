@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 import '../src/rust/api/client.dart' as native;
 import 'command_history.dart';
 import 'errors.dart';
+import 'zmodem_mux.dart';
 import 'terminal_appearance.dart';
 
 /// Marks user-originated terminal input so broadcast never forwards protocol
@@ -65,7 +66,7 @@ class TerminalSession extends ChangeNotifier {
   final StreamController<List<int>> _zmodemInput = StreamController<List<int>>(
     sync: true,
   );
-  ZModemMux? _zmodem;
+  WTermZModemMux? _zmodem;
   StreamSubscription<Uint8List>? _output;
   Future<void> _writes = Future.value();
   Timer? _resizeTimer;
@@ -201,7 +202,7 @@ class TerminalSession extends ChangeNotifier {
   }
 
   void _startLive() {
-    final mux = ZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
+    final mux = WTermZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
       ..onTerminalInput = terminal.write
       ..onFileOffer = (offer) {
         final handler = onZmodemOffer;
@@ -316,7 +317,8 @@ class TerminalSession extends ChangeNotifier {
     await output?.cancel();
     _zmodem
       ?..onFileOffer = null
-      ..onFileRequest = null;
+      ..onFileRequest = null
+      ..dispose();
     _zmodem = null;
     await _zmodemInput.close();
     await _wire.close();
