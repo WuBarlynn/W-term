@@ -6,7 +6,7 @@
 
 - 终端路径悬停时显示下划线，Cmd/Ctrl+点击预览行为不变。
 - 插件设置新增划词/右键菜单的固定命令、存为片段、分享图片开关；变更随加密设置同步。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41235116628](https://github.com/WuBarlynn/W-term/actions/runs/41235116628) 成功。悬停下划线仍待实机验收。
 
 ## 1.0.55 传输字节级进度（2026-10-31）
 
