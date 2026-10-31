@@ -572,3 +572,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 链接下划线：获取 TerminalView 渲染对象时增加异常保护，布局切换帧直接跳过，避免新覆盖层在极早帧抛错。
 - 验证：`build/flutter-tests-1.0.39.log` **301 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.39（92）；Windows CI 41186496288 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：Windows 实体机等宽字体/终端显示、链接下划线像素位置；Windows 输入与自动更新仍待用户复测。
+
+## 32. 1.0.40 上传选项（2026-10-31）
+
+- 三端版本 **1.0.40（93）**；本地产物 `build/release-1.0.40/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.40 。
+- 插件设置新增“拖拽上传”开关与单文件大小上限（不限/50/100/500/1024/2048 MB）；macOS 与 Windows 均可拖入文件/文件夹，超限文件在上传前拒绝并逐项标记失败。
+- 覆盖/保留并自动重命名/跳过冲突选项保留；“隐藏回显”不适用于 SFTP，未单独实现。
+- 验证：`build/flutter-tests-1.0.40.log` **301 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.40（93）；Windows CI 41188182230 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：真实拖拽（含 Windows）、超限大文件、文件夹拖拽与冲突选择；Windows 实体机输入/自动更新仍待复测。
