@@ -25,6 +25,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/temporary_directory.dart';
@@ -784,6 +785,10 @@ class FilesPaneState extends State<FilesPane> {
   }
 
   Future<void> preview(native.RemoteEntry entry) async {
+    if (isPdfPreviewName(entry.name)) {
+      await previewPdf(entry);
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -807,6 +812,45 @@ class FilesPaneState extends State<FilesPane> {
       if (mounted) setState(() => error = userFacingError(e));
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> previewPdf(native.RemoteEntry entry) async {
+    if (entry.size > maxInlinePdfBytes) {
+      if (mounted) {
+        setState(() => error = 'PDF 超过 100 MB，请先下载到本地再打开');
+      }
+      return;
+    }
+    Directory? temporary;
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '准备 PDF 预览…';
+    });
+    try {
+      temporary = await createAppTemporaryDirectory('wterm-pdf-');
+      final local = '${temporary.path}/${_safeLocalName(entry.name)}';
+      await native.downloadFile(
+        connectionId: widget.connectionId,
+        remotePath: entry.path,
+        localPath: local,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => _PdfPreviewDialog(title: entry.name, path: local),
+      );
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+      if (temporary != null) {
+        await temporary
+            .delete(recursive: true)
+            .catchError((Object _) => temporary!);
+      }
     }
   }
 
@@ -1455,4 +1499,55 @@ class _FilePreviewDialogState extends State<_FilePreviewDialog> {
       ],
     );
   }
+}
+
+const maxInlinePdfBytes = 100 * 1024 * 1024;
+
+bool isPdfPreviewName(String name) => name.toLowerCase().endsWith('.pdf');
+
+class _PdfPreviewDialog extends StatelessWidget {
+  final String title;
+  final String path;
+  const _PdfPreviewDialog({required this.title, required this.path});
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    insetPadding: const EdgeInsets.all(24),
+    child: SizedBox(
+      width: 920,
+      height: 720,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '关闭预览',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: PdfViewer.file(
+              path,
+              params: const PdfViewerParams(backgroundColor: Color(0xff171c22)),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

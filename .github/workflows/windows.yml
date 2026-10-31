@@ -67,6 +67,9 @@ jobs:
           if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
           & $iscc "/DAppVersion=$short" "/DAppBuild=$build" installer\wterm.iss
           Get-ChildItem build\windows\installer
+      - name: Smoke test silent installer
+        shell: pwsh
+        run: ./scripts/test-windows-installer.ps1
       - name: Upload native asset logs
         if: failure()
         uses: actions/upload-artifact@v4
