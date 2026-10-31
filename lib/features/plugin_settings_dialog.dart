@@ -20,6 +20,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool completion = pluginSettings.commandCompletion;
   late bool notifications = pluginSettings.taskNotifications;
   late bool imeAutoEnglish = pluginSettings.imeAutoEnglish;
+  late bool windowsHardwareInput = pluginSettings.windowsHardwareInput;
   bool saving = false;
   String? error;
 
@@ -36,6 +37,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         completion: completion,
         notifications: notifications,
         imeAutoEnglishNext: imeAutoEnglish,
+        windowsHardwareInputNext: windowsHardwareInput,
       );
       if (notifications) unawaited(systemNotifications.setup());
       if (mounted) Navigator.pop(context);
@@ -98,6 +100,18 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
                   : (value) => setState(() => imeAutoEnglish = value),
               title: const Text('终端自动切英文输入'),
               subtitle: const Text('聚焦终端时切到 ASCII 键盘，离开时恢复原输入法'),
+            ),
+          if (defaultTargetPlatform == TargetPlatform.windows)
+            SwitchListTile(
+              value: windowsHardwareInput,
+              onChanged: saving
+                  ? null
+                  : (value) => setState(() => windowsHardwareInput = value),
+              title: const Text('Windows 硬件键盘输入'),
+              subtitle: const Text(
+                '输入法异常或无法输入时的兼容模式：绕过 Flutter 文本输入，只接收硬件键盘；'
+                '中文输入法组字可能不可用',
+              ),
             ),
           const Align(
             alignment: Alignment.centerLeft,

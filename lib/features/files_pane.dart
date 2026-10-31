@@ -1511,43 +1511,54 @@ class _PdfPreviewDialog extends StatelessWidget {
   const _PdfPreviewDialog({required this.title, required this.path});
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    insetPadding: const EdgeInsets.all(24),
-    child: SizedBox(
-      width: 920,
-      height: 720,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-            child: Row(
-              children: [
-                const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+  Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+    final width = screen.width >= 960
+        ? 920.0
+        : (screen.width - 32).clamp(280.0, 920.0).toDouble();
+    final height = screen.height >= 780
+        ? 720.0
+        : (screen.height - 32).clamp(280.0, 720.0).toDouble();
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: '关闭预览',
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+                  IconButton(
+                    tooltip: '关闭预览',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: PdfViewer.file(
-              path,
-              params: const PdfViewerParams(backgroundColor: Color(0xff171c22)),
+            const Divider(height: 1),
+            Expanded(
+              child: PdfViewer.file(
+                path,
+                params: const PdfViewerParams(
+                  backgroundColor: Color(0xff171c22),
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

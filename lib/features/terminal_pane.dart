@@ -1419,6 +1419,9 @@ class _TerminalPaneState extends State<TerminalPane> {
                     },
                     autofocus: false,
                     readOnly: ended,
+                    hardwareKeyboardOnly:
+                        Theme.of(context).platform == TargetPlatform.windows &&
+                        pluginSettings.windowsHardwareInput,
                     padding: const EdgeInsets.all(12),
                     textStyle: TerminalStyle(
                       fontSize: terminalAppearance.fontSize.toDouble(),

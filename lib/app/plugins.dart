@@ -22,6 +22,7 @@ class PluginSettings extends ChangeNotifier {
   bool commandCompletion = true;
   bool taskNotifications = true;
   bool imeAutoEnglish = false;
+  bool windowsHardwareInput = false;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -43,6 +44,7 @@ class PluginSettings extends ChangeNotifier {
           commandCompletion = value['commandCompletion'] != false;
           taskNotifications = value['taskNotifications'] != false;
           imeAutoEnglish = value['imeAutoEnglish'] == true;
+          windowsHardwareInput = value['windowsHardwareInput'] == true;
         }
       }
     } catch (_) {
@@ -60,6 +62,7 @@ class PluginSettings extends ChangeNotifier {
     bool? completion,
     bool? notifications,
     bool? imeAutoEnglishNext,
+    bool? windowsHardwareInputNext,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
@@ -67,6 +70,7 @@ class PluginSettings extends ChangeNotifier {
     commandCompletion = completion ?? commandCompletion;
     taskNotifications = notifications ?? taskNotifications;
     imeAutoEnglish = imeAutoEnglishNext ?? imeAutoEnglish;
+    windowsHardwareInput = windowsHardwareInputNext ?? windowsHardwareInput;
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
@@ -80,6 +84,7 @@ class PluginSettings extends ChangeNotifier {
         'commandCompletion': commandCompletion,
         'taskNotifications': taskNotifications,
         'imeAutoEnglish': imeAutoEnglish,
+        'windowsHardwareInput': windowsHardwareInput,
       }),
       flush: true,
     );

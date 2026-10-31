@@ -39,12 +39,14 @@ void main() {
       final store = PluginSettings(file: () async => file);
       await store.load();
       expect(store.jsonFormatter, isTrue);
+      expect(store.windowsHardwareInput, isFalse);
       await store.save(
         json: false,
         ip: true,
         preview: false,
         completion: false,
         notifications: false,
+        windowsHardwareInputNext: true,
       );
       final restored = PluginSettings(file: () async => file);
       await restored.load();
@@ -53,6 +55,7 @@ void main() {
       expect(restored.filePreview, isFalse);
       expect(restored.commandCompletion, isFalse);
       expect(restored.taskNotifications, isFalse);
+      expect(restored.windowsHardwareInput, isTrue);
     } finally {
       await dir.delete(recursive: true);
     }
