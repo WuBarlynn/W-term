@@ -580,3 +580,9 @@ UI、实际桥接、测试、文档与双端构建。
 - 覆盖/保留并自动重命名/跳过冲突选项保留；“隐藏回显”不适用于 SFTP，未单独实现。
 - 验证：`build/flutter-tests-1.0.40.log` **301 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.40（93）；Windows CI 41188182230 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：真实拖拽（含 Windows）、超限大文件、文件夹拖拽与冲突选择；Windows 实体机输入/自动更新仍待复测。
+
+## 33. 完成度审计校正（2026-10-31）
+
+已完成并有三端构建/CI/测试证据：三平台发布与校验；Windows 安装包/静默安装 CI、独立窗口收回、输入兼容开关、等宽字体回退；macOS 自签名 DMG、窗口收回；字体枚举/内置/导入；PDF 与 OOXML 文本预览；右侧固定命令 Dock；跨标签下载队列；链接自动下划线；OSC 133 精确通知；自动 shell 探测；片段标签。
+
+仍不能标记完成：iPad 多窗口、ZMODEM 真实 lrzsz 互操作、Office 原排版渲染、在线字体市场、Linux 输入法、Windows/macOS 双架构、完整进程/端口操作实测，以及 Windows/Apple 真机日用验收。云同步按用户指示仅保留 GitHub，不作为缺口。
