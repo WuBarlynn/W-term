@@ -10,10 +10,10 @@ import 'terminal_appearance.dart';
 class SyncedSettings {
   static Future<String> export() async => jsonEncode({
     'version': 1,
-    'appearance': terminalAppearance.toJson(),
-    'plugins': pluginSettings.toJson(),
-    'pinned': pinnedCommands.toJson(),
-    'highlights': keywordHighlights.toJson(),
+    'appearance': await terminalAppearance.exportSynced(),
+    'plugins': await pluginSettings.exportSynced(),
+    'pinned': await pinnedCommands.exportSynced(),
+    'highlights': await keywordHighlights.exportSynced(),
   });
 
   static Future<void> import(String json) async {

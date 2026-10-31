@@ -95,6 +95,11 @@ class PinnedCommands extends ChangeNotifier {
     'entries': entries.map((entry) => entry.toJson()).toList(),
   };
 
+  Future<Map<String, Object?>> exportSynced() async {
+    await _pending.catchError((Object _) {});
+    return toJson();
+  }
+
   Future<void> applySynced(Object? data) async {
     if (data is! Map || data['entries'] is! List) return;
     final next = (data['entries'] as List)

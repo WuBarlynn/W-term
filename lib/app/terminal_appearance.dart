@@ -408,6 +408,11 @@ class TerminalAppearance extends ChangeNotifier {
     'copyOnSelect': copyOnSelect,
   };
 
+  Future<Map<String, Object?>> exportSynced() async {
+    await _pending.catchError((Object _) {});
+    return toJson();
+  }
+
   Future<void> applySynced(Object? data) async {
     if (data is! Map) return;
     final nextPalette = data['palette'];

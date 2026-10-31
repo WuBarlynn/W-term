@@ -247,4 +247,19 @@ void main() {
     expect(find.text('取消剩余任务'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  test('application upload queue exposes one running batch across panes', () {
+    uploadQueue.finish();
+    final first = UploadBatch('/one', ['a']);
+    uploadQueue.begin(first);
+    expect(uploadQueue.running, isTrue);
+    expect(identical(uploadQueue.batch, first), isTrue);
+    first.finish();
+    uploadQueue.finish();
+    expect(uploadQueue.running, isFalse);
+    final second = UploadBatch('/two', ['b']);
+    uploadQueue.begin(second);
+    expect(identical(uploadQueue.batch, second), isTrue);
+    uploadQueue.finish();
+  });
 }

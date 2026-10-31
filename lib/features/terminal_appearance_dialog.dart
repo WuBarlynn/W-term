@@ -8,6 +8,7 @@ import '../app/font_catalog.dart';
 import '../app/imported_fonts.dart';
 import '../app/terminal_appearance.dart';
 import '../app/errors.dart';
+import 'font_market_dialog.dart';
 
 class TerminalAppearanceDialog extends StatefulWidget {
   final TerminalAppearance store;
@@ -54,6 +55,18 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
     terminalFont.dispose();
     cjkFont.dispose();
     super.dispose();
+  }
+
+  Future<void> _openFontMarket() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => FontMarketDialog(
+        installed: importedFonts.names.toSet(),
+        install: (entry) =>
+            importedFonts.importUrl(Uri.parse(entry.url), entry.name),
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> editCustomTheme() async {
@@ -382,6 +395,11 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     onPressed: busy || importingFont ? null : _importFontUrl,
                     icon: const Icon(Icons.link, size: 18),
                     label: const Text('从 URL 安装'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: busy || importingFont ? null : _openFontMarket,
+                    icon: const Icon(Icons.storefront_outlined, size: 18),
+                    label: const Text('在线字体'),
                   ),
                   if (importingFont)
                     const SizedBox(

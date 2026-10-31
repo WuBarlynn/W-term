@@ -79,7 +79,6 @@ class FilesPaneState extends State<FilesPane> {
 
   @override
   void dispose() {
-    uploadBatch?.cancelRemaining();
     folderAccess?.release().catchError((Object _) {});
     path.dispose();
     search.dispose();
@@ -482,14 +481,18 @@ class FilesPaneState extends State<FilesPane> {
   }
 
   Future<void> showUploadTasks() async {
-    final batch = uploadBatch;
+    final batch = uploadQueue.batch;
     if (batch == null) return;
+    final canRetry =
+        identical(batch, uploadBatch) && uploadSources.isNotEmpty && !busy;
     final retry = await showDialog<bool>(
       context: context,
-      builder: (_) =>
-          UploadTasksDialog(batch: batch, allowRetry: !busy || batch.active),
+      builder: (_) => UploadTasksDialog(batch: batch, allowRetry: canRetry),
     );
-    if (retry == true && mounted && identical(batch, uploadBatch)) {
+    if (retry == true &&
+        mounted &&
+        canRetry &&
+        identical(batch, uploadQueue.batch)) {
       await uploadFiles(uploadSources, retryBatch: batch);
     }
   }
@@ -510,6 +513,12 @@ class FilesPaneState extends State<FilesPane> {
     FolderAccess? newFolderAccess,
   }) async {
     if (listing == null || busy || files.isEmpty) return;
+    if (retryBatch == null && uploadQueue.running) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先等待当前上传队列完成')),
+      );
+      return;
+    }
     final directory = retryBatch?.destination ?? destination ?? listing!.path;
     final batch =
         retryBatch ??
@@ -523,6 +532,7 @@ class FilesPaneState extends State<FilesPane> {
         ? List.generate(files.length, (i) => i)
         : batch.retryFailures();
     if (indices.isEmpty) return;
+    uploadQueue.begin(batch);
     if (retryBatch == null) {
       final previous = folderAccess;
       folderAccess = newFolderAccess;
@@ -535,10 +545,9 @@ class FilesPaneState extends State<FilesPane> {
       dragging = false;
       error = null;
     });
-    setState(() {
-      uploadBatch = batch;
-      uploadSources = List.unmodifiable(files);
-    });
+    uploadBatch = batch;
+    uploadSources = List.unmodifiable(files);
+    if (mounted) setState(() {});
     final conflictDecisions = UploadConflictDecisions();
     var uploaded = 0;
     var skipped = 0;
@@ -546,7 +555,7 @@ class FilesPaneState extends State<FilesPane> {
     final failures = <String>[];
     try {
       for (final index in indices) {
-        if (!mounted || !batch.start(index)) break;
+        if (!batch.start(index)) break;
         final file = files[index];
         Directory? temporary;
         var scoped = false;
@@ -594,7 +603,9 @@ class FilesPaneState extends State<FilesPane> {
               name == '..') {
             throw const FormatException('无效的文件名');
           }
-          setState(() => activity = '上传 $name（${index + 1}/${files.length}）…');
+          if (mounted) {
+            setState(() => activity = '上传 $name（${index + 1}/${files.length}）…');
+          }
           if (Platform.isMacOS && bookmark != null && bookmark.isNotEmpty) {
             scoped = await DesktopDrop.instance
                 .startAccessingSecurityScopedResource(bookmark: bookmark);
@@ -615,7 +626,6 @@ class FilesPaneState extends State<FilesPane> {
           temporary = await createAppTemporaryDirectory('wterm-upload-');
           final local = File('${temporary.path}/payload');
           await file.openRead().cast<List<int>>().pipe(local.openWrite());
-          if (!mounted) break;
           var policy = 'reject';
           while (mounted) {
             try {
@@ -705,6 +715,7 @@ class FilesPaneState extends State<FilesPane> {
         }
       } finally {
         batch.finish();
+        uploadQueue.finish();
         await transferAccess?.release();
       }
     }
@@ -1224,21 +1235,24 @@ class FilesPaneState extends State<FilesPane> {
                       ),
                     ),
                     ListenableBuilder(
-                      listenable: downloadQueue,
+                      listenable: Listenable.merge([uploadQueue, downloadQueue]),
                       builder: (context, _) {
-                        if (uploadBatch == null &&
+                        if (uploadQueue.batch == null &&
                             downloadQueue.batch == null &&
                             downloadTask == null) {
                           return const SizedBox.shrink();
                         }
+                        final running = uploadQueue.running
+                            ? Icons.cloud_upload_outlined
+                            : downloadQueue.running
+                            ? Icons.downloading
+                            : Icons.playlist_add_check;
                         return PopupMenuButton<String>(
                           tooltip: '传输任务',
                           icon: Icon(
-                            downloadQueue.running
-                                ? Icons.downloading
-                                : Icons.playlist_add_check,
+                            running,
                             size: 19,
-                            color: downloadQueue.running
+                            color: uploadQueue.running || downloadQueue.running
                                 ? Theme.of(context).colorScheme.primary
                                 : null,
                           ),
@@ -1252,10 +1266,10 @@ class FilesPaneState extends State<FilesPane> {
                             }
                           },
                           itemBuilder: (_) => [
-                            if (uploadBatch != null)
+                            if (uploadQueue.batch != null)
                               const PopupMenuItem(
                                 value: 'upload',
-                                child: Text('上传任务'),
+                                child: Text('上传队列'),
                               ),
                             if (downloadQueue.batch != null)
                               const PopupMenuItem(

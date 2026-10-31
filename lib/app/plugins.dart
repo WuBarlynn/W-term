@@ -78,6 +78,8 @@ class PluginSettings extends ChangeNotifier {
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
+  Future<Map<String, Object?>> exportSynced() async => toJson();
+
   Future<void> applySynced(Object? data) async {
     if (data is! Map) return;
     final maxUpload = data['maxUploadSizeMb'];

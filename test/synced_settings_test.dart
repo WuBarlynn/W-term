@@ -97,4 +97,17 @@ void main() {
     expect(store.palette, 'dark');
     expect(store.fontSize, 13);
   });
+
+  test('export waits for an in-flight appearance save', () async {
+    final dir = await Directory.systemTemp.createTemp('wterm-settings');
+    addTearDown(() => dir.delete(recursive: true));
+    final store = TerminalAppearance(
+      file: () async => File('${dir.path}/appearance.json'),
+    );
+    final saving = store.save('nord', 16);
+    final exported = await store.exportSynced();
+    await saving;
+    expect(exported['palette'], 'nord');
+    expect(exported['fontSize'], 16);
+  });
 }

@@ -107,3 +107,23 @@ List<UploadTask> filterUploadTasks(
       )
       .toList();
 }
+
+/// Application-wide upload queue. The batch keeps running when its originating
+/// file pane is disposed so another tab can observe progress.
+class UploadQueue extends ChangeNotifier {
+  UploadBatch? batch;
+  bool running = false;
+
+  void begin(UploadBatch next) {
+    batch = next;
+    running = true;
+    notifyListeners();
+  }
+
+  void finish() {
+    running = false;
+    notifyListeners();
+  }
+}
+
+final uploadQueue = UploadQueue();
