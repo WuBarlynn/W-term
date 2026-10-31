@@ -3461,6 +3461,7 @@ fn wire__crate__api__vault__vault_save_snippet_impl(
             let api_id = <String>::sse_decode(&mut deserializer);
             let api_name = <String>::sse_decode(&mut deserializer);
             let api_command = <String>::sse_decode(&mut deserializer);
+            let api_tags = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -3470,6 +3471,7 @@ fn wire__crate__api__vault__vault_save_snippet_impl(
                             api_id,
                             api_name,
                             api_command,
+                            api_tags,
                         )?;
                         std::result::Result::Ok(output_ok)
                     })(),

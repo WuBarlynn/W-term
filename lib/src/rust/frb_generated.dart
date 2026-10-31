@@ -540,6 +540,7 @@ abstract class RustLibApi extends BaseApi {
     required String id,
     required String name,
     required String command,
+    required List<String> tags,
   });
 
   Future<void> crateApiVaultVaultWrite({
@@ -3621,6 +3622,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String id,
     required String name,
     required String command,
+    required List<String> tags,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -3630,6 +3632,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(id, serializer);
           sse_encode_String(name, serializer);
           sse_encode_String(command, serializer);
+          sse_encode_list_String(tags, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -3642,7 +3645,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiVaultVaultSaveSnippetConstMeta,
-        argValues: [token, id, name, command],
+        argValues: [token, id, name, command, tags],
         apiImpl: this,
       ),
     );
@@ -3651,7 +3654,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVaultVaultSaveSnippetConstMeta =>
       const TaskConstMeta(
         debugName: "vault_save_snippet",
-        argNames: ["token", "id", "name", "command"],
+        argNames: ["token", "id", "name", "command", "tags"],
       );
 
   @override

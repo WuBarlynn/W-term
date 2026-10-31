@@ -33,11 +33,13 @@ Future<void> vaultSaveSnippet({
   required String id,
   required String name,
   required String command,
+  required List<String> tags,
 }) => RustLib.instance.api.crateApiVaultVaultSaveSnippet(
   token: token,
   id: id,
   name: name,
   command: command,
+  tags: tags,
 );
 
 Future<void> vaultDeleteSnippet({required String token, required String id}) =>

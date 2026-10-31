@@ -492,12 +492,26 @@ class NativeVaultSession
               s['id'] as String,
               s['name'] as String,
               s['command'] as String,
+              tags: [
+                for (final tag in (s['tags'] as List? ?? const []))
+                  if (tag is String) tag,
+              ],
             ),
           )
           .toList();
   @override
-  Future<void> saveSnippet(String id, String name, String command) => native
-      .vaultSaveSnippet(token: _token, id: id, name: name, command: command);
+  Future<void> saveSnippet(
+    String id,
+    String name,
+    String command, {
+    List<String> tags = const [],
+  }) => native.vaultSaveSnippet(
+    token: _token,
+    id: id,
+    name: name,
+    command: command,
+    tags: tags,
+  );
   @override
   Future<void> deleteSnippet(String id) =>
       native.vaultDeleteSnippet(token: _token, id: id);

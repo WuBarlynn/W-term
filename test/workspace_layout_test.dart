@@ -39,7 +39,12 @@ class OfflineSnippetStore extends KeychainHostStore implements SnippetStore {
     const CommandSnippet('1', 'Offline command', 'uptime'),
   ];
   @override
-  Future<void> saveSnippet(String id, String name, String command) async {}
+  Future<void> saveSnippet(
+    String id,
+    String name,
+    String command, {
+    List<String> tags = const [],
+  }) async {}
   @override
   Future<void> deleteSnippet(String id) async {}
 }

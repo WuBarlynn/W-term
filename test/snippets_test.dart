@@ -5,15 +5,23 @@ import 'package:wterm/app/snippet_store.dart';
 import 'package:wterm/features/snippets_dialog.dart';
 
 class MemorySnippets implements SnippetStore {
-  List<CommandSnippet> items = [const CommandSnippet('1', 'Disk', 'df -h')];
+  List<CommandSnippet> items = [
+    const CommandSnippet('1', 'Disk', 'df -h'),
+    const CommandSnippet('2', 'Deploy', 'make deploy', tags: ['ops']),
+  ];
   bool failSave = false;
   @override
   Future<List<CommandSnippet>> readSnippets() async => List.of(items);
   @override
-  Future<void> saveSnippet(String id, String name, String command) async {
+  Future<void> saveSnippet(
+    String id,
+    String name,
+    String command, {
+    List<String> tags = const [],
+  }) async {
     if (failSave) throw StateError('save unavailable');
     items.removeWhere((s) => s.id == id);
-    items.add(CommandSnippet(id.isEmpty ? '2' : id, name, command));
+    items.add(CommandSnippet(id.isEmpty ? '2' : id, name, command, tags: tags));
   }
 
   @override
@@ -91,14 +99,50 @@ void main() {
     expect(find.textContaining('save unavailable'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '磁盘空间'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'df -H'), findsOneWidget);
-    expect(store.items.single.command, 'df -h');
+    expect(store.items.firstWhere((s) => s.id == '1').command, 'df -h');
     store.failSave = false;
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('编辑片段'), findsNothing);
-    expect(store.items.single.id, '1');
-    expect(store.items.single.name, '磁盘空间');
-    expect(store.items.single.command, 'df -H');
+    final edited = store.items.firstWhere((s) => s.id == '1');
+    expect(edited.name, '磁盘空间');
+    expect(edited.command, 'df -H');
+  });
+
+  testWidgets('snippet tags filter the library and are saved on edit', (
+    tester,
+  ) async {
+    final store = MemorySnippets();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SnippetsDialog(
+            store: store,
+            allowInsert: false,
+            hostTags: ['prod'],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Deploy'), findsOneWidget);
+    await tester.tap(find.text('全部标签'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('#ops').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Deploy'), findsOneWidget);
+    expect(find.text('Disk'), findsNothing);
+
+    await tester.tap(find.text('Deploy'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '主机标签（逗号分隔，可选）'),
+      'ops, release',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    final saved = store.items.firstWhere((s) => s.name == 'Deploy');
+    expect(saved.tags, ['ops', 'release']);
   });
 
   test('rejects newlines, terminal escapes and excessive UTF-8 payloads', () {
@@ -167,14 +211,14 @@ void main() {
     );
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(store.items.length, 1);
+    expect(store.items.length, 2);
     await tester.enterText(
       find.widgetWithText(TextFormField, '单行命令'),
       'ps aux',
     );
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(store.items.length, 2);
+    expect(store.items.length, 3);
     await tester.enterText(find.widgetWithText(TextField, '搜索片段'), 'process');
     await tester.pumpAndSettle();
     expect(find.text('Processes'), findsOneWidget);

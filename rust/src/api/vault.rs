@@ -387,9 +387,30 @@ struct Snippet {
     id: String,
     name: String,
     command: String,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
-pub fn vault_save_snippet(token: String, id: String, name: String, command: String) -> Result<()> {
+pub fn vault_save_snippet(
+    token: String,
+    id: String,
+    name: String,
+    command: String,
+    tags: Vec<String>,
+) -> Result<()> {
+    let tags: Vec<String> = tags
+        .into_iter()
+        .map(|tag| tag.trim().to_string())
+        .filter(|tag| !tag.is_empty())
+        .map(|tag| {
+            ensure!(
+                tag.len() <= 48 && !tag.chars().any(|ch| ch.is_control()),
+                "片段标签无效"
+            );
+            Ok(tag)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    ensure!(tags.len() <= 20, "片段标签最多 20 个");
     with_vault(&token, |db| {
         let mut entries: Vec<Snippet> = serde_json::from_str(&read_record(db, "snippets")?)?;
         let id = if id.is_empty() {
@@ -406,6 +427,7 @@ pub fn vault_save_snippet(token: String, id: String, name: String, command: Stri
             id,
             name: name.trim().into(),
             command,
+            tags,
         });
         put_record(db, "snippets", &serde_json::to_string(&entries)?)
     })
@@ -1151,15 +1173,21 @@ mod tests {
             Ok(())
         })?;
         for command in ["ls\nreboot", "\u{1b}[200~", "", "tab\t"] {
-            assert!(
-                vault_save_snippet(token.clone(), "".into(), "Bad".into(), command.into()).is_err()
-            );
+            assert!(vault_save_snippet(
+                token.clone(),
+                "".into(),
+                "Bad".into(),
+                command.into(),
+                vec![]
+            )
+            .is_err());
         }
         vault_save_snippet(
             token.clone(),
             "".into(),
             "Secret snippet".into(),
             "echo unique-snippet-fixture".into(),
+            vec!["ops".into(), "prod".into()],
         )?;
         let entries: Vec<Snippet> =
             serde_json::from_str(&vault_read(token.clone(), "snippets".into())?)?;
@@ -1175,8 +1203,11 @@ mod tests {
             serde_json::from_str(&vault_read(token.clone(), "snippets".into())?)?;
         assert_eq!(restored.len(), 2);
         assert_ne!(restored[0].id, restored[1].id);
+        assert!(restored.iter().any(|s| s.tags == ["ops", "prod"]));
         vault_delete_snippet(token.clone(), id.clone())?;
-        assert!(vault_save_snippet(token.clone(), id, "stale".into(), "ls".into()).is_err());
+        assert!(
+            vault_save_snippet(token.clone(), id, "stale".into(), "ls".into(), vec![]).is_err()
+        );
         vault_lock(token.clone())?;
         assert!(vault_read(token, "snippets".into()).is_err());
         let bytes = std::fs::read(&path)?;

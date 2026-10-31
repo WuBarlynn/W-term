@@ -10,10 +10,12 @@ import '../app/pinned_commands.dart';
 class SnippetsDialog extends StatefulWidget {
   final SnippetStore store;
   final bool allowInsert;
+  final List<String> hostTags;
   const SnippetsDialog({
     super.key,
     required this.store,
     this.allowInsert = true,
+    this.hostTags = const [],
   });
   @override
   State<SnippetsDialog> createState() => _SnippetsDialogState();
@@ -22,6 +24,7 @@ class SnippetsDialog extends StatefulWidget {
 class _SnippetsDialogState extends State<SnippetsDialog> {
   List<CommandSnippet> entries = [];
   String query = '';
+  String? tagFilter;
   String? error;
   bool busy = true;
   int tab = 0;
@@ -104,8 +107,12 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
       barrierDismissible: false,
       builder: (_) => _SnippetEditor(
         entry: entry,
-        onSave: (name, command) =>
-            widget.store.saveSnippet(entry?.id ?? '', name, command),
+        onSave: (name, command, tags) => widget.store.saveSnippet(
+          entry?.id ?? '',
+          name,
+          command,
+          tags: tags,
+        ),
       ),
     );
     if (saved == true && mounted) await load();
@@ -242,11 +249,20 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final allTags = <String>{
+      ...widget.hostTags,
+      for (final entry in entries) ...entry.tags,
+    }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (tagFilter != null && !allTags.contains(tagFilter)) {
+      tagFilter = null;
+    }
     final visible = entries
         .where(
-          (s) => '${s.name}\n${s.command}'.toLowerCase().contains(
-            query.toLowerCase(),
-          ),
+          (s) =>
+              '${s.name}\n${s.command}'.toLowerCase().contains(
+                query.toLowerCase(),
+              ) &&
+              (tagFilter == null || s.tags.contains(tagFilter)),
         )
         .toList();
     return PopScope(
@@ -290,9 +306,30 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                 },
               ),
               const SizedBox(height: 8),
-              TextField(
-                decoration: const InputDecoration(labelText: '搜索片段'),
-                onChanged: (v) => setState(() => query = v),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: const InputDecoration(labelText: '搜索片段'),
+                      onChanged: (v) => setState(() => query = v),
+                    ),
+                  ),
+                  if (allTags.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: tagFilter ?? '',
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        const DropdownMenuItem(value: '', child: Text('全部标签')),
+                        for (final tag in allTags)
+                          DropdownMenuItem(value: tag, child: Text('#$tag')),
+                      ],
+                      onChanged: (value) => setState(
+                        () => tagFilter = value?.isEmpty == true ? null : value,
+                      ),
+                    ),
+                  ],
+                ],
               ),
               if (busy) const LinearProgressIndicator(),
               if (error != null)
@@ -318,7 +355,11 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                entry.command,
+                                [
+                                  if (entry.tags.isNotEmpty)
+                                    '#${entry.tags.join(' #')}',
+                                  entry.command,
+                                ].join('\n'),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -422,7 +463,8 @@ class _SnippetsDialogState extends State<SnippetsDialog> {
 
 class _SnippetEditor extends StatefulWidget {
   final CommandSnippet? entry;
-  final Future<void> Function(String name, String command) onSave;
+  final Future<void> Function(String name, String command, List<String> tags)
+  onSave;
   const _SnippetEditor({this.entry, required this.onSave});
   @override
   State<_SnippetEditor> createState() => _SnippetEditorState();
@@ -430,7 +472,8 @@ class _SnippetEditor extends StatefulWidget {
 
 class _SnippetEditorState extends State<_SnippetEditor> {
   late final name = TextEditingController(text: widget.entry?.name),
-      command = TextEditingController(text: widget.entry?.command);
+      command = TextEditingController(text: widget.entry?.command),
+      tags = TextEditingController(text: widget.entry?.tags.join(', '));
   final form = GlobalKey<FormState>();
   bool saving = false;
   String? error;
@@ -439,6 +482,7 @@ class _SnippetEditorState extends State<_SnippetEditor> {
     name.dispose();
     command.clear();
     command.dispose();
+    tags.dispose();
     super.dispose();
   }
 
@@ -449,7 +493,12 @@ class _SnippetEditorState extends State<_SnippetEditor> {
       error = null;
     });
     try {
-      await widget.onSave(name.text.trim(), command.text);
+      final parsedTags = tags.text
+          .split(RegExp(r'[,，]'))
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+      await widget.onSave(name.text.trim(), command.text, parsedTags);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
@@ -488,6 +537,15 @@ class _SnippetEditorState extends State<_SnippetEditor> {
                 enableSuggestions: false,
                 decoration: const InputDecoration(labelText: '单行命令'),
                 validator: (v) => validateSnippetCommand(v ?? ''),
+              ),
+              TextFormField(
+                controller: tags,
+                enabled: !saving,
+                maxLength: 480,
+                decoration: const InputDecoration(
+                  labelText: '主机标签（逗号分隔，可选）',
+                  hintText: '例如 production, database',
+                ),
               ),
               if (error != null)
                 Text(
