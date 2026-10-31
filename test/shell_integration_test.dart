@@ -24,4 +24,20 @@ void main() {
     );
     expect(fishDirectoryIntegrationCommand.contains('\n'), isFalse);
   });
+
+  test('command-finished hooks emit OSC 133;D for every shell', () {
+    for (final entry in {
+      'bash': bashCommandFinishedIntegrationCommand,
+      'zsh': zshCommandFinishedIntegrationCommand,
+      'fish': fishCommandFinishedIntegrationCommand,
+    }.entries) {
+      expect(entry.value, contains(r'\033]133;D;%s\007'));
+      expect(entry.value.contains('\n'), isFalse, reason: entry.key);
+      expect(shellCommandFinishedIntegrationCommandFor(entry.key), entry.value);
+    }
+    expect(
+      shellCommandFinishedIntegrationCommandFor('unknown'),
+      bashCommandFinishedIntegrationCommand,
+    );
+  });
 }

@@ -948,6 +948,8 @@ class _TerminalPaneState extends State<TerminalPane> {
       );
     } else if (value == 'shell-integration') {
       await shellIntegration();
+    } else if (value == 'command-finished-hook') {
+      await commandFinishedHook();
     }
   }
 
@@ -981,6 +983,44 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已发送目录上报设置；文件面板可开启跟随')));
+    }
+  }
+
+  Future<void> commandFinishedHook() async {
+    final shell = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('命令完成通知钩子'),
+        content: const Text(
+          '把 OSC 133;D 完成标记注入当前 shell，使任务完成通知在命令结束时立即触发，'
+          '而不是等待输出空闲。只对当前会话生效，不会修改 shell 启动文件。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'fish'),
+            child: const Text('fish'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'zsh'),
+            child: const Text('zsh'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'bash'),
+            child: const Text('bash'),
+          ),
+        ],
+      ),
+    );
+    if (shell == null) return;
+    _sendInput('${shellCommandFinishedIntegrationCommandFor(shell)}\n');
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已发送命令完成通知钩子；长命令结束时会精确提示')));
     }
   }
 
@@ -1214,6 +1254,15 @@ class _TerminalPaneState extends State<TerminalPane> {
                 const PopupMenuDivider(),
               ],
               const PopupMenuItem(value: 'highlight', child: Text('关键字高亮…')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'shell-integration',
+                child: Text('目录上报（文件跟随）'),
+              ),
+              const PopupMenuItem(
+                value: 'command-finished-hook',
+                child: Text('命令完成通知钩子'),
+              ),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'horizontal', child: Text('水平分屏')),
               const PopupMenuItem(value: 'vertical', child: Text('垂直分屏')),

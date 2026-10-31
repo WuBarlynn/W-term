@@ -366,6 +366,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       username: username,
       onEnded: () => _terminalEnded(terminal.connectionId),
       onActivity: () => taskMonitor.activity(terminal.connectionId),
+      onCommandFinished: (exitCode) =>
+          taskMonitor.commandFinished(terminal.connectionId, exitCode: exitCode),
       onCommand: (command) {
         unawaited(
           commandHistory.record(
@@ -674,6 +676,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           _terminalEnded(connectedId);
         },
         onActivity: () => taskMonitor.activity(connectedId),
+        onCommandFinished: (exitCode) =>
+            taskMonitor.commandFinished(connectedId, exitCode: exitCode),
         onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
         onZmodemRequest: _requestZmodemFiles,
         onCommand: (command) {
@@ -947,6 +951,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         snapshot: snapshot,
         onEnded: () => _terminalEnded(connectionId),
         onActivity: () => taskMonitor.activity(connectionId),
+        onCommandFinished: (exitCode) =>
+            taskMonitor.commandFinished(connectionId, exitCode: exitCode),
         onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
         onZmodemRequest: _requestZmodemFiles,
         onCommand: (command) {
@@ -1069,14 +1075,17 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         unawaited(
           systemNotifications.showTask(
             title: completion.title,
-            body: '$fullCommand（${completion.elapsed.inSeconds} 秒）',
+            body:
+                '$fullCommand（${completion.elapsed.inSeconds} 秒'
+                '${completion.exitCode == null ? '' : '，退出码 ${completion.exitCode}'}）',
           ),
         );
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '任务完成 · ${completion.title} · $command（${completion.elapsed.inSeconds} 秒）',
+            '任务完成 · ${completion.title} · $command（${completion.elapsed.inSeconds} 秒'
+            '${completion.exitCode == null ? '' : '，退出码 ${completion.exitCode}'}）',
           ),
           action: SnackBarAction(
             label: '查看',
@@ -1507,6 +1516,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         snapshot: snapshot,
         onEnded: () => _terminalEnded(session.id),
         onActivity: () => taskMonitor.activity(session.id),
+        onCommandFinished: (exitCode) =>
+            taskMonitor.commandFinished(session.id, exitCode: exitCode),
         onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
         onZmodemRequest: _requestZmodemFiles,
         onCommand: (command) {

@@ -51,6 +51,7 @@ class TerminalSession extends ChangeNotifier {
   final Terminal terminal = _WTermTerminal(maxLines: 5000);
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
+  void Function(int? exitCode)? onCommandFinished;
   final VoidCallback? onActivity;
   final void Function(ZModemOffer offer)? onZmodemOffer;
   final Future<Iterable<ZModemOffer>> Function()? onZmodemRequest;
@@ -86,6 +87,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.onCommandFinished,
     this.onActivity,
     this.onZmodemOffer,
     this.onZmodemRequest,
@@ -103,6 +105,7 @@ class TerminalSession extends ChangeNotifier {
     required String snapshot,
     required this.onEnded,
     this.onCommand,
+    this.onCommandFinished,
     this.onActivity,
     this.onZmodemOffer,
     this.onZmodemRequest,
@@ -118,6 +121,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.onCommandFinished,
     this.onActivity,
     this.onZmodemOffer,
     this.onZmodemRequest,
@@ -128,6 +132,7 @@ class TerminalSession extends ChangeNotifier {
     _local = true;
     terminal.onOutput = _handleTerminalInput;
     terminal.onResize = _resize;
+    terminal.onPrivateOSC = _handlePrivateOsc;
     unawaited(_startLocalPty());
   }
 
@@ -167,6 +172,22 @@ class TerminalSession extends ChangeNotifier {
 
   bool get isLocal => _local;
 
+  void _handlePrivateOsc(String code, List<String> args) {
+    if (code == '133') {
+      if (args.isNotEmpty && args.first == 'D') {
+        final exitCode = args.length > 1 ? int.tryParse(args[1]) : null;
+        onCommandFinished?.call(exitCode);
+      }
+      return;
+    }
+    if (code != '7' || args.isEmpty) return;
+    final uri = Uri.tryParse(args.first);
+    final value = uri?.path;
+    if (value == null || value.isEmpty) return;
+    currentDirectory = Uri.decodeComponent(value);
+    notifyListeners();
+  }
+
   void _startLive() {
     final mux = ZModemMux(stdout: _wire.stream, stdin: _zmodemInput.sink)
       ..onTerminalInput = terminal.write
@@ -192,14 +213,7 @@ class TerminalSession extends ChangeNotifier {
     );
     terminal.onOutput = _handleTerminalInput;
     terminal.onResize = _resize;
-    terminal.onPrivateOSC = (code, args) {
-      if (code != '7' || args.isEmpty) return;
-      final uri = Uri.tryParse(args.first);
-      final value = uri?.path;
-      if (value == null || value.isEmpty) return;
-      currentDirectory = Uri.decodeComponent(value);
-      notifyListeners();
-    };
+    terminal.onPrivateOSC = _handlePrivateOsc;
     _output = native
         .terminalOutput(connectionId: connectionId)
         .listen(
@@ -229,6 +243,7 @@ class TerminalSession extends ChangeNotifier {
     required this.username,
     required this.onEnded,
     this.onCommand,
+    this.onCommandFinished,
     this.onActivity,
     this.onZmodemOffer,
     this.onZmodemRequest,
@@ -238,6 +253,7 @@ class TerminalSession extends ChangeNotifier {
        _offline = true {
     _ended = true;
     terminal.onOutput = _handleTerminalInput;
+    terminal.onPrivateOSC = _handlePrivateOsc;
     terminal.write('\r\n\x1b[90m上次会话已断开，使用“重新连接”恢复。\x1b[0m\r\n');
   }
 

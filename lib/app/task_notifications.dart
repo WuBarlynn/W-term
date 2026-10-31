@@ -7,11 +7,13 @@ import 'plugins.dart';
 class TaskCompletion {
   final String sessionId, title, command;
   final Duration elapsed;
+  final int? exitCode;
   const TaskCompletion({
     required this.sessionId,
     required this.title,
     required this.command,
     required this.elapsed,
+    this.exitCode,
   });
 }
 
@@ -81,9 +83,15 @@ class TaskMonitor extends ChangeNotifier {
     task.idle = Timer(idleDelay, () => _finish(sessionId));
   }
 
-  void _finish(String sessionId) {
+  /// Called when a shell integration OSC 133;D marker arrives. This is more
+  /// precise than the idle heuristic for silent commands.
+  void commandFinished(String sessionId, {int? exitCode}) =>
+      _finish(sessionId, exitCode: exitCode);
+
+  void _finish(String sessionId, {int? exitCode}) {
     final task = _tasks.remove(sessionId);
     if (task == null) return;
+    task.idle?.cancel();
     final elapsed = _now().difference(task.startedAt);
     if (elapsed < minimumDuration) return;
     _pending.add(
@@ -92,6 +100,7 @@ class TaskMonitor extends ChangeNotifier {
         title: task.title,
         command: task.command,
         elapsed: elapsed,
+        exitCode: exitCode,
       ),
     );
     notifyListeners();

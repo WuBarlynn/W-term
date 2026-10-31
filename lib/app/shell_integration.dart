@@ -11,3 +11,20 @@ const fishDirectoryIntegrationCommand =
 String shellDirectoryIntegrationCommandFor(String shell) => shell == 'fish'
     ? fishDirectoryIntegrationCommand
     : shellDirectoryIntegrationCommand;
+
+// OSC 133;D is emitted just before the next prompt. It lets the app finish a
+// command notification immediately instead of waiting for output to go idle.
+const bashCommandFinishedIntegrationCommand =
+    r'''__wterm_done() { printf '\033]133;D;%s\007' "$?"; }; PROMPT_COMMAND="__wterm_done${PROMPT_COMMAND:+; $PROMPT_COMMAND}"''';
+const zshCommandFinishedIntegrationCommand =
+    r'''autoload -Uz add-zsh-hook; __wterm_done() { printf '\033]133;D;%s\007' "$?"; }; add-zsh-hook precmd __wterm_done''';
+const fishCommandFinishedIntegrationCommand =
+    r'''function __wterm_done --on-event fish_postexec; printf '\033]133;D;%s\007' $status; end''';
+
+String shellCommandFinishedIntegrationCommandFor(String shell) =>
+    switch (shell) {
+      'bash' => bashCommandFinishedIntegrationCommand,
+      'zsh' => zshCommandFinishedIntegrationCommand,
+      'fish' => fishCommandFinishedIntegrationCommand,
+      _ => bashCommandFinishedIntegrationCommand,
+    };
