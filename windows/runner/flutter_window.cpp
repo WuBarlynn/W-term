@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <flutter/standard_method_codec.h>
+#include <imm.h>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_multi_window/desktop_multi_window_plugin.h"
@@ -88,6 +89,26 @@ bool FlutterWindow::OnCreate() {
         }
         result->Success(flutter::EncodableValue(values));
       });
+  ime_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "dev.wterm/biometrics",
+          &flutter::StandardMethodCodec::GetInstance());
+  ime_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() != "setAsciiInput") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* ascii = std::get_if<bool>(call.arguments());
+        if (ascii == nullptr) {
+          result->Error("bad_args", "setAsciiInput expects a bool");
+          return;
+        }
+        SetAsciiInput(*ascii);
+        result->Success();
+      });
   DesktopMultiWindowSetWindowCreatedCallback([](void* controller) {
     auto* flutter_view_controller =
         reinterpret_cast<flutter::FlutterViewController*>(controller);
@@ -110,7 +131,32 @@ bool FlutterWindow::OnCreate() {
   return true;
 }
 
+void FlutterWindow::SetAsciiInput(bool ascii) {
+  HIMC context = ImmGetContext(GetHandle());
+  if (context == nullptr) {
+    return;
+  }
+  if (ascii) {
+    DWORD conversion = 0;
+    DWORD sentence = 0;
+    if (ImmGetConversionStatus(context, &conversion, &sentence)) {
+      if (!ime_has_previous_) {
+        ime_previous_conversion_ = conversion;
+        ime_previous_sentence_ = sentence;
+        ime_has_previous_ = true;
+      }
+      ImmSetConversionStatus(context, IME_CMODE_ALPHANUMERIC, IME_SMODE_NONE);
+    }
+  } else if (ime_has_previous_) {
+    ImmSetConversionStatus(context, static_cast<DWORD>(ime_previous_conversion_),
+                           static_cast<DWORD>(ime_previous_sentence_));
+    ime_has_previous_ = false;
+  }
+  ImmReleaseContext(GetHandle(), context);
+}
+
 void FlutterWindow::OnDestroy() {
+  SetAsciiInput(false);
   UnregisterHotKey(GetHandle(), 1);
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

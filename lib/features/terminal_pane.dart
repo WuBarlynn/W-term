@@ -156,7 +156,11 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   void _applyImeState() {
-    if (!(Theme.of(context).platform == TargetPlatform.macOS)) return;
+    final platform = Theme.of(context).platform;
+    if (platform != TargetPlatform.macOS &&
+        platform != TargetPlatform.windows) {
+      return;
+    }
     unawaited(
       _imeChannel
           .invokeMethod<void>(
@@ -1245,7 +1249,6 @@ class _TerminalPaneState extends State<TerminalPane> {
     for (final highlight in List.of(controller.highlights)) {
       highlight.dispose();
     }
-    widget.session.terminal.onOutput = widget.session.send;
     focus.dispose();
     controller.dispose();
     super.dispose();
