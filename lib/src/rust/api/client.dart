@@ -7,8 +7,13 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `mutable_remote_path`, `numbered_upload_path`, `replace_upload`, `upload_metadata`
+// These functions are ignored because they are not marked as `pub`: `clear_transfer_progress`, `download_file_inner`, `mutable_remote_path`, `numbered_upload_path`, `replace_upload`, `report_transfer_progress`, `transfer_progress_map`, `upload_file_with_policy_inner`, `upload_metadata`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+Future<int> transferProgress({required String operationId}) => RustLib
+    .instance
+    .api
+    .crateApiClientTransferProgress(operationId: operationId);
 
 Future<ServerIdentity> probeServer({required String host, required int port}) =>
     RustLib.instance.api.crateApiClientProbeServer(host: host, port: port);
@@ -113,6 +118,18 @@ Future<int> downloadFile({
   localPath: localPath,
 );
 
+Future<int> downloadFileProgress({
+  required String connectionId,
+  required String remotePath,
+  required String localPath,
+  required String operationId,
+}) => RustLib.instance.api.crateApiClientDownloadFileProgress(
+  connectionId: connectionId,
+  remotePath: remotePath,
+  localPath: localPath,
+  operationId: operationId,
+);
+
 Future<int> uploadFile({
   required String connectionId,
   required String localPath,
@@ -135,6 +152,20 @@ Future<UploadResult> uploadFileWithPolicy({
   localPath: localPath,
   remotePath: remotePath,
   policy: policy,
+);
+
+Future<UploadResult> uploadFileWithPolicyProgress({
+  required String connectionId,
+  required String localPath,
+  required String remotePath,
+  required String policy,
+  required String operationId,
+}) => RustLib.instance.api.crateApiClientUploadFileWithPolicyProgress(
+  connectionId: connectionId,
+  localPath: localPath,
+  remotePath: remotePath,
+  policy: policy,
+  operationId: operationId,
 );
 
 /// SFTP v3 rename refuses replacement, including a concurrently-created target.

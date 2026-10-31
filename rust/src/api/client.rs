@@ -2,6 +2,8 @@ use crate::{frb_generated::StreamSink, session};
 use anyhow::{bail, Context, Result};
 use russh::ChannelMsg;
 use russh_sftp::protocol::OpenFlags;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -19,6 +21,34 @@ pub struct RemoteEntry {
     pub size: u64,
     pub modified_at: Option<u32>,
 }
+static TRANSFER_PROGRESS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+
+fn transfer_progress_map() -> &'static Mutex<HashMap<String, u64>> {
+    TRANSFER_PROGRESS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn report_transfer_progress(operation_id: Option<&str>, bytes: u64) {
+    let Some(id) = operation_id else { return };
+    if let Ok(mut map) = transfer_progress_map().lock() {
+        map.insert(id.to_string(), bytes);
+    }
+}
+
+fn clear_transfer_progress(operation_id: Option<&str>) {
+    let Some(id) = operation_id else { return };
+    if let Ok(mut map) = transfer_progress_map().lock() {
+        map.remove(id);
+    }
+}
+
+pub fn transfer_progress(operation_id: String) -> u64 {
+    transfer_progress_map()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&operation_id).copied())
+        .unwrap_or(0)
+}
+
 #[derive(Clone, Debug)]
 pub struct DirectoryListing {
     pub path: String,
@@ -217,6 +247,27 @@ pub async fn download_file(
     remote_path: String,
     local_path: String,
 ) -> Result<u64> {
+    download_file_inner(connection_id, remote_path, local_path, None).await
+}
+
+pub async fn download_file_progress(
+    connection_id: String,
+    remote_path: String,
+    local_path: String,
+    operation_id: String,
+) -> Result<u64> {
+    let result =
+        download_file_inner(connection_id, remote_path, local_path, Some(&operation_id)).await;
+    clear_transfer_progress(Some(&operation_id));
+    result
+}
+
+async fn download_file_inner(
+    connection_id: String,
+    remote_path: String,
+    local_path: String,
+    operation_id: Option<&str>,
+) -> Result<u64> {
     let sftp = session::sftp(&connection_id).await?;
     let before = sftp.metadata(&remote_path).await?;
     if !before.is_regular() {
@@ -229,7 +280,18 @@ pub async fn download_file(
         .open(&local_path)
         .await?;
     let result: Result<u64> = async {
-        let n = tokio::io::copy(&mut source, &mut target).await?;
+        let mut buffer = vec![0u8; 64 * 1024];
+        let mut n = 0u64;
+        report_transfer_progress(operation_id, 0);
+        loop {
+            let read = source.read(&mut buffer).await?;
+            if read == 0 {
+                break;
+            }
+            target.write_all(&buffer[..read]).await?;
+            n += read as u64;
+            report_transfer_progress(operation_id, n);
+        }
         target.flush().await?;
         let after = sftp.metadata(&remote_path).await?;
         if before.size != after.size || before.mtime != after.mtime || after.size != Some(n) {
@@ -333,6 +395,35 @@ pub async fn upload_file_with_policy(
     remote_path: String,
     policy: String,
 ) -> Result<UploadResult> {
+    upload_file_with_policy_inner(connection_id, local_path, remote_path, policy, None).await
+}
+
+pub async fn upload_file_with_policy_progress(
+    connection_id: String,
+    local_path: String,
+    remote_path: String,
+    policy: String,
+    operation_id: String,
+) -> Result<UploadResult> {
+    let result = upload_file_with_policy_inner(
+        connection_id,
+        local_path,
+        remote_path,
+        policy,
+        Some(&operation_id),
+    )
+    .await;
+    clear_transfer_progress(Some(&operation_id));
+    result
+}
+
+async fn upload_file_with_policy_inner(
+    connection_id: String,
+    local_path: String,
+    remote_path: String,
+    policy: String,
+    operation_id: Option<&str>,
+) -> Result<UploadResult> {
     anyhow::ensure!(
         ["reject", "replace", "keepBoth"].contains(&policy.as_str()),
         "Invalid upload policy"
@@ -357,7 +448,18 @@ pub async fn upload_file_with_policy(
         )
         .await?;
     let result = async {
-        let n = tokio::io::copy(&mut source, &mut target).await?;
+        let mut buffer = vec![0u8; 64 * 1024];
+        let mut n = 0u64;
+        report_transfer_progress(operation_id, 0);
+        loop {
+            let read = source.read(&mut buffer).await?;
+            if read == 0 {
+                break;
+            }
+            target.write_all(&buffer[..read]).await?;
+            n += read as u64;
+            report_transfer_progress(operation_id, n);
+        }
         target.flush().await?;
         target.shutdown().await?;
         anyhow::ensure!(n == expected, "Local file changed during upload");

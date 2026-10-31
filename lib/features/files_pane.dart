@@ -277,11 +277,40 @@ class FilesPaneState extends State<FilesPane> {
           );
           batch.complete(index, '已下载 $count 个文件');
         } else {
-          await native.downloadFile(
-            connectionId: widget.connectionId,
-            remotePath: entry.path,
-            localPath: _uniqueLocal(batch.destination, entry.name),
-          );
+          final operationId =
+              'download-${DateTime.now().microsecondsSinceEpoch}-$index';
+          final total = entry.size;
+          var polling = false;
+          final timer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
+            if (polling) return;
+            polling = true;
+            try {
+              final sent = await native.transferProgress(
+                operationId: operationId,
+              );
+              if (total > 0) {
+                final percent = (sent * 100 / total).clamp(0, 100).round();
+                batch.progress(
+                  index,
+                  '$percent% · ${formatSize(sent)} / ${formatSize(total)}',
+                );
+              }
+            } catch (_) {
+              // Progress is best-effort; the transfer result remains authoritative.
+            } finally {
+              polling = false;
+            }
+          });
+          try {
+            await native.downloadFileProgress(
+              connectionId: widget.connectionId,
+              remotePath: entry.path,
+              localPath: _uniqueLocal(batch.destination, entry.name),
+              operationId: operationId,
+            );
+          } finally {
+            timer.cancel();
+          }
           batch.complete(index, '已保存');
         }
       } catch (e) {
@@ -626,14 +655,44 @@ class FilesPaneState extends State<FilesPane> {
           temporary = await createAppTemporaryDirectory('wterm-upload-');
           final local = File('${temporary.path}/payload');
           await file.openRead().cast<List<int>>().pipe(local.openWrite());
+          final operationId =
+              'upload-${DateTime.now().microsecondsSinceEpoch}-$index';
+          var polling = false;
+          final progressTimer = Timer.periodic(
+            const Duration(milliseconds: 200),
+            (_) async {
+              if (polling) return;
+              polling = true;
+              try {
+                final sent = await native.transferProgress(
+                  operationId: operationId,
+                );
+                if (uploadBytes > 0) {
+                  final percent = (sent * 100 / uploadBytes)
+                      .clamp(0, 100)
+                      .round();
+                  batch.progress(
+                    index,
+                    '$percent% · ${formatSize(sent)} / ${formatSize(uploadBytes)}',
+                  );
+                }
+              } catch (_) {
+                // Progress is best-effort; the transfer result remains authoritative.
+              } finally {
+                polling = false;
+              }
+            },
+          );
           var policy = 'reject';
+          try {
           while (mounted) {
             try {
-              final result = await native.uploadFileWithPolicy(
+              final result = await native.uploadFileWithPolicyProgress(
                 connectionId: widget.connectionId,
                 localPath: local.path,
                 remotePath: '${directory == '/' ? '' : directory}/$relative',
                 policy: policy,
+                operationId: operationId,
               );
               uploaded++;
               batch.complete(
@@ -669,6 +728,9 @@ class FilesPaneState extends State<FilesPane> {
               }
               policy = choice;
             }
+          }
+          } finally {
+            progressTimer.cancel();
           }
         } catch (e) {
           final message = userFacingError(e);

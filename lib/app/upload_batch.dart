@@ -49,6 +49,12 @@ class UploadBatch extends ChangeNotifier {
     return true;
   }
 
+  void progress(int index, String detail) {
+    if (tasks[index].state != UploadState.running) return;
+    tasks[index].detail = detail;
+    notifyListeners();
+  }
+
   void complete(int index, String detail) =>
       _finish(index, UploadState.completed, detail);
   void fail(int index, String detail) =>
