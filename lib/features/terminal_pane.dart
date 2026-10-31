@@ -531,7 +531,11 @@ class _TerminalPaneState extends State<TerminalPane> {
               child: SingleChildScrollView(
                 child: SelectableText(
                   text,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontFamilyFallback: monoFontFallback,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -811,7 +815,11 @@ class _TerminalPaneState extends State<TerminalPane> {
           child: SingleChildScrollView(
             child: SelectableText(
               formatted,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontFamilyFallback: monoFontFallback,
+                fontSize: 12,
+              ),
             ),
           ),
         ),
@@ -1970,7 +1978,12 @@ class _LinkUnderlinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || terminal.isUsingAltBuffer) return;
-    final dynamic target = render();
+    dynamic target;
+    try {
+      target = render();
+    } catch (_) {
+      return;
+    }
     if (target == null) return;
     try {
       final cell = target.cellSize as Size;

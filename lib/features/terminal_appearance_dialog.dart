@@ -646,6 +646,7 @@ class _ThemeEditorDialogState extends State<_ThemeEditorDialog> {
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontFamily: 'monospace',
+                                  fontFamilyFallback: monoFontFallback,
                                 ),
                                 decoration: const InputDecoration(
                                   isDense: true,
@@ -687,6 +688,7 @@ class _ThemeEditorDialogState extends State<_ThemeEditorDialog> {
                 style: TextStyle(
                   color: theme.foreground,
                   fontFamily: 'monospace',
+                  fontFamilyFallback: monoFontFallback,
                   fontSize: 12,
                 ),
               ),
@@ -754,6 +756,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                       ? Colors.white
                       : Colors.black,
                   fontFamily: 'monospace',
+                  fontFamilyFallback: monoFontFallback,
                 ),
               ),
             ),

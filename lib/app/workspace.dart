@@ -1,3 +1,4 @@
+import 'font_catalog.dart';
 import 'interactive_auth.dart';
 import 'connection_route.dart';
 import 'forward_store.dart';
@@ -570,7 +571,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                     const SizedBox(height: 20),
                     SelectableText(
                       identity.fingerprint,
-                      style: const TextStyle(fontFamily: 'Menlo', fontSize: 13),
+                      style: const TextStyle(
+                        fontFamily: 'Menlo',
+                        fontFamilyFallback: monoFontFallback,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(

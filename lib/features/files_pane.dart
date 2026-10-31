@@ -1,3 +1,4 @@
+import '../app/font_catalog.dart';
 import '../app/errors.dart';
 import '../app/directory_history.dart';
 import 'directory_history_bar.dart';
@@ -1150,6 +1151,7 @@ class FilesPaneState extends State<FilesPane> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontFamily: 'Menlo',
+                          fontFamilyFallback: monoFontFallback,
                         ),
                         decoration: const InputDecoration(
                           prefixIcon: Icon(Icons.folder_outlined, size: 18),
@@ -1542,6 +1544,7 @@ class _FilePreviewDialogState extends State<_FilePreviewDialog> {
                   widget.text,
                   style: const TextStyle(
                     fontFamily: 'Menlo',
+                    fontFamilyFallback: monoFontFallback,
                     fontSize: 12,
                     height: 1.45,
                   ),

@@ -13,6 +13,8 @@ void main() {
     expect(commonCjkFonts, contains('Noto Sans SC'));
     expect(platformDefaultUiFont(), isNotEmpty);
     expect(platformDefaultTerminalFont(), isNotEmpty);
+    expect(monoFontFallback, contains('Cascadia Mono'));
+    expect(monoFontFallback, contains('Menlo'));
   });
 
   test('font files referenced by pubspec exist', () {

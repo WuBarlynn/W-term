@@ -7,6 +7,14 @@ import 'imported_fonts.dart';
 
 /// Fonts shipped with the app. They are registered through pubspec and are
 /// available even when the operating system has no CJK or coding font.
+const monoFontFallback = <String>[
+  'Cascadia Mono',
+  'SF Mono',
+  'Menlo',
+  'Consolas',
+  'monospace',
+];
+
 const bundledFonts = <String>['JetBrains Mono', 'Noto Sans SC'];
 
 const commonUiFonts = <String>[

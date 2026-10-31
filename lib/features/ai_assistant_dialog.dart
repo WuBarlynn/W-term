@@ -1,3 +1,5 @@
+import '../app/font_catalog.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -506,7 +508,10 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
               const SizedBox(height: 12),
               SelectableText(
                 command,
-                style: const TextStyle(fontFamily: 'monospace'),
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontFamilyFallback: monoFontFallback,
+                ),
               ),
             ],
           ),
@@ -638,6 +643,7 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
                                 message.command!,
                                 style: const TextStyle(
                                   fontFamily: 'monospace',
+                                  fontFamilyFallback: monoFontFallback,
                                   fontSize: 12,
                                 ),
                               ),

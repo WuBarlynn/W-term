@@ -1,3 +1,5 @@
+import '../app/font_catalog.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -138,7 +140,11 @@ class _RemoteTextEditorState extends State<RemoteTextEditor> {
                   keyboardType: TextInputType.multiline,
                   autocorrect: false,
                   enableSuggestions: false,
-                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 13),
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontFamilyFallback: monoFontFallback,
+                    fontSize: 13,
+                  ),
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                   ),

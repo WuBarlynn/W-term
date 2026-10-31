@@ -1,3 +1,5 @@
+import '../app/font_catalog.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -154,7 +156,10 @@ class _CommandHistoryDialogState extends State<CommandHistoryDialog> {
                             entry.command,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontFamily: 'monospace'),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontFamilyFallback: monoFontFallback,
+                            ),
                           ),
                           subtitle: Text(
                             '${_time(entry.at)} · ${entry.username}@${entry.host}',

@@ -1,3 +1,5 @@
+import '../app/font_catalog.dart';
+
 import 'package:flutter/material.dart';
 
 /// Searches an in-memory snapshot, so incoming output cannot move results while
@@ -100,6 +102,7 @@ class _TerminalSearchState extends State<TerminalSearch> {
                                   lines[line],
                                   style: const TextStyle(
                                     fontFamily: 'Menlo',
+                                    fontFamilyFallback: monoFontFallback,
                                     fontSize: 13,
                                   ),
                                 ),

@@ -1,3 +1,5 @@
+import '../app/font_catalog.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -463,6 +465,7 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                           filteredOutput,
                           style: const TextStyle(
                             fontFamily: 'monospace',
+                            fontFamilyFallback: monoFontFallback,
                             fontSize: 12,
                             color: Color(0xffd3d8df),
                             height: 1.45,
