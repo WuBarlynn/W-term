@@ -6,7 +6,7 @@
 
 - 终端外观新增行高调节，范围 0.9–2.0、步进 0.1，默认 1.2。
 - 行高随外观文件保存，并纳入 GitHub 加密设置同步；预览区域同步显示行高。
-- 验证：Flutter 全量 **322 项**通过，`flutter analyze` 无问题。
+- 验证：Flutter 全量 **322 项**通过，`flutter analyze` 无问题；macOS Apple Silicon 与 Intel 自签名 DMG 通过签名、架构与镜像校验；iOS IPA 完成；Windows CI [41243773487](https://github.com/WuBarlynn/W-term/actions/runs/41243773487) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.59 主机正则高亮规则（2026-10-31）
 
