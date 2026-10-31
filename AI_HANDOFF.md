@@ -594,7 +594,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 终端字体默认 Menlo；Windows 硬件键盘输入默认开启（`windowsHardwareInput` 缺省为 `Platform.isWindows`）。
 - 新增同步 `Kind::Settings` 与保险库 `settings` 记录；`SyncedSettings` 聚合终端外观、插件、固定命令和关键词高亮，所有会发布或接收快照的同步操作前后自动导出/应用。设置不进入仅本机范围。
 - 生成无白边圆角图标；iOS 保持不透明。
-- 验证：Flutter **305 项**、Rust 同步 **93 项**、`flutter analyze` 通过；三端构建结果待本轮发布记录补充。
+- 验证：Flutter **305 项**、Rust 同步 **93 项**、`flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41199329162](https://github.com/WuBarlynn/W-term/actions/runs/41199329162) 成功。发布包位于 `build/release-1.0.42/`。Windows 实机输入、双设备设置同步与自动更新仍待验收。
 
 ## 34. 1.0.41 Windows 终端字体回退（2026-10-31）
 

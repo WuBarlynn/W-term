@@ -10,7 +10,7 @@
 - 终端字体默认改为 Menlo；Windows 仍保留等宽字体回退链。
 - 应用设置（终端外观、插件开关、固定命令、关键词高亮）随 GitHub 加密同步；设置作为单条同步记录参与三方合并与冲突审阅，不扩展仅本机范围。
 - macOS、iOS、Windows 图标统一为无白边圆角图标；iOS 保持不透明满幅。
-- 验证：Flutter 全量 **305 项**通过，`flutter analyze` 无问题；Rust 同步测试 **93 项**通过；三端构建与本轮真机验收状态见下文与交接文档。
+- 验证：Flutter 全量 **305 项**通过，`flutter analyze` 无问题；Rust 同步测试 **93 项**通过；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41199329162](https://github.com/WuBarlynn/W-term/actions/runs/41199329162) 成功（构建、启动冒烟、静默安装卸载、Rust 测试）。三端实机输入、设置双向同步与更新安装仍未验收。
 
 ## 1.0.41 Windows 终端字体回退（2026-10-31）
 
