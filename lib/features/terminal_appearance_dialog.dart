@@ -22,6 +22,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String palette = widget.store.palette;
   late int size = widget.store.fontSize;
   late double lineHeight = widget.store.lineHeight;
+  late String fontWeight = widget.store.fontWeight;
   late String uiTheme = widget.store.uiTheme;
   late String skin = widget.store.skin;
   late bool copyOnSelect = widget.store.copyOnSelect;
@@ -260,6 +261,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextCopyOnSelect: copyOnSelect,
         nextCursorStyle: cursorStyle,
         nextLineHeight: lineHeight,
+        nextFontWeight: fontWeight,
         nextBottomPadding: bottomPadding,
         nextScrollback: scrollback,
         nextUiToneFollowsTerminal: uiToneFollowsTerminal,
@@ -469,6 +471,22 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                       ),
               ),
               DropdownButtonFormField<String>(
+                initialValue: fontWeight,
+                decoration: const InputDecoration(labelText: '字重'),
+                items: [
+                  for (final entry
+                      in TerminalAppearance.fontWeightNames.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: busy
+                    ? null
+                    : (value) =>
+                          setState(() => fontWeight = value ?? 'normal'),
+              ),
+              DropdownButtonFormField<String>(
                 initialValue: cursorStyle,
                 decoration: const InputDecoration(labelText: '光标样式'),
                 items: const [
@@ -537,6 +555,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     color: theme.foreground,
                     fontSize: size.toDouble(),
                     height: lineHeight,
+                    fontWeight: TerminalAppearance.fontWeights[fontWeight],
                     fontFamily: terminalFont.text.trim().isEmpty
                         ? platformDefaultTerminalFont()
                         : terminalFont.text.trim(),

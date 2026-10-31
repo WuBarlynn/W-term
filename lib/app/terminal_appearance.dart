@@ -108,6 +108,18 @@ class TerminalAppearance extends ChangeNotifier {
     'onelight': 'One Light',
     'custom': '自定义',
   };
+  static const fontWeights = {
+    'normal': FontWeight.w400,
+    'medium': FontWeight.w500,
+    'semibold': FontWeight.w600,
+    'bold': FontWeight.w700,
+  };
+  static const fontWeightNames = {
+    'normal': '常规',
+    'medium': '中等',
+    'semibold': '半粗',
+    'bold': '粗体',
+  };
   static const customColorLabels = {
     'background': '背景',
     'foreground': '前景',
@@ -136,12 +148,15 @@ class TerminalAppearance extends ChangeNotifier {
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
   double lineHeight = 1.2;
+  String fontWeight = 'normal';
   bool copyOnSelect = false;
   String cursorStyle = 'block';
   int bottomPadding = 0;
   int scrollback = 5000;
   bool uiToneFollowsTerminal = false;
   Map<String, int> customColors = const {};
+  FontWeight get terminalFontWeight =>
+      fontWeights[fontWeight] ?? FontWeight.w400;
   Future<void> _pending = Future.value();
 
   /// Seeds the editor from a built-in palette instead of starting blank.
@@ -404,6 +419,10 @@ class TerminalAppearance extends ChangeNotifier {
           storedLineHeight <= 2) {
         lineHeight = storedLineHeight.toDouble();
       }
+      final storedWeight = value['fontWeight'];
+      if (storedWeight is String && fontWeights.containsKey(storedWeight)) {
+        fontWeight = storedWeight;
+      }
       final storedPadding = value['bottomPadding'];
       if (storedPadding is int && storedPadding >= 0 && storedPadding <= 64) {
         bottomPadding = storedPadding;
@@ -426,6 +445,7 @@ class TerminalAppearance extends ChangeNotifier {
     'palette': palette,
     'fontSize': fontSize,
     'lineHeight': lineHeight,
+    'fontWeight': fontWeight,
     'uiTheme': uiTheme,
     'uiFont': uiFont,
     'terminalFont': terminalFont,
@@ -495,6 +515,10 @@ class TerminalAppearance extends ChangeNotifier {
       nextLineHeight: data['lineHeight'] is num
           ? (data['lineHeight'] as num).toDouble()
           : lineHeight,
+      nextFontWeight: data['fontWeight'] is String &&
+              fontWeights.containsKey(data['fontWeight'])
+          ? data['fontWeight'] as String
+          : fontWeight,
       nextBottomPadding: data['bottomPadding'] is int
           ? data['bottomPadding'] as int
           : bottomPadding,
@@ -517,6 +541,7 @@ class TerminalAppearance extends ChangeNotifier {
     bool? nextCopyOnSelect,
     String? nextCursorStyle,
     double? nextLineHeight,
+    String? nextFontWeight,
     int? nextBottomPadding,
     int? nextScrollback,
     bool? nextUiToneFollowsTerminal,
@@ -524,6 +549,7 @@ class TerminalAppearance extends ChangeNotifier {
     final nextMode = nextUiTheme ?? uiTheme;
     final nextCursor = nextCursorStyle ?? cursorStyle;
     final nextLine = (nextLineHeight ?? lineHeight).clamp(0.9, 2.0).toDouble();
+    final nextWeight = nextFontWeight ?? fontWeight;
     final nextPadding = (nextBottomPadding ?? bottomPadding).clamp(0, 64);
     final nextScroll = (nextScrollback ?? scrollback).clamp(1000, 100000);
     final nextColors = nextCustomColors ?? customColors;
@@ -540,6 +566,7 @@ class TerminalAppearance extends ChangeNotifier {
         nextSize > 28 ||
         nextLine < 0.9 ||
         nextLine > 2.0 ||
+        !fontWeights.containsKey(nextWeight) ||
         !{'system', 'dark', 'light'}.contains(nextMode) ||
         !{'block', 'underline', 'verticalBar'}.contains(nextCursor) ||
         !validColors) {
@@ -562,6 +589,7 @@ class TerminalAppearance extends ChangeNotifier {
           'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
           'cursorStyle': nextCursor,
           'lineHeight': nextLine,
+          'fontWeight': nextWeight,
           'bottomPadding': nextPadding,
           'scrollback': nextScroll,
           'uiToneFollowsTerminal':
@@ -581,6 +609,7 @@ class TerminalAppearance extends ChangeNotifier {
       copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
       cursorStyle = nextCursor;
       lineHeight = nextLine;
+      fontWeight = nextWeight;
       bottomPadding = nextPadding;
       scrollback = nextScroll;
       uiToneFollowsTerminal =

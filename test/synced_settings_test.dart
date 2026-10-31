@@ -19,6 +19,7 @@ void main() {
       'palette': 'nord',
       'fontSize': 15,
       'lineHeight': 1.5,
+      'fontWeight': 'medium',
       'uiTheme': 'dark',
       'terminalFont': 'Menlo',
       'skin': 'aurora',
@@ -27,6 +28,7 @@ void main() {
     expect(store.palette, 'nord');
     expect(store.fontSize, 15);
     expect(store.lineHeight, 1.5);
+    expect(store.fontWeight, 'medium');
     expect(store.uiTheme, 'dark');
     expect(store.terminalFont, 'Menlo');
     expect(store.skin, 'aurora');

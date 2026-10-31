@@ -69,6 +69,7 @@ void main() {
       nextCopyOnSelect: true,
       nextCursorStyle: 'verticalBar',
       nextLineHeight: 1.6,
+      nextFontWeight: 'semibold',
       nextBottomPadding: 24,
       nextScrollback: 20000,
       nextUiToneFollowsTerminal: true,
@@ -82,6 +83,8 @@ void main() {
     expect(restored.copyOnSelect, isTrue);
     expect(restored.cursorStyle, 'verticalBar');
     expect(restored.lineHeight, 1.6);
+    expect(restored.fontWeight, 'semibold');
+    expect(restored.terminalFontWeight, FontWeight.w600);
     expect(restored.bottomPadding, 24);
     expect(restored.scrollback, 20000);
     expect(restored.uiToneFollowsTerminal, isTrue);
