@@ -25,25 +25,24 @@ fi
 # Generate Flutter/plugin configuration once; Xcode builds without signing,
 # then this script applies the stable self-signed identity manually.
 flutter build macos "--$mode" --no-pub --config-only
-work_dir="$PWD/build/macos-signed"
+target_arch="${WTERM_MACOS_ARCH:-$(uname -m)}"
+case "$target_arch" in
+  arm64) work_dir="$PWD/build/macos-signed" ;;
+  x86_64) work_dir="$PWD/build/macos-signed-x86_64" ;;
+  *) printf 'Unsupported Mac architecture: %s\n' "$target_arch" >&2; exit 1 ;;
+esac
 mkdir -p "$work_dir"
 settings_file=$(mktemp "$work_dir/settings.XXXXXX")
 entitlements_file=$(mktemp "$work_dir/selfsigned-entitlements.XXXXXX.plist")
 trap 'rm -f "$settings_file" "$entitlements_file"' EXIT
-
-host_arch=$(uname -m)
-case "$host_arch" in
-  arm64|x86_64) ;;
-  *) printf 'Unsupported Mac architecture: %s\n' "$host_arch" >&2; exit 1 ;;
-esac
 
 xcode_args=(
   -workspace macos/Runner.xcworkspace
   -scheme Runner
   -configuration "$configuration"
   -derivedDataPath "$work_dir"
-  -destination "platform=macOS,arch=$host_arch"
-  "ARCHS=$host_arch"
+  -destination "platform=macOS,arch=$target_arch"
+  "ARCHS=$target_arch"
   CODE_SIGNING_ALLOWED=NO
   CODE_SIGNING_REQUIRED=NO
   CODE_SIGN_IDENTITY=
@@ -83,7 +82,7 @@ with open(dst, 'wb') as f:
     plistlib.dump(ent, f, fmt=plistlib.FMT_XML, sort_keys=True)
 PY
 
-printf 'Building %s (%s) without Xcode provisioning...\n' "$configuration" "$host_arch"
+printf 'Building %s (%s) without Xcode provisioning...\n' "$configuration" "$target_arch"
 xcodebuild -quiet "${xcode_args[@]}" build
 
 if [[ ! -d "$app" ]]; then

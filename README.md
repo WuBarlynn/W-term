@@ -83,7 +83,7 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 
 最新三端安装包与校验文件位于 GitHub Releases：
 
-- macOS：`wterm-macos-<version>.dmg`
+- macOS：`wterm-macos-<version>.dmg`（Apple Silicon）、`wterm-macos-<version>-intel.dmg`（Intel）
 - iOS：`wterm-ios-<version>-unsigned.ipa`
 - Windows：`wterm-windows-<version>-setup.exe`、`wterm-windows-<version>-portable.zip`
 
@@ -95,7 +95,7 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 - Rust 1.98.1
 - flutter_rust_bridge 2.13.0
 - Xcode（Apple 平台）
-- macOS 14+ / Apple Silicon，iOS / iPadOS 17+
+- macOS 14+ / Apple Silicon 或 Intel，iOS / iPadOS 17+
 
 项目内工具链：
 

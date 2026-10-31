@@ -78,7 +78,7 @@
 - [x] Windows 安装包已加入 CI（Inno Setup）；macOS DMG 已加入脚本
 - [~] GitHub Release 检查；SHA256SUMS 校验；Windows 静默安装/重启；macOS 下载并打开 DMG；iOS 无自动安装
 - [ ] Web 端
-- [ ] Windows x86_64 苹果芯片双架构发布（当前 macOS arm64、Windows x64）
+- [x] macOS Apple Silicon 与 Intel 双架构 DMG；Windows 仍为 x64
 - [~] 桌面托盘/菜单栏、`wterm://connect` 深链接、固定全局快捷键、本地 Shell（桌面 PTY）已实现；输入法自动切换仍缺
 
 ## 同步、账号与协作
@@ -97,7 +97,7 @@
 ### 1.0.52 仍未完成
 
 - 同步/协作：Gist/S3 后端、版本回滚、多端在线状态、Cloud Term 云账号、组织/团队共享与角色权限、SSH 公钥目录、审计日志、Web 端。
-- 终端/平台：iPad 多窗口、Windows/macOS 双架构发布、完整进程/端口操作实测。
+- 终端/平台：iPad 多窗口、完整进程/端口操作实测。
 - 引导/界面：分享图片缺图片剪贴板；终端行高/字重受 xterm 渲染限制；顶部状态栏仅含延迟/CPU/内存。
 - 文件/片段：隐藏回显（当前 SFTP 上传路径不适用）、上传队列跨会话恢复。
 - 插件/桌面：Windows 独立窗口/托盘/深链接/全局快捷键实测、Windows 输入与自动更新实测、macOS 收回实测。
