@@ -299,6 +299,23 @@ class NativeVaultSession
   Future<String> runSync() =>
       _withSyncedSettings(() => sync_native.syncRun(token: _token));
   @override
+  Future<List<SyncRevision>> syncHistory() async {
+    final entries = await sync_native.syncHistory(token: _token);
+    return [
+      for (final entry in entries)
+        SyncRevision(entry.revision, entry.committedAt, entry.message),
+    ];
+  }
+
+  @override
+  Future<String> restoreSync(String revision) => _withSyncedSettings(
+    () => sync_native.syncRestore(
+      token: _token,
+      revision: revision,
+      confirmation: '恢复此版本',
+    ),
+  );
+  @override
   Future<SyncReview?> syncConflicts() async {
     final r = await sync_native.syncConflicts(token: _token);
     if (r == null) return null;

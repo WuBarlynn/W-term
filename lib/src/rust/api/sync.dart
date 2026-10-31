@@ -27,6 +27,19 @@ Future<void> syncSaveSettings({
 Future<String> syncCheck({required String token}) =>
     RustLib.instance.api.crateApiSyncSyncCheck(token: token);
 
+Future<List<SyncHistoryEntry>> syncHistory({required String token}) =>
+    RustLib.instance.api.crateApiSyncSyncHistory(token: token);
+
+Future<String> syncRestore({
+  required String token,
+  required String revision,
+  required String confirmation,
+}) => RustLib.instance.api.crateApiSyncSyncRestore(
+  token: token,
+  revision: revision,
+  confirmation: confirmation,
+);
+
 Future<String> syncInitialize({
   required String token,
   required String mode,
@@ -256,6 +269,31 @@ class SyncDisconnectInfo {
           target == other.target &&
           initialized == other.initialized &&
           blockedReason == other.blockedReason;
+}
+
+class SyncHistoryEntry {
+  final String revision;
+  final String committedAt;
+  final String message;
+
+  const SyncHistoryEntry({
+    required this.revision,
+    required this.committedAt,
+    required this.message,
+  });
+
+  @override
+  int get hashCode =>
+      revision.hashCode ^ committedAt.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncHistoryEntry &&
+          runtimeType == other.runtimeType &&
+          revision == other.revision &&
+          committedAt == other.committedAt &&
+          message == other.message;
 }
 
 class SyncRotationStatus {

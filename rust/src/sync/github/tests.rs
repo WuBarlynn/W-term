@@ -144,6 +144,28 @@ impl Fake {
                     json!({"ref":"refs/heads/sync","object":{"type":"commit","sha":self.head}}),
                 )
             }
+            ("GET", p) if p.starts_with("/commits?") => {
+                let mut items = Vec::new();
+                let mut cursor = Some(self.head.clone());
+                while let Some(id) = cursor {
+                    let Some(commit) = self.commits.get(&id) else {
+                        break;
+                    };
+                    items.push(json!({
+                        "sha":id,
+                        "commit":{
+                            "message":"W Term encrypted sync",
+                            "author":{"date":"2026-10-31T00:00:00Z"}
+                        }
+                    }));
+                    cursor = commit["parents"]
+                        .as_array()
+                        .and_then(|parents| parents.first())
+                        .and_then(|parent| parent["sha"].as_str())
+                        .map(str::to_owned);
+                }
+                (200, Value::Array(items))
+            }
             ("GET", p) if p.starts_with("/git/commits/") => (
                 200,
                 self.commits.get(&p[13..]).cloned().unwrap_or(Value::Null),
@@ -676,6 +698,55 @@ async fn manual_sync_creates_joins_merges_and_preserves_conflicts() -> Result<()
         TOKEN
     )
     .is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn history_lists_commits_and_restore_republishes_old_snapshot_without_force() -> Result<()> {
+    use crate::sync::service;
+    let server = Server::new().await;
+    let client = server.client();
+    let dir = tempfile::tempdir()?;
+    let mut a = service_db(&dir);
+    put_record(
+        &a,
+        "snippets",
+        r#"[{"id":"a","name":"A","command":"echo old"}]"#,
+    )?;
+    let code = service::initialize_with(&mut a, "create", PASSWORD, &client).await?;
+    service::confirm(&mut a, &code)?;
+    service::run_with(&mut a, &client).await?;
+    let first = server.data.lock().unwrap().head.clone();
+    put_record(
+        &a,
+        "snippets",
+        r#"[{"id":"a","name":"A","command":"echo new"}]"#,
+    )?;
+    service::run_with(&mut a, &client).await?;
+    let second = server.data.lock().unwrap().head.clone();
+    assert_ne!(first, second);
+    let history = service::history_with(&mut a, &client).await?;
+    assert!(history.len() >= 2);
+    assert_eq!(history[0].revision, second);
+    assert!(history.iter().any(|entry| entry.revision == first));
+    let before = server.data.lock().unwrap().mutations();
+    if let Err(error) = service::restore_with(&mut a, &first, &client).await {
+        panic!("restore failed: {error:#}");
+    }
+    let restored_head = server.data.lock().unwrap().head.clone();
+    assert_ne!(restored_head, first);
+    assert_ne!(restored_head, second);
+    assert!(server.data.lock().unwrap().mutations() > before);
+    let value: Value = serde_json::from_str(&a.query_row(
+        "SELECT value FROM records WHERE kind='snippets'",
+        [],
+        |row| row.get::<_, String>(0),
+    )?)?;
+    assert_eq!(value[0]["command"], json!("echo old"));
+    let head = server.data.lock().unwrap().head.clone();
+    service::run_with(&mut a, &client).await?;
+    assert_eq!(head, server.data.lock().unwrap().head);
+    assert!(service::restore_with(&mut a, &head, &client).await.is_err());
     Ok(())
 }
 

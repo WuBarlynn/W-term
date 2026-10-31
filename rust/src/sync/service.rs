@@ -210,6 +210,110 @@ pub fn confirm(db: &mut Connection, code: &str) -> Result<()> {
     tx.commit()?;
     Ok(())
 }
+pub async fn history(db: &mut Connection) -> Result<Vec<github::HistoryEntry>> {
+    let c = config(db)?.context("请先保存仓库设置")?;
+    history_with(db, &c.client()?).await
+}
+
+pub(super) async fn history_with(
+    db: &mut Connection,
+    client: &github::GitHub,
+) -> Result<Vec<github::HistoryEntry>> {
+    let c = config(db)?.context("请先保存仓库设置")?;
+    ensure!(
+        c.recovery_confirmed && c.repo_id > 0,
+        "请先完成同步空间设置并核验恢复码"
+    );
+    ensure!(
+        client.repository(true).await? == c.repo_id,
+        "GitHub 仓库身份已变化，已停止读取历史"
+    );
+    client.history().await
+}
+
+pub async fn restore(db: &mut Connection, revision: &str, confirmation: &str) -> Result<String> {
+    ensure!(confirmation == "恢复此版本", "请输入确认文本以恢复历史版本");
+    let c = config(db)?.context("请先保存仓库设置")?;
+    ensure!(
+        c.recovery_confirmed && c.repo_id > 0,
+        "请先完成同步空间设置并核验恢复码"
+    );
+    restore_with(db, revision, &c.client()?).await
+}
+
+pub(super) async fn restore_with(
+    db: &mut Connection,
+    revision: &str,
+    client: &github::GitHub,
+) -> Result<String> {
+    let c = config(db)?.context("请先保存仓库设置")?;
+    ensure!(
+        client.repository(true).await? == c.repo_id,
+        "GitHub 仓库身份已变化，已停止恢复"
+    );
+    let s = state::load(db)?.context("请先创建或接入同步空间")?;
+    ensure!(
+        !s.has_pending(),
+        "存在待处理同步，请先完成同步再恢复历史版本"
+    );
+    ensure!(
+        s.fetch_revision() == s.remote_revision(),
+        "同步密钥接入尚未完成，请先完成一次普通同步"
+    );
+    let head = client.fetch(None).await?;
+    ensure!(
+        s.remote_revision() == Some(head.revision.as_str()),
+        "远端已更新，请先同步并处理变更后再恢复历史版本"
+    );
+    ensure!(revision != head.revision, "该版本已是当前同步版本");
+    let head_snapshot = decode_history(&head, db, s.space())?;
+    ensure!(
+        head_snapshot == *s.base_snapshot(),
+        "本机同步基线与远端不一致，请先完成一次普通同步"
+    );
+    let current = vault::capture(db, s.local_snapshot(), s.device())?;
+    ensure!(
+        current == *s.base_snapshot(),
+        "本机存在尚未同步的修改，请先同步后再恢复历史版本"
+    );
+    let old = client.files_at(revision).await?;
+    ensure!(old.revision == revision, "历史版本已变化，请刷新列表");
+    let snapshot = decode_history(&old, db, s.space())?;
+    let snapshot = state::rollback_snapshot(s.base_snapshot(), &snapshot, s.device())?;
+    let generation = s.generation();
+    match state::prepare(db, generation, &snapshot, Some(old.revision.clone()))? {
+        state::Preparation::Conflicts(_) => {
+            anyhow::bail!("历史版本与当前数据存在冲突，请先同步并处理冲突后再试")
+        }
+        state::Preparation::Ready(_) => {}
+    }
+    ensure!(
+        client.repository(true).await? == c.repo_id,
+        "GitHub 仓库身份已变化，已停止恢复"
+    );
+    let generation = state::load(db)?.context("同步状态不存在")?.generation();
+    state::retarget_rollback(db, generation, &head.revision)?;
+    client.publish(db, generation).await?;
+    Ok("已按所选历史版本创建新的同步提交，当前数据已回到该版本".into())
+}
+
+fn decode_history(files: &github::RemoteFiles, db: &Connection, space: &str) -> Result<Snapshot> {
+    let (key, envelope) = crypto::load(db)?.context("同步密钥不存在")?;
+    let remote_envelope =
+        crypto::KeyEnvelope::decode(files.envelope.as_deref().context("历史版本缺少密钥文件")?)?;
+    ensure!(
+        remote_envelope.encode()? == envelope.encode()?,
+        "历史版本密钥与当前同步空间不一致"
+    );
+    let snapshot = crypto::decrypt(
+        files.packet.as_deref().context("历史版本缺少同步数据")?,
+        &key,
+    )?
+    .snapshot;
+    ensure!(snapshot.space == space, "历史版本不属于当前同步空间");
+    Ok(snapshot)
+}
+
 pub async fn run(db: &mut Connection) -> Result<String> {
     let c = config(db)?.context("请先保存仓库设置")?;
     let client = c.client()?;

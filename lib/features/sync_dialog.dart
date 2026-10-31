@@ -6,6 +6,7 @@ import 'sync_conflicts_dialog.dart';
 import 'sync_rotation_dialog.dart';
 import 'sync_scope_dialog.dart';
 import 'sync_disconnect_dialog.dart';
+import 'sync_history_dialog.dart';
 
 class SyncDialog extends StatefulWidget {
   final SyncStore store;
@@ -523,6 +524,33 @@ class _SyncDialogState extends State<SyncDialog> {
                               }
                             },
                       child: const Text('处理同步冲突'),
+                    ),
+
+                    OutlinedButton(
+                      onPressed: busy || settingsDirty || p.pending
+                          ? null
+                          : () async {
+                              final result = await showDialog<String>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => SyncHistoryDialog(
+                                  store: widget.store,
+                                  currentRevision: p.revision,
+                                ),
+                              );
+                              if (!mounted) return;
+                              if (result != null) {
+                                setState(() => message = result);
+                              }
+                              try {
+                                await refresh();
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() => message = userFacingError(e));
+                                }
+                              }
+                            },
+                      child: const Text('版本历史'),
                     ),
 
                     Text(

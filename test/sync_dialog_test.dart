@@ -117,6 +117,10 @@ class MemorySync implements SyncStore {
   @override
   Future<SyncReview?> syncConflicts() async => null;
   @override
+  Future<List<SyncRevision>> syncHistory() async => const [];
+  @override
+  Future<String> restoreSync(String revision) async => '已恢复';
+  @override
   Future<String> resolveSync(String reviewId, List<SyncChoice> choices) async =>
       '同步完成';
   @override

@@ -62,6 +62,12 @@ pub struct RemoteFiles {
     pub packet: Option<Vec<u8>>,
     pub envelope: Option<Vec<u8>>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HistoryEntry {
+    pub revision: String,
+    pub committed_at: String,
+    pub message: String,
+}
 #[derive(Debug)]
 struct HttpFailure {
     status: u16,
@@ -164,6 +170,7 @@ impl GitHub {
             ("GET", p) if p.starts_with("/git/commits/") => "读取提交",
             ("GET", p) if p.starts_with("/git/trees/") => "读取文件目录",
             ("GET", p) if p.starts_with("/git/blobs/") => "读取同步文件",
+            ("GET", p) if p.starts_with("/commits") => "读取同步历史",
             ("POST", "/git/blobs") => "上传加密文件",
             ("POST", "/git/trees") => "创建文件目录",
             ("POST", "/git/commits") => "创建同步提交",
@@ -399,6 +406,77 @@ impl GitHub {
             ensure!(self.contains(&head, pinned).await?, "远端历史已回退或分叉");
         }
         self.files(&self.commit(&head).await?).await
+    }
+    /// Reads one immutable historical commit after proving it is in branch ancestry.
+    pub async fn files_at(&self, revision: &str) -> Result<RemoteFiles> {
+        tokio::time::timeout(Duration::from_secs(120), self.files_at_inner(revision))
+            .await
+            .map_err(|_| anyhow::anyhow!("GitHub 历史版本读取超时"))?
+    }
+    async fn files_at_inner(&self, revision: &str) -> Result<RemoteFiles> {
+        self.repository(false).await?;
+        let head = self.head().await?;
+        sha(revision)?;
+        ensure!(
+            self.contains(&head, revision).await?,
+            "远端历史已回退或分叉"
+        );
+        self.files(&self.commit(revision).await?).await
+    }
+    /// Lists commits on the current branch that contain the encrypted packet.
+    pub async fn history(&self) -> Result<Vec<HistoryEntry>> {
+        tokio::time::timeout(Duration::from_secs(120), self.history_inner())
+            .await
+            .map_err(|_| anyhow::anyhow!("GitHub 历史读取超时"))?
+    }
+    async fn history_inner(&self) -> Result<Vec<HistoryEntry>> {
+        self.repository(false).await?;
+        let head = self.head().await?;
+        let r = self
+            .request(
+                Method::GET,
+                &format!("/commits?sha={head}&path={PACKET_FILE}&per_page=30"),
+                None,
+                200,
+                META_LIMIT,
+            )
+            .await?;
+        let items = r.as_array().context("GitHub 同步历史格式无效")?;
+        ensure!(
+            !items.is_empty() && items.len() <= 30,
+            "GitHub 同步历史数量无效"
+        );
+        let mut entries = Vec::with_capacity(items.len());
+        let mut seen = BTreeSet::new();
+        for item in items {
+            let revision = sha(text_field(item, "sha")?)?;
+            ensure!(seen.insert(revision.clone()), "GitHub 同步历史包含重复提交");
+            let commit = item.get("commit").context("GitHub 同步历史缺少提交信息")?;
+            let message = text_field(commit, "message")?;
+            ensure!(
+                message.len() <= 4096 && !message.contains('\0'),
+                "GitHub 同步历史消息无效"
+            );
+            let date = commit
+                .get("author")
+                .and_then(|author| author.get("date"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            ensure!(
+                date.len() <= 64 && date.bytes().all(|b| b.is_ascii_graphic()),
+                "GitHub 同步历史时间无效"
+            );
+            entries.push(HistoryEntry {
+                revision,
+                committed_at: date.into(),
+                message: message.chars().take(200).collect(),
+            });
+        }
+        ensure!(
+            entries.iter().any(|entry| entry.revision == head),
+            "同步历史与当前分支不一致"
+        );
+        Ok(entries)
     }
     async fn create_blob(&self, bytes: &[u8]) -> Result<String> {
         let r = self

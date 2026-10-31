@@ -37,6 +37,8 @@ abstract interface class SyncStore {
   Future<String> initializeSync(String mode, String secret);
   Future<void> confirmSyncRecovery(String code);
   Future<String> runSync();
+  Future<List<SyncRevision>> syncHistory();
+  Future<String> restoreSync(String revision);
   Future<String> adoptSyncKey(String mode, String secret);
   Future<SyncReview?> syncConflicts();
   Future<String> resolveSync(String reviewId, List<SyncChoice> choices);
@@ -48,8 +50,7 @@ abstract interface class SyncStore {
   Future<String> publishRotation(String batchId);
 }
 
-class SyncConflictEntry {
-  final String kind, id, localSummary, remoteSummary;
+class SyncConflictEntry {  final String kind, id, localSummary, remoteSummary;
   final bool localDeleted, remoteDeleted;
   final List<String> changedFields;
   const SyncConflictEntry({
@@ -67,6 +68,11 @@ class SyncReview {
   final String id;
   final List<SyncConflictEntry> items;
   const SyncReview(this.id, this.items);
+}
+
+class SyncRevision {
+  final String revision, committedAt, message;
+  const SyncRevision(this.revision, this.committedAt, this.message);
 }
 
 class SyncChoice {

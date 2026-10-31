@@ -130,6 +130,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SyncConflictItem> dco_decode_list_sync_conflict_item(dynamic raw);
 
   @protected
+  List<SyncHistoryEntry> dco_decode_list_sync_history_entry(dynamic raw);
+
+  @protected
   List<SyncScopeItem> dco_decode_list_sync_scope_item(dynamic raw);
 
   @protected
@@ -196,6 +199,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncDisconnectInfo dco_decode_sync_disconnect_info(dynamic raw);
+
+  @protected
+  SyncHistoryEntry dco_decode_sync_history_entry(dynamic raw);
 
   @protected
   SyncRotationStatus dco_decode_sync_rotation_status(dynamic raw);
@@ -360,6 +366,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<SyncHistoryEntry> sse_decode_list_sync_history_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<SyncScopeItem> sse_decode_list_sync_scope_item(
     SseDeserializer deserializer,
   );
@@ -446,6 +457,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SyncDisconnectInfo sse_decode_sync_disconnect_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  SyncHistoryEntry sse_decode_sync_history_entry(SseDeserializer deserializer);
 
   @protected
   SyncRotationStatus sse_decode_sync_rotation_status(
@@ -657,6 +671,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_sync_history_entry(
+    List<SyncHistoryEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_sync_scope_item(
     List<SyncScopeItem> self,
     SseSerializer serializer,
@@ -761,6 +781,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_sync_disconnect_info(
     SyncDisconnectInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_history_entry(
+    SyncHistoryEntry self,
     SseSerializer serializer,
   );
 

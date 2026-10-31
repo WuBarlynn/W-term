@@ -561,6 +561,79 @@ fn prepare_inner(
     tx.commit()?;
     Ok(Preparation::Ready(pending))
 }
+pub(crate) fn rollback_snapshot(base: &Snapshot, old: &Snapshot, device: &str) -> Result<Snapshot> {
+    ensure!(base.space == old.space, "历史版本属于其他同步空间");
+    uuid::Uuid::parse_str(device).context("同步设备 ID 无效")?;
+    let base_map = base.map();
+    let old_map = old.map();
+    let keys: BTreeSet<Key> = base_map.keys().chain(old_map.keys()).cloned().collect();
+    let mut records = Vec::with_capacity(keys.len());
+    for key in keys {
+        let previous = base_map.get(&key);
+        let target = old_map.get(&key);
+        let record = if previous
+            .zip(target)
+            .is_some_and(|(left, right)| left.value == right.value)
+        {
+            (*previous.expect("checked pair")).clone()
+        } else if let Some(previous) = previous {
+            let counter = previous
+                .revision
+                .counter
+                .checked_add(1)
+                .context("同步记录版本已耗尽")?;
+            Record {
+                key: key.clone(),
+                revision: Revision {
+                    counter,
+                    device: device.into(),
+                },
+                value: target.and_then(|record| record.value.clone()),
+            }
+        } else if let Some(target) = target {
+            Record {
+                key: key.clone(),
+                revision: Revision {
+                    counter: target.revision.counter,
+                    device: target.revision.device.clone(),
+                },
+                value: target.value.clone(),
+            }
+        } else {
+            continue;
+        };
+        records.push(record);
+    }
+    let snapshot = Snapshot {
+        version: FORMAT_VERSION,
+        space: base.space.clone(),
+        records,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+pub(crate) fn retarget_rollback(db: &mut Connection, generation: u64, head: &str) -> Result<()> {
+    check_revision(Some(head))?;
+    let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let mut state = checked(&tx, generation)?;
+    let pending = state
+        .pending
+        .as_mut()
+        .context("历史恢复批次不存在，请重新操作")?;
+    ensure!(
+        !pending.key_rotation && pending.snapshot == state.local,
+        "历史恢复状态不一致，请重新同步后重试"
+    );
+    pending.needs_upload = true;
+    pending.expected_revision = Some(head.to_owned());
+    state.remote_revision = Some(head.to_owned());
+    state.validate()?;
+    save(&tx, &state)?;
+    tx.commit()?;
+    Ok(())
+}
+
 /// Re-encrypts the last confirmed snapshot; uncommitted business edits remain
 /// local and will be captured by the next ordinary sync.
 pub(super) fn prepare_rotation_in_transaction(db: &Connection, generation: u64) -> Result<State> {

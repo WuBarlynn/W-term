@@ -37,6 +37,37 @@ pub async fn sync_check(token: String) -> Result<String> {
         result = service::check(db) => result,
     }
 }
+pub struct SyncHistoryEntry {
+    pub revision: String,
+    pub committed_at: String,
+    pub message: String,
+}
+pub async fn sync_history(token: String) -> Result<Vec<SyncHistoryEntry>> {
+    let mut lease = vault::lease(&token)?;
+    let cancel = lease.cancelled.clone();
+    let db = lease.db.as_mut().context("保险库连接不可用")?;
+    let entries = tokio::select! { biased;
+        _ = cancel.notified() => anyhow::bail!("同步历史读取已取消"),
+        result = service::history(db) => result?,
+    };
+    Ok(entries
+        .into_iter()
+        .map(|entry| SyncHistoryEntry {
+            revision: entry.revision,
+            committed_at: entry.committed_at,
+            message: entry.message,
+        })
+        .collect())
+}
+pub async fn sync_restore(token: String, revision: String, confirmation: String) -> Result<String> {
+    let mut lease = vault::lease(&token)?;
+    let cancel = lease.cancelled.clone();
+    let db = lease.db.as_mut().context("保险库连接不可用")?;
+    tokio::select! { biased;
+        _ = cancel.notified() => anyhow::bail!("历史版本恢复已取消"),
+        result = service::restore(db, &revision, &confirmation) => result,
+    }
+}
 pub async fn sync_initialize(token: String, mode: String, secret: String) -> Result<String> {
     let secret = zeroize::Zeroizing::new(secret);
     let mut lease = vault::lease(&token)?;
