@@ -8,7 +8,7 @@
 - 快捷键绑定保存在本机并随 GitHub 加密设置同步；Windows 默认使用 Ctrl+Shift，macOS 使用 Cmd。
 - 分享图片对话框新增“导出文本”，导出完整终端缓冲区文本；图片模板仍最多显示 36 行。
 - 终端内搜索、粘贴和收藏数字键保持固定行为。
-- 验证：Flutter 全量 **318 项**通过，`flutter analyze` 无问题；三端构建状态见下方记录。
+- 验证：Flutter 全量 **318 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41214502777](https://github.com/WuBarlynn/W-term/actions/runs/41214502777) 成功。快捷键录制与文本导出仍需实机验收。
 
 ## 1.0.47 实时状态栏与终端外观选项（2026-10-31）
 

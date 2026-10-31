@@ -593,7 +593,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 新增 `ShortcutSettings` 与 `ShortcutSettingsDialog`；可配置 new/close-tab/prev-tab/next-tab/sessions，绑定随设置同步。
 - TerminalPane 先匹配自定义绑定，再处理收藏数字键；Workspace 顶层 CallbackShortcuts 使用同一绑定。
 - 分享图片新增完整缓冲区文本导出（.txt），模板图片仍限制 36 行。
-- 验证：Flutter **318 项**与 `flutter analyze` 通过；三端构建与实机按键/分享面板待记录。
+- 验证：Flutter **318 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41214502777](https://github.com/WuBarlynn/W-term/actions/runs/41214502777) 成功。发布包位于 `build/release-1.0.48/`。
 
 ## 40. 1.0.47 实时状态栏与终端外观选项（2026-10-31）
 
