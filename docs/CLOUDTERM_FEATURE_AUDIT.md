@@ -60,7 +60,7 @@
 - [~] IP 归属查询：选中 IPv4 后查询国家/城市/运营商，带插件开关；依赖第三方接口，未实现本地库/缓存
 - [~] JSON 格式化：插件开关控制，选中后右键格式化/复制；缺自动识别划词菜单
 - [~] 任务完成通知插件：长命令空闲启发式 + OSC 133;D 精确完成钩子（bash/zsh/fish 可自动探测或手动安装、携带退出码）、应用内定位、macOS/iOS/Windows/Linux 系统通知；缺已有集成的退出码实测
-- [~] 界面字体、终端字体、CJK 回退、字号、配色、字重和界面主题可设置；已内置 JetBrains Mono、Noto Sans SC，并枚举系统字体供选择；支持从本地文件或 http/https URL 导入并注册字体（≤32 MB，仅存本机）；缺在线字体市场/字体库
+- [x] 界面字体、终端字体、CJK 回退、字号、配色、字重和界面主题可设置；已内置 JetBrains Mono、Noto Sans SC，并枚举系统字体供选择；支持从本地文件、http/https URL 导入并注册字体（≤32 MB，仅存本机）；内置六个 SIL OFL 在线字体，可直接下载安装
 
 ## 外观与平台
 
@@ -90,7 +90,7 @@
 ### 1.0.43 仍未完成
 
 - 同步/协作：Gist/S3 后端、版本回滚、多端在线状态、Cloud Term 云账号、组织/团队共享与角色权限、SSH 公钥目录、审计日志、Web 端。
-- 终端/平台：iPad 多窗口、ZMODEM 真实 lrzsz 互操作、Office 原排版渲染、在线字体市场、Linux 输入法、Windows/macOS 双架构发布、完整进程/端口操作实测。
+- 终端/平台：iPad 多窗口、ZMODEM 真实 lrzsz 互操作、Office 原排版渲染、Linux 输入法、Windows/macOS 双架构发布、完整进程/端口操作实测。
 - 文件/片段：隐藏回显（当前 SFTP 上传路径不适用）、ZMODEM 实机收发、上传队列跨会话恢复。
 - 插件/桌面：Windows 独立窗口/托盘/深链接/全局快捷键实测、Windows 输入与自动更新实测、macOS 收回实测。
 - 验收：Apple 真机 Touch ID/Face ID、双设备 GitHub、真实 OpenSSH/代理/转发、弱网/后台/外部键盘、Windows 桌面输入与安装、至少四周日用均未执行。
