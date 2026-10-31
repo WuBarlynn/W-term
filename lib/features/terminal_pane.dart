@@ -30,6 +30,7 @@ import 'package:xterm/xterm.dart';
 import '../app/terminal_session.dart';
 import '../app/pinned_commands.dart';
 import '../app/plugins.dart';
+import '../app/system_metrics.dart';
 import '../app/terminal_links.dart';
 import '../src/rust/api/client.dart' as native;
 import '../app/errors.dart';
@@ -94,6 +95,11 @@ class _TerminalPaneState extends State<TerminalPane> {
   String? _pendingShellAction;
   String? _lastReportedShell;
   Timer? _shellProbeTimer;
+  Timer? _statusTimer;
+  bool _statusSampling = false;
+  ProcSnapshot? _lastProc;
+  double? _cpuPercent, _memoryPercent;
+  int? _latencyMs;
   @override
   void initState() {
     super.initState();
@@ -108,6 +114,15 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.terminal.addListener(_markLinksDirty);
     _wasActive = widget.active;
     _lastReportedShell = widget.session.reportedShell;
+    if (!widget.session.isLocal) {
+      _statusTimer = Timer.periodic(
+        const Duration(seconds: 10),
+        (_) => unawaited(_sampleStatus()),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_sampleStatus());
+      });
+    }
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _focus();
@@ -401,6 +416,59 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.terminal.paste(command);
     _focus();
   }
+
+  Future<void> _sampleStatus() async {
+    if (!mounted || _statusSampling || !pluginSettings.showStatusBar) return;
+    _statusSampling = true;
+    final watch = Stopwatch()..start();
+    try {
+      final raw = await native.runCommand(
+        connectionId: widget.session.connectionId,
+        command:
+            "sh -c 'head -1 /proc/stat; grep -E \"^(MemTotal|MemAvailable|MemFree|Buffers|Cached):\" /proc/meminfo'",
+      );
+      final snapshot = ProcSnapshot.parse(raw);
+      if (!mounted) return;
+      setState(() {
+        _latencyMs = watch.elapsedMilliseconds;
+        if (snapshot != null) {
+          _cpuPercent = cpuUsageBetween(_lastProc, snapshot);
+          _memoryPercent = snapshot.memoryUsedPercent;
+          _lastProc = snapshot;
+        }
+      });
+    } catch (_) {
+      // Remote metrics are optional and must never disturb the terminal.
+    } finally {
+      _statusSampling = false;
+    }
+  }
+
+  Widget _statusBar() => Container(
+    height: 24,
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    child: Row(
+      children: [
+        const Icon(Icons.speed, size: 13),
+        const SizedBox(width: 4),
+        Text(
+          _latencyMs == null ? '—' : '$_latencyMs ms',
+          style: const TextStyle(fontSize: 11),
+        ),
+        const SizedBox(width: 14),
+        const Icon(Icons.memory, size: 13),
+        const SizedBox(width: 4),
+        Text('CPU ${formatPercent(_cpuPercent)}', style: const TextStyle(fontSize: 11)),
+        const SizedBox(width: 14),
+        const Icon(Icons.storage, size: 13),
+        const SizedBox(width: 4),
+        Text('内存 ${formatPercent(_memoryPercent)}', style: const TextStyle(fontSize: 11)),
+        const Spacer(),
+        const Text('每 10 秒采样', style: TextStyle(fontSize: 10)),
+      ],
+    ),
+  );
 
   Future<void> _openLinkAt(PointerUpEvent event) async {
     if (ended) return;
@@ -1426,6 +1494,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _copyTimer?.cancel();
     _highlightTimer?.cancel();
     _shellProbeTimer?.cancel();
+    _statusTimer?.cancel();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);
@@ -1538,6 +1607,11 @@ class _TerminalPaneState extends State<TerminalPane> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: _toolbar(),
           ),
+          if (pluginSettings.showStatusBar &&
+              (_latencyMs != null ||
+                  _cpuPercent != null ||
+                  _memoryPercent != null))
+            _statusBar(),
           Expanded(
             child: ListenableBuilder(
               listenable: pinnedCommands,
@@ -1567,6 +1641,22 @@ class _TerminalPaneState extends State<TerminalPane> {
                                 children: [
                                   TerminalView(
                                     key: _terminalViewKey,
+                                    padding: EdgeInsets.fromLTRB(
+                                      12,
+                                      12,
+                                      12,
+                                      12 +
+                                          terminalAppearance.bottomPadding
+                                              .toDouble(),
+                                    ),
+                                    cursorType: switch (terminalAppearance
+                                        .cursorStyle) {
+                                      'underline' =>
+                                        TerminalCursorType.underline,
+                                      'verticalBar' =>
+                                        TerminalCursorType.verticalBar,
+                                      _ => TerminalCursorType.block,
+                                    },
                                     deleteDetection:
                                         Theme.of(context).platform ==
                                             TargetPlatform.iOS ||
@@ -1692,7 +1782,6 @@ class _TerminalPaneState extends State<TerminalPane> {
                                         Theme.of(context).platform ==
                                             TargetPlatform.windows &&
                                         pluginSettings.windowsHardwareInput,
-                                    padding: const EdgeInsets.all(12),
                                     textStyle: TerminalStyle(
                                       fontSize: terminalAppearance.fontSize
                                           .toDouble(),

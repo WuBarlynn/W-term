@@ -136,6 +136,9 @@ class TerminalAppearance extends ChangeNotifier {
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
   bool copyOnSelect = false;
+  String cursorStyle = 'block';
+  int bottomPadding = 0;
+  int scrollback = 5000;
   Map<String, int> customColors = const {};
   Future<void> _pending = Future.value();
 
@@ -388,6 +391,21 @@ class TerminalAppearance extends ChangeNotifier {
         fontSize = storedSize;
       }
       copyOnSelect = value['copyOnSelect'] == true;
+      final storedCursor = value['cursorStyle'];
+      if (storedCursor is String &&
+          {'block', 'underline', 'verticalBar'}.contains(storedCursor)) {
+        cursorStyle = storedCursor;
+      }
+      final storedPadding = value['bottomPadding'];
+      if (storedPadding is int && storedPadding >= 0 && storedPadding <= 64) {
+        bottomPadding = storedPadding;
+      }
+      final storedScrollback = value['scrollback'];
+      if (storedScrollback is int &&
+          storedScrollback >= 1000 &&
+          storedScrollback <= 100000) {
+        scrollback = storedScrollback;
+      }
       notifyListeners();
     } on FileSystemException {
       // Appearance is optional; an unreadable preference never blocks startup.
@@ -406,6 +424,9 @@ class TerminalAppearance extends ChangeNotifier {
     'skin': skin,
     'customColors': customColors,
     'copyOnSelect': copyOnSelect,
+    'cursorStyle': cursorStyle,
+    'bottomPadding': bottomPadding,
+    'scrollback': scrollback,
   };
 
   Future<Map<String, Object?>> exportSynced() async {
@@ -458,6 +479,15 @@ class TerminalAppearance extends ChangeNotifier {
           : skin,
       nextCustomColors: rawColors is Map ? colors : customColors,
       nextCopyOnSelect: data['copyOnSelect'] == true,
+      nextCursorStyle: data['cursorStyle'] is String
+          ? data['cursorStyle'] as String
+          : cursorStyle,
+      nextBottomPadding: data['bottomPadding'] is int
+          ? data['bottomPadding'] as int
+          : bottomPadding,
+      nextScrollback: data['scrollback'] is int
+          ? data['scrollback'] as int
+          : scrollback,
     );
   }
 
@@ -471,8 +501,14 @@ class TerminalAppearance extends ChangeNotifier {
     String? nextSkin,
     Map<String, int>? nextCustomColors,
     bool? nextCopyOnSelect,
+    String? nextCursorStyle,
+    int? nextBottomPadding,
+    int? nextScrollback,
   }) {
     final nextMode = nextUiTheme ?? uiTheme;
+    final nextCursor = nextCursorStyle ?? cursorStyle;
+    final nextPadding = (nextBottomPadding ?? bottomPadding).clamp(0, 64);
+    final nextScroll = (nextScrollback ?? scrollback).clamp(1000, 100000);
     final nextColors = nextCustomColors ?? customColors;
     final validColors =
         nextColors.isEmpty ||
@@ -486,6 +522,7 @@ class TerminalAppearance extends ChangeNotifier {
         nextSize < 10 ||
         nextSize > 28 ||
         !{'system', 'dark', 'light'}.contains(nextMode) ||
+        !{'block', 'underline', 'verticalBar'}.contains(nextCursor) ||
         !validColors) {
       return Future.error(ArgumentError('无效的终端外观设置'));
     }
@@ -504,6 +541,9 @@ class TerminalAppearance extends ChangeNotifier {
           'skin': nextSkin ?? skin,
           'customColors': nextColors,
           'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
+          'cursorStyle': nextCursor,
+          'bottomPadding': nextPadding,
+          'scrollback': nextScroll,
         }),
         flush: true,
       );
@@ -517,6 +557,9 @@ class TerminalAppearance extends ChangeNotifier {
       skin = nextSkin ?? skin;
       customColors = Map.unmodifiable(nextColors);
       copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
+      cursorStyle = nextCursor;
+      bottomPadding = nextPadding;
+      scrollback = nextScroll;
       notifyListeners();
     });
     _pending = operation;

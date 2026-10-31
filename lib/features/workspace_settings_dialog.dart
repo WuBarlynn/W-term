@@ -16,6 +16,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
   late bool showFavoritesBar = pluginSettings.showFavoritesBar;
   late bool clickTabLocates = pluginSettings.clickTabLocates;
   late bool restoreLayout = pluginSettings.restoreLayout;
+  late bool showStatusBar = pluginSettings.showStatusBar;
   bool saving = false;
   String error = '';
 
@@ -35,6 +36,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
         showFavoritesBarNext: showFavoritesBar,
         clickTabLocatesNext: clickTabLocates,
         restoreLayoutNext: restoreLayout,
+        showStatusBarNext: showStatusBar,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -88,6 +90,15 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
                 : (value) => setState(() => restoreLayout = value),
             title: const Text('启动恢复上次布局'),
             subtitle: const Text('下次启动以未连接窗格恢复标签、分屏与目录。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showStatusBar,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => showStatusBar = value),
+            title: const Text('显示实时状态栏'),
+            subtitle: const Text('每 10 秒采样 SSH 延迟、CPU 与内存，依赖远端 /proc。'),
           ),
           if (error.isNotEmpty)
             Text(

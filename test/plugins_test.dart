@@ -45,6 +45,7 @@ void main() {
       expect(store.showFavoritesBar, isTrue);
       expect(store.clickTabLocates, isFalse);
       expect(store.restoreLayout, isTrue);
+      expect(store.showStatusBar, isTrue);
       expect(store.maxUploadSizeMb, 0);
       expect(uploadTooLarge(101 * 1024 * 1024, 100), isTrue);
       expect(uploadTooLarge(100 * 1024 * 1024, 100), isFalse);
@@ -61,6 +62,7 @@ void main() {
         showFavoritesBarNext: false,
         clickTabLocatesNext: true,
         restoreLayoutNext: false,
+        showStatusBarNext: false,
         maxUploadSizeMbNext: 500,
       );
       final restored = PluginSettings(file: () async => file);
@@ -76,6 +78,7 @@ void main() {
       expect(restored.showFavoritesBar, isFalse);
       expect(restored.clickTabLocates, isTrue);
       expect(restored.restoreLayout, isFalse);
+      expect(restored.showStatusBar, isFalse);
       expect(restored.maxUploadSizeMb, 500);
     } finally {
       await dir.delete(recursive: true);

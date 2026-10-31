@@ -67,6 +67,9 @@ void main() {
       15,
       nextCustomColors: colors,
       nextCopyOnSelect: true,
+      nextCursorStyle: 'verticalBar',
+      nextBottomPadding: 24,
+      nextScrollback: 20000,
     );
     expect(settings.activeTheme.background, const Color(0xff102030));
     expect(settings.activeTheme.selection, const Color(0x44112233));
@@ -75,6 +78,9 @@ void main() {
     await restored.load();
     expect(restored.palette, 'custom');
     expect(restored.copyOnSelect, isTrue);
+    expect(restored.cursorStyle, 'verticalBar');
+    expect(restored.bottomPadding, 24);
+    expect(restored.scrollback, 20000);
     expect(restored.customColors['background'], 0xff102030);
     expect(restored.activeTheme.background, const Color(0xff102030));
 

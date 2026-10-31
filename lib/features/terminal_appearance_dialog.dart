@@ -24,6 +24,9 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String uiTheme = widget.store.uiTheme;
   late String skin = widget.store.skin;
   late bool copyOnSelect = widget.store.copyOnSelect;
+  late String cursorStyle = widget.store.cursorStyle;
+  late int bottomPadding = widget.store.bottomPadding;
+  late int scrollback = widget.store.scrollback;
   late Map<String, int> customColors = widget.store.customColors.isEmpty
       ? TerminalAppearance.defaultCustomColors(widget.store.palette)
       : Map.of(widget.store.customColors);
@@ -253,6 +256,9 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextSkin: skin,
         nextCustomColors: customColors,
         nextCopyOnSelect: copyOnSelect,
+        nextCursorStyle: cursorStyle,
+        nextBottomPadding: bottomPadding,
+        nextScrollback: scrollback,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -445,6 +451,47 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     ? null
                     : (v) => setState(() => size = v.round()),
               ),
+              DropdownButtonFormField<String>(
+                initialValue: cursorStyle,
+                decoration: const InputDecoration(labelText: '光标样式'),
+                items: const [
+                  DropdownMenuItem(value: 'block', child: Text('方块')),
+                  DropdownMenuItem(value: 'verticalBar', child: Text('竖线')),
+                  DropdownMenuItem(value: 'underline', child: Text('下划线')),
+                ],
+                onChanged: busy
+                    ? null
+                    : (value) =>
+                          setState(() => cursorStyle = value ?? 'block'),
+              ),
+              const SizedBox(height: 8),
+              Text('底部留白：$bottomPadding'),
+              Slider(
+                min: 0,
+                max: 64,
+                divisions: 16,
+                value: bottomPadding.toDouble(),
+                label: '$bottomPadding',
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => bottomPadding = value.round()),
+              ),
+              DropdownButtonFormField<int>(
+                initialValue: scrollback,
+                decoration: const InputDecoration(labelText: '回滚行数'),
+                items: const [
+                  DropdownMenuItem(value: 1000, child: Text('1,000 行')),
+                  DropdownMenuItem(value: 2000, child: Text('2,000 行')),
+                  DropdownMenuItem(value: 5000, child: Text('5,000 行')),
+                  DropdownMenuItem(value: 10000, child: Text('10,000 行')),
+                  DropdownMenuItem(value: 20000, child: Text('20,000 行')),
+                  DropdownMenuItem(value: 50000, child: Text('50,000 行')),
+                ],
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => scrollback = value ?? 5000),
+              ),
+              const SizedBox(height: 8),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('选中即复制'),

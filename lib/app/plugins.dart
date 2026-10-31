@@ -29,6 +29,7 @@ class PluginSettings extends ChangeNotifier {
   bool showFavoritesBar = true;
   bool clickTabLocates = false;
   bool restoreLayout = true;
+  bool showStatusBar = true;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -61,6 +62,7 @@ class PluginSettings extends ChangeNotifier {
           showFavoritesBar = value['showFavoritesBar'] != false;
           clickTabLocates = value['clickTabLocates'] == true;
           restoreLayout = value['restoreLayout'] != false;
+          showStatusBar = value['showStatusBar'] != false;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -87,6 +89,7 @@ class PluginSettings extends ChangeNotifier {
     'showFavoritesBar': showFavoritesBar,
     'clickTabLocates': clickTabLocates,
     'restoreLayout': restoreLayout,
+    'showStatusBar': showStatusBar,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -111,6 +114,7 @@ class PluginSettings extends ChangeNotifier {
       showFavoritesBarNext: data['showFavoritesBar'] != false,
       clickTabLocatesNext: data['clickTabLocates'] == true,
       restoreLayoutNext: data['restoreLayout'] != false,
+      showStatusBarNext: data['showStatusBar'] != false,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -131,6 +135,7 @@ class PluginSettings extends ChangeNotifier {
     bool? showFavoritesBarNext,
     bool? clickTabLocatesNext,
     bool? restoreLayoutNext,
+    bool? showStatusBarNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -146,6 +151,7 @@ class PluginSettings extends ChangeNotifier {
     showFavoritesBar = showFavoritesBarNext ?? showFavoritesBar;
     clickTabLocates = clickTabLocatesNext ?? clickTabLocates;
     restoreLayout = restoreLayoutNext ?? restoreLayout;
+    showStatusBar = showStatusBarNext ?? showStatusBar;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -167,6 +173,7 @@ class PluginSettings extends ChangeNotifier {
         'showFavoritesBar': showFavoritesBar,
         'clickTabLocates': clickTabLocates,
         'restoreLayout': restoreLayout,
+        'showStatusBar': showStatusBar,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

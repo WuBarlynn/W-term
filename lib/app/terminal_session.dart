@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 import '../src/rust/api/client.dart' as native;
 import 'command_history.dart';
 import 'errors.dart';
+import 'terminal_appearance.dart';
 
 /// Marks user-originated terminal input so broadcast never forwards protocol
 /// replies (device attributes, cursor reports, mouse reports) to other hosts.
@@ -48,7 +49,9 @@ class _WTermTerminal extends Terminal {
 /// any widget. Views can attach, move and detach without reconnecting.
 class TerminalSession extends ChangeNotifier {
   final String connectionId, host, username, hostId;
-  final Terminal terminal = _WTermTerminal(maxLines: 5000);
+  final Terminal terminal = _WTermTerminal(
+    maxLines: terminalAppearance.scrollback,
+  );
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
   void Function(int? exitCode)? onCommandFinished;

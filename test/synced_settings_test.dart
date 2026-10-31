@@ -54,6 +54,7 @@ void main() {
       'showFavoritesBar': false,
       'clickTabLocates': true,
       'restoreLayout': false,
+      'showStatusBar': false,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -66,6 +67,7 @@ void main() {
     expect(store.showFavoritesBar, isFalse);
     expect(store.clickTabLocates, isTrue);
     expect(store.restoreLayout, isFalse);
+    expect(store.showStatusBar, isFalse);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 
