@@ -7,7 +7,7 @@
 - 本地维护 `third_party/xterm`（MIT，4.0.0）并为 `TerminalStyle` 增加 `fontWeight`；粗体运行仍使用 `FontWeight.bold`。
 - 终端外观新增字重选择：常规、中等、半粗、粗体，默认常规。
 - 字重随外观文件保存并纳入 GitHub 加密设置同步，预览区域同步显示。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过。
+- 验证：Flutter 全量 **323 项**通过，`flutter analyze` 无问题；macOS Apple Silicon 与 Intel 自签名 DMG、iOS IPA 完成；Windows CI [41248004661](https://github.com/WuBarlynn/W-term/actions/runs/41248004661) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.61 GitHub 同步版本历史（2026-10-31）
 
