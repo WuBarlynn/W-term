@@ -23,6 +23,7 @@ class PluginSettings extends ChangeNotifier {
   bool taskNotifications = true;
   bool imeAutoEnglish = false;
   bool windowsHardwareInput = false;
+  bool linkUnderline = true;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -45,6 +46,7 @@ class PluginSettings extends ChangeNotifier {
           taskNotifications = value['taskNotifications'] != false;
           imeAutoEnglish = value['imeAutoEnglish'] == true;
           windowsHardwareInput = value['windowsHardwareInput'] == true;
+          linkUnderline = value['linkUnderline'] != false;
         }
       }
     } catch (_) {
@@ -63,6 +65,7 @@ class PluginSettings extends ChangeNotifier {
     bool? notifications,
     bool? imeAutoEnglishNext,
     bool? windowsHardwareInputNext,
+    bool? linkUnderlineNext,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
@@ -85,6 +88,7 @@ class PluginSettings extends ChangeNotifier {
         'taskNotifications': taskNotifications,
         'imeAutoEnglish': imeAutoEnglish,
         'windowsHardwareInput': windowsHardwareInput,
+        'linkUnderline': linkUnderline,
       }),
       flush: true,
     );

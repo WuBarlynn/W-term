@@ -21,6 +21,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool notifications = pluginSettings.taskNotifications;
   late bool imeAutoEnglish = pluginSettings.imeAutoEnglish;
   late bool windowsHardwareInput = pluginSettings.windowsHardwareInput;
+  late bool linkUnderline = pluginSettings.linkUnderline;
   bool saving = false;
   String? error;
 
@@ -38,6 +39,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         notifications: notifications,
         imeAutoEnglishNext: imeAutoEnglish,
         windowsHardwareInputNext: windowsHardwareInput,
+        linkUnderlineNext: linkUnderline,
       );
       if (notifications) unawaited(systemNotifications.setup());
       if (mounted) Navigator.pop(context);
@@ -91,6 +93,14 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
                 : (value) => setState(() => notifications = value),
             title: const Text('任务完成通知'),
             subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
+          ),
+          SwitchListTile(
+            value: linkUnderline,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => linkUnderline = value),
+            title: const Text('终端链接自动下划线'),
+            subtitle: const Text('识别 http/https 链接并绘制下划线；点击打开逻辑不变'),
           ),
           if (defaultTargetPlatform == TargetPlatform.macOS)
             SwitchListTile(

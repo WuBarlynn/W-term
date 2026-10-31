@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wterm/app/pinned_commands.dart';
+import 'package:wterm/app/plugins.dart';
 import 'package:wterm/app/terminal_session.dart';
 import 'package:wterm/features/terminal_pane.dart';
 
@@ -53,5 +54,24 @@ void main() {
     );
     await tester.pump();
     expect(find.byTooltip('dockcmd'), findsOneWidget);
+  });
+
+  testWidgets('link underlines render over terminal output', (tester) async {
+    pluginSettings.linkUnderline = true;
+    addTearDown(() => pluginSettings.linkUnderline = true);
+    final session = _RoutingSession();
+    session.terminal.write('https://example.com/docs\r\n');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalPane(session: session, active: true, onActivate: () {}),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('terminal-link-underlines')),
+      findsOneWidget,
+    );
   });
 }

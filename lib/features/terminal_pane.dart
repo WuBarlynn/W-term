@@ -29,6 +29,7 @@ import 'package:xterm/xterm.dart';
 import '../app/terminal_session.dart';
 import '../app/pinned_commands.dart';
 import '../app/plugins.dart';
+import '../app/terminal_links.dart';
 import '../src/rust/api/client.dart' as native;
 import '../app/errors.dart';
 import '../app/workspace_layout.dart';
@@ -80,6 +81,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   final focus = FocusNode();
   final _terminalBoundary = GlobalKey();
   final _terminalViewKey = GlobalKey<TerminalViewState>();
+  final _linkRepaint = ValueNotifier<int>(0);
   bool _wasActive = false;
   Timer? _copyTimer;
   String? _autoCopied;
@@ -99,6 +101,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     keywordHighlights.addListener(_highlightSettingsChanged);
     focus.addListener(_imeFocusChanged);
     widget.session.addInputListener(_inputObserved);
+    widget.session.terminal.addListener(_markLinksDirty);
     _wasActive = widget.active;
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -114,8 +117,10 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(sessionChanged);
       oldWidget.session.removeInputListener(_inputObserved);
+      oldWidget.session.terminal.removeListener(_markLinksDirty);
       widget.session.addListener(sessionChanged);
       widget.session.addInputListener(_inputObserved);
+      widget.session.terminal.addListener(_markLinksDirty);
     }
     if (widget.active && !_wasActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
@@ -149,6 +154,11 @@ class _TerminalPaneState extends State<TerminalPane> {
   void _pluginSettingsChanged() {
     if (!pluginSettings.commandCompletion) _refreshCompletions();
     _applyImeState();
+    if (mounted) setState(() {});
+  }
+
+  void _markLinksDirty() {
+    _linkRepaint.value++;
   }
 
   void _imeFocusChanged() {
@@ -1284,6 +1294,8 @@ class _TerminalPaneState extends State<TerminalPane> {
     keywordHighlights.removeListener(_highlightSettingsChanged);
     focus.removeListener(_imeFocusChanged);
     widget.session.removeInputListener(_inputObserved);
+    widget.session.terminal.removeListener(_markLinksDirty);
+    _linkRepaint.dispose();
     if (pluginSettings.imeAutoEnglish) {
       unawaited(
         _imeChannel
@@ -1409,217 +1421,267 @@ class _TerminalPaneState extends State<TerminalPane> {
                           key: _terminalBoundary,
                           child: Listener(
                             onPointerUp: _openLinkAt,
-                            child: TerminalView(
-                              key: _terminalViewKey,
-                              deleteDetection:
-                                  Theme.of(context).platform ==
-                                      TargetPlatform.iOS ||
-                                  Theme.of(context).platform ==
-                                      TargetPlatform.android,
-                              widget.session.terminal,
-                              theme: terminalAppearance.activeTheme,
-                              controller: controller,
-                              focusNode: focus,
-                              onKeyEvent: (_, event) {
-                                if (event is KeyDownEvent &&
-                                    widget.onShortcut != null) {
-                                  final keyboard = HardwareKeyboard.instance;
-                                  final apple =
-                                      Theme.of(context).platform ==
-                                          TargetPlatform.macOS ||
-                                      Theme.of(context).platform ==
-                                          TargetPlatform.iOS;
-                                  final primary = apple
-                                      ? keyboard.isMetaPressed
-                                      : keyboard.isControlPressed &&
-                                            keyboard.isShiftPressed;
-                                  if (event.logicalKey ==
-                                      LogicalKeyboardKey.f11) {
-                                    widget.onShortcut!('focus', null);
-                                    return KeyEventResult.handled;
-                                  }
-                                  if (primary) {
-                                    final key = event.logicalKey;
-                                    if (key == LogicalKeyboardKey.keyT) {
-                                      widget.onShortcut!('new', null);
-                                      return KeyEventResult.handled;
-                                    }
-                                    if (key == LogicalKeyboardKey.keyW) {
-                                      widget.onShortcut!('close-tab', null);
-                                      return KeyEventResult.handled;
-                                    }
-                                    if (key == LogicalKeyboardKey.keyO &&
-                                        keyboard.isShiftPressed) {
-                                      widget.onShortcut!('sessions', null);
-                                      return KeyEventResult.handled;
-                                    }
-                                    if (keyboard.isShiftPressed &&
-                                        key == LogicalKeyboardKey.bracketLeft) {
-                                      widget.onShortcut!('prev-tab', null);
-                                      return KeyEventResult.handled;
-                                    }
-                                    if (keyboard.isShiftPressed &&
-                                        key ==
-                                            LogicalKeyboardKey.bracketRight) {
-                                      widget.onShortcut!('next-tab', null);
-                                      return KeyEventResult.handled;
-                                    }
-                                    const digits = [
-                                      LogicalKeyboardKey.digit1,
-                                      LogicalKeyboardKey.digit2,
-                                      LogicalKeyboardKey.digit3,
-                                      LogicalKeyboardKey.digit4,
-                                      LogicalKeyboardKey.digit5,
-                                      LogicalKeyboardKey.digit6,
-                                      LogicalKeyboardKey.digit7,
-                                      LogicalKeyboardKey.digit8,
-                                      LogicalKeyboardKey.digit9,
-                                    ];
-                                    final index = digits.indexOf(key);
-                                    if (index >= 0) {
-                                      widget.onShortcut!('tab', index);
-                                      return KeyEventResult.handled;
-                                    }
-                                  }
-                                }
-                                if (event is KeyDownEvent &&
-                                    event.logicalKey ==
-                                        LogicalKeyboardKey.keyF &&
-                                    (HardwareKeyboard.instance.isMetaPressed ||
-                                        (HardwareKeyboard
-                                                .instance
-                                                .isControlPressed &&
-                                            HardwareKeyboard
-                                                .instance
-                                                .isShiftPressed))) {
-                                  unawaited(searchHistory());
-                                  return KeyEventResult.handled;
-                                }
-                                if (event is KeyDownEvent &&
-                                    HardwareKeyboard.instance.isMetaPressed) {
-                                  if (event.logicalKey ==
-                                      LogicalKeyboardKey.keyV) {
-                                    unawaited(paste());
-                                    return KeyEventResult.handled;
-                                  }
-                                  if (event.logicalKey ==
-                                      LogicalKeyboardKey.keyC) {
-                                    unawaited(copy());
-                                    return KeyEventResult.handled;
-                                  }
-                                }
-                                return KeyEventResult.ignored;
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: (_) {
+                                _linkRepaint.value++;
+                                return false;
                               },
-                              autofocus: false,
-                              readOnly: ended,
-                              hardwareKeyboardOnly:
-                                  Theme.of(context).platform ==
-                                      TargetPlatform.windows &&
-                                  pluginSettings.windowsHardwareInput,
-                              padding: const EdgeInsets.all(12),
-                              textStyle: TerminalStyle(
-                                fontSize: terminalAppearance.fontSize
-                                    .toDouble(),
-                                fontFamily: _terminalFontFamily,
-                                fontFamilyFallback: _terminalFontFallback,
-                              ),
-                              onSecondaryTapDown: (details, _) async {
-                                final selected = await showMenu<String>(
-                                  context: context,
-                                  position: RelativeRect.fromLTRB(
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
-                                    details.globalPosition.dx,
-                                    details.globalPosition.dy,
+                              child: Stack(
+                                children: [
+                                  TerminalView(
+                                    key: _terminalViewKey,
+                                    deleteDetection:
+                                        Theme.of(context).platform ==
+                                            TargetPlatform.iOS ||
+                                        Theme.of(context).platform ==
+                                            TargetPlatform.android,
+                                    widget.session.terminal,
+                                    theme: terminalAppearance.activeTheme,
+                                    controller: controller,
+                                    focusNode: focus,
+                                    onKeyEvent: (_, event) {
+                                      if (event is KeyDownEvent &&
+                                          widget.onShortcut != null) {
+                                        final keyboard =
+                                            HardwareKeyboard.instance;
+                                        final apple =
+                                            Theme.of(context).platform ==
+                                                TargetPlatform.macOS ||
+                                            Theme.of(context).platform ==
+                                                TargetPlatform.iOS;
+                                        final primary = apple
+                                            ? keyboard.isMetaPressed
+                                            : keyboard.isControlPressed &&
+                                                  keyboard.isShiftPressed;
+                                        if (event.logicalKey ==
+                                            LogicalKeyboardKey.f11) {
+                                          widget.onShortcut!('focus', null);
+                                          return KeyEventResult.handled;
+                                        }
+                                        if (primary) {
+                                          final key = event.logicalKey;
+                                          if (key == LogicalKeyboardKey.keyT) {
+                                            widget.onShortcut!('new', null);
+                                            return KeyEventResult.handled;
+                                          }
+                                          if (key == LogicalKeyboardKey.keyW) {
+                                            widget.onShortcut!(
+                                              'close-tab',
+                                              null,
+                                            );
+                                            return KeyEventResult.handled;
+                                          }
+                                          if (key == LogicalKeyboardKey.keyO &&
+                                              keyboard.isShiftPressed) {
+                                            widget.onShortcut!(
+                                              'sessions',
+                                              null,
+                                            );
+                                            return KeyEventResult.handled;
+                                          }
+                                          if (keyboard.isShiftPressed &&
+                                              key ==
+                                                  LogicalKeyboardKey
+                                                      .bracketLeft) {
+                                            widget.onShortcut!(
+                                              'prev-tab',
+                                              null,
+                                            );
+                                            return KeyEventResult.handled;
+                                          }
+                                          if (keyboard.isShiftPressed &&
+                                              key ==
+                                                  LogicalKeyboardKey
+                                                      .bracketRight) {
+                                            widget.onShortcut!(
+                                              'next-tab',
+                                              null,
+                                            );
+                                            return KeyEventResult.handled;
+                                          }
+                                          const digits = [
+                                            LogicalKeyboardKey.digit1,
+                                            LogicalKeyboardKey.digit2,
+                                            LogicalKeyboardKey.digit3,
+                                            LogicalKeyboardKey.digit4,
+                                            LogicalKeyboardKey.digit5,
+                                            LogicalKeyboardKey.digit6,
+                                            LogicalKeyboardKey.digit7,
+                                            LogicalKeyboardKey.digit8,
+                                            LogicalKeyboardKey.digit9,
+                                          ];
+                                          final index = digits.indexOf(key);
+                                          if (index >= 0) {
+                                            widget.onShortcut!('tab', index);
+                                            return KeyEventResult.handled;
+                                          }
+                                        }
+                                      }
+                                      if (event is KeyDownEvent &&
+                                          event.logicalKey ==
+                                              LogicalKeyboardKey.keyF &&
+                                          (HardwareKeyboard
+                                                  .instance
+                                                  .isMetaPressed ||
+                                              (HardwareKeyboard
+                                                      .instance
+                                                      .isControlPressed &&
+                                                  HardwareKeyboard
+                                                      .instance
+                                                      .isShiftPressed))) {
+                                        unawaited(searchHistory());
+                                        return KeyEventResult.handled;
+                                      }
+                                      if (event is KeyDownEvent &&
+                                          HardwareKeyboard
+                                              .instance
+                                              .isMetaPressed) {
+                                        if (event.logicalKey ==
+                                            LogicalKeyboardKey.keyV) {
+                                          unawaited(paste());
+                                          return KeyEventResult.handled;
+                                        }
+                                        if (event.logicalKey ==
+                                            LogicalKeyboardKey.keyC) {
+                                          unawaited(copy());
+                                          return KeyEventResult.handled;
+                                        }
+                                      }
+                                      return KeyEventResult.ignored;
+                                    },
+                                    autofocus: false,
+                                    readOnly: ended,
+                                    hardwareKeyboardOnly:
+                                        Theme.of(context).platform ==
+                                            TargetPlatform.windows &&
+                                        pluginSettings.windowsHardwareInput,
+                                    padding: const EdgeInsets.all(12),
+                                    textStyle: TerminalStyle(
+                                      fontSize: terminalAppearance.fontSize
+                                          .toDouble(),
+                                      fontFamily: _terminalFontFamily,
+                                      fontFamilyFallback: _terminalFontFallback,
+                                    ),
+                                    onSecondaryTapDown: (details, _) async {
+                                      final selected = await showMenu<String>(
+                                        context: context,
+                                        position: RelativeRect.fromLTRB(
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                        ),
+                                        items: [
+                                          const PopupMenuItem(
+                                            value: 'copy',
+                                            child: Text('复制'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'copy-all',
+                                            child: Text('全选并复制'),
+                                          ),
+                                          if (!ended)
+                                            const PopupMenuItem(
+                                              value: 'paste',
+                                              child: Text('粘贴'),
+                                            ),
+                                          if (widget.onOpenFiles != null)
+                                            const PopupMenuItem(
+                                              value: 'files',
+                                              child: Text('打开文件面板'),
+                                            ),
+                                          if (pluginSettings.jsonFormatter)
+                                            const PopupMenuItem(
+                                              value: 'json',
+                                              child: Text('格式化选中 JSON'),
+                                            ),
+                                          if (pluginSettings.ipLookup)
+                                            const PopupMenuItem(
+                                              value: 'ip',
+                                              child: Text('查询选中 IP 归属'),
+                                            ),
+                                          if (pluginSettings.filePreview)
+                                            const PopupMenuItem(
+                                              value: 'preview-file',
+                                              child: Text('预览选中文件'),
+                                            ),
+                                          const PopupMenuItem(
+                                            value: 'open-link',
+                                            child: Text('打开选中链接'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'pin',
+                                            child: Text('固定选中命令'),
+                                          ),
+                                          if (widget.snippets != null)
+                                            const PopupMenuItem(
+                                              value: 'save-snippet',
+                                              child: Text('存为命令片段'),
+                                            ),
+                                          const PopupMenuItem(
+                                            value: 'share-image',
+                                            child: Text('分享终端为图片'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'plugins',
+                                            child: Text('插件设置'),
+                                          ),
+                                        ],
+                                      );
+                                      if (selected == 'copy') {
+                                        await copy();
+                                      } else if (selected == 'copy-all') {
+                                        await _copyAll();
+                                      } else if (selected == 'paste') {
+                                        await paste();
+                                      } else if (selected == 'files') {
+                                        widget.onOpenFiles?.call();
+                                      } else if (selected == 'json') {
+                                        await formatJson();
+                                      } else if (selected == 'ip') {
+                                        await lookupSelectedIp();
+                                      } else if (selected == 'preview-file') {
+                                        await previewSelectedFile();
+                                      } else if (selected == 'open-link') {
+                                        await openSelectedLink();
+                                      } else if (selected == 'pin') {
+                                        await pinSelection();
+                                      } else if (selected == 'save-snippet') {
+                                        await saveSelectionAsSnippet();
+                                      } else if (selected == 'share-image') {
+                                        await shareImage();
+                                      } else if (selected == 'plugins') {
+                                        if (!context.mounted) return;
+                                        await showDialog<void>(
+                                          context: context,
+                                          builder: (_) =>
+                                              const PluginSettingsDialog(),
+                                        );
+                                      }
+                                    },
                                   ),
-                                  items: [
-                                    const PopupMenuItem(
-                                      value: 'copy',
-                                      child: Text('复制'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'copy-all',
-                                      child: Text('全选并复制'),
-                                    ),
-                                    if (!ended)
-                                      const PopupMenuItem(
-                                        value: 'paste',
-                                        child: Text('粘贴'),
+                                  if (pluginSettings.linkUnderline)
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: CustomPaint(
+                                          key: const ValueKey(
+                                            'terminal-link-underlines',
+                                          ),
+                                          painter: _LinkUnderlinePainter(
+                                            terminal: widget.session.terminal,
+                                            render: () => _terminalViewKey
+                                                .currentState
+                                                ?.renderTerminal,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            repaint: _linkRepaint,
+                                          ),
+                                        ),
                                       ),
-                                    if (widget.onOpenFiles != null)
-                                      const PopupMenuItem(
-                                        value: 'files',
-                                        child: Text('打开文件面板'),
-                                      ),
-                                    if (pluginSettings.jsonFormatter)
-                                      const PopupMenuItem(
-                                        value: 'json',
-                                        child: Text('格式化选中 JSON'),
-                                      ),
-                                    if (pluginSettings.ipLookup)
-                                      const PopupMenuItem(
-                                        value: 'ip',
-                                        child: Text('查询选中 IP 归属'),
-                                      ),
-                                    if (pluginSettings.filePreview)
-                                      const PopupMenuItem(
-                                        value: 'preview-file',
-                                        child: Text('预览选中文件'),
-                                      ),
-                                    const PopupMenuItem(
-                                      value: 'open-link',
-                                      child: Text('打开选中链接'),
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'pin',
-                                      child: Text('固定选中命令'),
-                                    ),
-                                    if (widget.snippets != null)
-                                      const PopupMenuItem(
-                                        value: 'save-snippet',
-                                        child: Text('存为命令片段'),
-                                      ),
-                                    const PopupMenuItem(
-                                      value: 'share-image',
-                                      child: Text('分享终端为图片'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'plugins',
-                                      child: Text('插件设置'),
-                                    ),
-                                  ],
-                                );
-                                if (selected == 'copy') {
-                                  await copy();
-                                } else if (selected == 'copy-all') {
-                                  await _copyAll();
-                                } else if (selected == 'paste') {
-                                  await paste();
-                                } else if (selected == 'files') {
-                                  widget.onOpenFiles?.call();
-                                } else if (selected == 'json') {
-                                  await formatJson();
-                                } else if (selected == 'ip') {
-                                  await lookupSelectedIp();
-                                } else if (selected == 'preview-file') {
-                                  await previewSelectedFile();
-                                } else if (selected == 'open-link') {
-                                  await openSelectedLink();
-                                } else if (selected == 'pin') {
-                                  await pinSelection();
-                                } else if (selected == 'save-snippet') {
-                                  await saveSelectionAsSnippet();
-                                } else if (selected == 'share-image') {
-                                  await shareImage();
-                                } else if (selected == 'plugins') {
-                                  if (!context.mounted) return;
-                                  await showDialog<void>(
-                                    context: context,
-                                    builder: (_) =>
-                                        const PluginSettingsDialog(),
-                                  );
-                                }
-                              },
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -1808,4 +1870,61 @@ class _LatencyBadgeState extends State<_LatencyBadge> {
       ),
     );
   }
+}
+
+class _LinkUnderlinePainter extends CustomPainter {
+  final Terminal terminal;
+  final Object? Function() render;
+  final Color color;
+  _LinkUnderlinePainter({
+    required this.terminal,
+    required this.render,
+    required this.color,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || terminal.isUsingAltBuffer) return;
+    final dynamic target = render();
+    if (target == null) return;
+    try {
+      final cell = target.cellSize as Size;
+      final lineHeight = (target.lineHeight as num).toDouble();
+      if (cell.width <= 0 || lineHeight <= 0) return;
+      final lines = terminal.buffer.lines;
+      if (lines.length == 0) return;
+      final top = target.getCellOffset(Offset.zero);
+      final first = (top.y as int).clamp(0, lines.length - 1);
+      final rows = (size.height / lineHeight).ceil() + 2;
+      final paint = Paint()
+        ..color = color
+        ..strokeWidth = 1;
+      for (
+        var line = first;
+        line < first + rows && line < lines.length;
+        line++
+      ) {
+        for (final span in findLinkSpans(lines[line].getText())) {
+          if (span.start >= terminal.viewWidth) continue;
+          final start =
+              target.getOffset(CellOffset(span.start, line)) as Offset;
+          final end = target.getOffset(
+            CellOffset(span.end.clamp(0, terminal.viewWidth), line),
+          ) as Offset;
+          if (start.dy < -lineHeight || start.dy > size.height) continue;
+          final y = start.dy + lineHeight - 1.5;
+          canvas.drawLine(Offset(start.dx, y), Offset(end.dx, y), paint);
+        }
+      }
+    } catch (_) {
+      // The render object can be between layouts; skip this frame.
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinkUnderlinePainter oldDelegate) =>
+      oldDelegate.terminal != terminal ||
+      oldDelegate.color != color ||
+      oldDelegate.render != render;
 }

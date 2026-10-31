@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
-const appVersion = '1.0.34';
-const appBuild = '87';
+const appVersion = '1.0.35';
+const appBuild = '88';
 
 class UpdateAsset {
   final String name, url;
