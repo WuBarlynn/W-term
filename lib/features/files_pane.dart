@@ -7,6 +7,8 @@ import 'folder_upload_preview.dart';
 import '../app/folder_access.dart';
 import '../app/download_task.dart';
 import 'download_task_dialog.dart';
+import '../app/download_batch.dart';
+import 'download_tasks_dialog.dart';
 import '../app/upload_batch.dart';
 import 'upload_tasks_dialog.dart';
 import 'upload_conflict_dialog.dart';
@@ -17,6 +19,7 @@ import 'remote_text_editor.dart';
 
 import 'package:desktop_drop/desktop_drop.dart';
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -53,6 +56,8 @@ class FilesPaneState extends State<FilesPane> {
   UploadBatch? uploadBatch;
   FolderAccess? folderAccess;
   DownloadTask? downloadTask;
+  DownloadBatch? downloadBatch;
+  bool downloadRunning = false;
   native.RemoteEntry? downloadEntry;
   List<XFile> uploadSources = const [];
   final history = DirectoryHistory();
@@ -71,6 +76,7 @@ class FilesPaneState extends State<FilesPane> {
   @override
   void dispose() {
     uploadBatch?.cancelRemaining();
+    downloadBatch?.cancelRemaining();
     folderAccess?.release().catchError((Object _) {});
     path.dispose();
     search.dispose();
@@ -228,66 +234,74 @@ class FilesPaneState extends State<FilesPane> {
       }
       return;
     }
+    if (downloadRunning) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已有下载队列正在运行，请等待或取消剩余任务')));
+      return;
+    }
     final directory = await getDirectoryPath();
     if (directory == null || !mounted) return;
+    final batch = DownloadBatch(directory, [
+      for (final entry in items)
+        DownloadItem(entry.name, entry.path, isDirectory: entry.isDirectory),
+    ]);
     setState(() {
-      busy = true;
-      activity = '准备批量下载…';
+      downloadBatch = batch;
+      downloadRunning = true;
+      selecting = false;
+      selected.clear();
       error = null;
     });
-    var completed = 0, directories = 0;
-    try {
-      for (final entry in items) {
-        if (!mounted) return;
+    unawaited(_runDownloadBatch(batch, items));
+    unawaited(showDownloadTasks());
+  }
+
+  Future<void> _runDownloadBatch(
+    DownloadBatch batch,
+    List<native.RemoteEntry> items,
+  ) async {
+    for (var index = 0; index < items.length; index++) {
+      if (!mounted) {
+        batch.finish();
+        return;
+      }
+      if (batch.cancelRequested) break;
+      if (!batch.start(index)) continue;
+      final entry = items[index];
+      try {
         if (entry.isDirectory) {
-          setState(() => activity = '扫描目录：${entry.name}');
-          completed += await _downloadTree(
+          final count = await _downloadTree(
             entry,
-            directory,
-            onProgress: (name, count) {
-              if (!mounted) return;
-              setState(
-                () => activity =
-                    '下载目录 ${entry.name}：$name（已完成 $completed + $count 个文件）',
-              );
+            batch.destination,
+            onProgress: (name, completed) {
+              batch.progress(index, '$name（$completed 个文件）');
             },
           );
-          directories++;
+          batch.complete(index, '已下载 $count 个文件');
         } else {
-          setState(
-            () =>
-                activity = '下载 ${completed + 1}/${items.length}：${entry.name}',
-          );
           await native.downloadFile(
             connectionId: widget.connectionId,
             remotePath: entry.path,
-            localPath: _uniqueLocal(directory, entry.name),
+            localPath: _uniqueLocal(batch.destination, entry.name),
           );
-          completed++;
+          batch.complete(index, '已保存');
         }
+      } catch (e) {
+        batch.fail(index, userFacingError(e));
       }
-      if (mounted) {
-        setState(() {
-          selecting = false;
-          selected.clear();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '已下载 $completed 个文件${directories == 0 ? '' : '（含 $directories 个目录）'}',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          error = '批量下载失败：${userFacingError(e)}（已完成 $completed 个文件）';
-        });
-      }
-    } finally {
-      if (mounted) setState(() => busy = false);
     }
+    batch.finish();
+    if (!mounted) return;
+    setState(() => downloadRunning = false);
+    final completed = batch.count(DownloadState.completed);
+    final failed = batch.count(DownloadState.failed);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '下载队列结束：成功 $completed${failed == 0 ? '' : '，失败 $failed'}',
+        ),
+      ),
+    );
   }
 
   Future<void> load(String target, {int? historyIndex}) async {
@@ -479,6 +493,15 @@ class FilesPaneState extends State<FilesPane> {
     if (retry == true && mounted && identical(batch, uploadBatch)) {
       await uploadFiles(uploadSources, retryBatch: batch);
     }
+  }
+
+  Future<void> showDownloadTasks() async {
+    final batch = downloadBatch;
+    if (batch == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => DownloadTasksDialog(batch: batch),
+    );
   }
 
   Future<void> uploadFiles(
@@ -1096,13 +1119,25 @@ class FilesPaneState extends State<FilesPane> {
                         size: 19,
                       ),
                     ),
-                    if (uploadBatch != null || downloadTask != null)
+                    if (uploadBatch != null ||
+                        downloadBatch != null ||
+                        downloadTask != null)
                       PopupMenuButton<String>(
                         tooltip: '传输任务',
-                        icon: const Icon(Icons.playlist_add_check, size: 19),
+                        icon: Icon(
+                          downloadRunning
+                              ? Icons.downloading
+                              : Icons.playlist_add_check,
+                          size: 19,
+                          color: downloadRunning
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
                         onSelected: (value) {
                           if (value == 'upload') {
                             showUploadTasks();
+                          } else if (value == 'download-batch') {
+                            showDownloadTasks();
                           } else {
                             showDownloadTask();
                           }
@@ -1112,6 +1147,11 @@ class FilesPaneState extends State<FilesPane> {
                             const PopupMenuItem(
                               value: 'upload',
                               child: Text('上传任务'),
+                            ),
+                          if (downloadBatch != null)
+                            const PopupMenuItem(
+                              value: 'download-batch',
+                              child: Text('下载队列'),
                             ),
                           if (downloadTask != null)
                             const PopupMenuItem(
