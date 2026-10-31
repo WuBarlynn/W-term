@@ -6,7 +6,7 @@
 
 - 终端路径识别支持双引号或单引号包裹的含空格路径，悬停下划线与 Cmd/Ctrl+点击预览覆盖引号内完整路径。
 - 未加引号且含空格的裸文件名仍无法无歧义切分；引号内普通短语不会被当作路径。
-- 验证：新增引号路径解析测试；Flutter 全量 **327 项**通过，`flutter analyze` 无问题。
+- 验证：新增引号路径解析测试；Flutter 全量 **327 项**通过，`flutter analyze` 无问题；macOS Apple Silicon 与 Intel 自签名 DMG、iOS IPA 完成；Windows CI [41253316728](https://github.com/WuBarlynn/W-term/actions/runs/41253316728) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.64 SSH 环境变量静默请求（2026-10-31）
 
