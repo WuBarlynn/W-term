@@ -9,7 +9,7 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 ### 连接与认证
 
 - SSH 密码、加密私钥、键盘交互 / MFA、持久交互式身份。
-- SSH 用户证书导入与登录。
+- SSH 证书导入与登录。
 - 主机指纹在认证前确认，指纹变化默认阻断。
 - 多级跳板路由，逐跳指纹、MFA、取消与整链清理。
 - 命名 HTTP CONNECT / SOCKS5 代理，支持继承、指定与直连。
@@ -64,7 +64,7 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 - macOS：自签名 Release、DMG。
 - iOS / iPadOS：未签名 IPA。
 - Windows：Inno Setup 安装程序与便携包，静默安装 / 卸载。
-- 桌面端 GitHub Release 更新检查与 SHA256 校验。
+- 桌面端 GitHub Release 更新检查。
 - Windows 界面使用微软雅黑，终端与代码区域使用等宽字体回退链。
 - MIT License。
 
@@ -75,7 +75,6 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 - macOS：`wterm-macos-<version>.dmg`
 - iOS：`wterm-ios-<version>-unsigned.ipa`
 - Windows：`wterm-windows-<version>-setup.exe`、`wterm-windows-<version>-portable.zip`
-- 校验：`SHA256SUMS.txt`
 
 ## 构建
 
