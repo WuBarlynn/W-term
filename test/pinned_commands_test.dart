@@ -32,4 +32,38 @@ void main() {
       await dir.delete(recursive: true);
     }
   });
+  tagTests();
+}
+
+void tagTests() {
+  test('tag-scoped pins follow host tags and survive restart', () async {
+    final dir = await Directory.systemTemp.createTemp('wterm-tag-pins-');
+    final file = File('${dir.path}/pins.json');
+    try {
+      final store = PinnedCommands(file: () async => file);
+      await store.load();
+      const tagged = PinnedCommand(
+        name: 'deploy',
+        command: 'make deploy',
+        tag: 'production',
+      );
+      await store.pin(tagged);
+      expect(store.forHost('host-a'), isEmpty);
+      expect(store.forHost('host-a', tags: ['production']).map((e) => e.name), [
+        'deploy',
+      ]);
+      expect(
+        store.forHost('host-a', tags: ['staging']).map((e) => e.name),
+        isEmpty,
+      );
+
+      final restored = PinnedCommands(file: () async => file);
+      await restored.load();
+      expect(restored.entries.single.tag, 'production');
+      await restored.pin(tagged);
+      expect(restored.entries.length, 1);
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
 }

@@ -42,6 +42,7 @@ class TerminalPane extends StatefulWidget {
   final BroadcastScope broadcastScope;
   final int broadcastTargetCount;
   final String? paneDragData;
+  final List<String> hostTags;
   final ValueChanged<BroadcastScope>? onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
   final VoidCallback? onReconnect;
@@ -59,6 +60,7 @@ class TerminalPane extends StatefulWidget {
     this.broadcastScope = BroadcastScope.off,
     this.broadcastTargetCount = 0,
     this.paneDragData,
+    this.hostTags = const [],
     this.onBroadcastChanged,
     this.onShortcut,
     this.onReconnect,
@@ -528,18 +530,84 @@ class _TerminalPaneState extends State<TerminalPane> {
           .showSnackBar(const SnackBar(content: Text('只能固定单行命令')));
       return;
     }
-    final hostScoped = widget.session.hostId.isNotEmpty;
+    final hostId = widget.session.hostId;
+    var scope = hostId.isNotEmpty ? 'host' : '';
+    if (widget.hostTags.isNotEmpty) {
+      final selected = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          var value = scope;
+          return StatefulBuilder(
+            builder: (context, update) => AlertDialog(
+              title: const Text('固定命令的位置'),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.public, size: 20),
+                      title: const Text('所有主机（全局）'),
+                      trailing: value.isEmpty
+                          ? const Icon(Icons.check, size: 18)
+                          : null,
+                      onTap: () => update(() => value = ''),
+                    ),
+                    if (hostId.isNotEmpty)
+                      ListTile(
+                        leading: const Icon(Icons.dns_outlined, size: 20),
+                        title: const Text('仅当前主机'),
+                        trailing: value == 'host'
+                            ? const Icon(Icons.check, size: 18)
+                            : null,
+                        onTap: () => update(() => value = 'host'),
+                      ),
+                    for (final tag in widget.hostTags)
+                      ListTile(
+                        leading: const Icon(Icons.label_outline, size: 20),
+                        title: Text('标签：$tag'),
+                        trailing: value == 'tag:$tag'
+                            ? const Icon(Icons.check, size: 18)
+                            : null,
+                        onTap: () => update(() => value = 'tag:$tag'),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, value),
+                  child: const Text('固定'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      if (selected == null) return;
+      scope = selected;
+    }
+    final tag = scope.startsWith('tag:') ? scope.substring(4) : '';
     await pinnedCommands.pin(
       PinnedCommand(
         name: command.length > 32 ? '${command.substring(0, 32)}…' : command,
         command: command,
-        hostId: hostScoped ? widget.session.hostId : '',
+        hostId: scope == 'host' ? hostId : '',
+        tag: tag,
       ),
     );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(hostScoped ? '已固定到当前主机的命令条' : '已固定到终端底部')),
-      );
+      final where = tag.isNotEmpty
+          ? '标签「$tag」的命令条'
+          : scope == 'host'
+          ? '当前主机的命令条'
+          : '终端底部（全局）';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('已固定到$where')));
     }
   }
 
@@ -1434,7 +1502,10 @@ class _TerminalPaneState extends State<TerminalPane> {
           ListenableBuilder(
             listenable: pinnedCommands,
             builder: (context, _) {
-              final pins = pinnedCommands.forHost(widget.session.hostId);
+              final pins = pinnedCommands.forHost(
+                widget.session.hostId,
+                tags: widget.hostTags,
+              );
               if (pins.isEmpty) return const SizedBox.shrink();
               return Container(
                 height: 40,

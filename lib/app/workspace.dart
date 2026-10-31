@@ -1251,11 +1251,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     });
   }
 
-  void _handleTabDrop(
-    String source,
-    String targetSessionId,
-    SplitEdge edge,
-  ) {
+  void _handleTabDrop(String source, String targetSessionId, SplitEdge edge) {
     final paneSessionId = paneDragSessionId(source);
     if (paneSessionId != null) {
       _movePaneToSplit(paneSessionId, targetSessionId, edge);
@@ -3432,6 +3428,7 @@ class _PaneTree extends StatelessWidget {
       broadcastScope: broadcastScope,
       broadcastTargetCount: targets.length,
       paneDragData: paneDragData(session.id),
+      hostTags: session.profile?.tags ?? const [],
       onBroadcastChanged: onBroadcastChanged,
       onShortcut: onShortcut,
       onReconnect: () => onReconnect(session.id),
@@ -3555,7 +3552,9 @@ class _SplitDividerState extends State<_SplitDivider> {
 
   void _update(double delta) {
     if (widget.extent <= 0) return;
-    final next = _clamp((_liveFraction ?? widget.fraction) + delta / widget.extent);
+    final next = _clamp(
+      (_liveFraction ?? widget.fraction) + delta / widget.extent,
+    );
     setState(() => _liveFraction = next);
     widget.onChanged(next);
   }

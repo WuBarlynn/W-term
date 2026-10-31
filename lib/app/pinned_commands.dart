@@ -6,17 +6,19 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class PinnedCommand {
-  final String name, command, hostId;
+  final String name, command, hostId, tag;
   const PinnedCommand({
     required this.name,
     required this.command,
     this.hostId = '',
+    this.tag = '',
   });
 
   Map<String, Object?> toJson() => {
     'name': name,
     'command': command,
     if (hostId.isNotEmpty) 'hostId': hostId,
+    if (tag.isNotEmpty) 'tag': tag,
   };
 
   static PinnedCommand? fromJson(Map<String, dynamic> value) {
@@ -29,6 +31,7 @@ class PinnedCommand {
       name: name,
       command: command,
       hostId: value['hostId'] is String ? value['hostId'] as String : '',
+      tag: value['tag'] is String ? value['tag'] as String : '',
     );
   }
 }
@@ -46,9 +49,19 @@ class PinnedCommands extends ChangeNotifier {
             '${(await getApplicationSupportDirectory()).path}/pinned-commands.json',
           ));
 
-  List<PinnedCommand> forHost(String hostId) => entries
-      .where((entry) => entry.hostId.isEmpty || entry.hostId == hostId)
-      .toList();
+  List<PinnedCommand> forHost(
+    String hostId, {
+    Iterable<String> tags = const [],
+  }) {
+    final hostTags = tags.toSet();
+    return entries
+        .where(
+          (entry) => entry.tag.isNotEmpty
+              ? hostTags.contains(entry.tag)
+              : entry.hostId.isEmpty || entry.hostId == hostId,
+        )
+        .toList();
+  }
 
   Future<void> load() async {
     try {
@@ -82,6 +95,7 @@ class PinnedCommands extends ChangeNotifier {
       (entry) =>
           entry.command == command.command &&
           entry.hostId == command.hostId &&
+          entry.tag == command.tag &&
           entry.name == command.name,
     );
     if (!exists) entries.insert(0, command);
@@ -95,6 +109,7 @@ class PinnedCommands extends ChangeNotifier {
       (entry) =>
           entry.command == command.command &&
           entry.hostId == command.hostId &&
+          entry.tag == command.tag &&
           entry.name == command.name,
     );
     notifyListeners();
