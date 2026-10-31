@@ -156,11 +156,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   void _applyImeState() {
-    final platform = Theme.of(context).platform;
-    if (platform != TargetPlatform.macOS &&
-        platform != TargetPlatform.windows) {
-      return;
-    }
+    if (!(Theme.of(context).platform == TargetPlatform.macOS)) return;
     unawaited(
       _imeChannel
           .invokeMethod<void>(

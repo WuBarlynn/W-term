@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
-const appVersion = '1.0.29';
-const appBuild = '82';
+const appVersion = '1.0.30';
+const appBuild = '83';
 
 class UpdateAsset {
   final String name, url;
@@ -181,7 +181,8 @@ Future<bool> verifyUpdateDownload(File file, UpdateInfo info) async {
 /// Silent per-user Inno Setup install. The app exits after starting the
 /// installer, which replaces files and restarts the application.
 const updateInstallerArguments = <String>[
-  '/SILENT',
+  '/VERYSILENT',
+  '/SUPPRESSMSGBOXES',
   '/CLOSEAPPLICATIONS',
   '/RESTARTAPPLICATIONS',
 ];

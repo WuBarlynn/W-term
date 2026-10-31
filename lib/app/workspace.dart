@@ -366,8 +366,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       username: username,
       onEnded: () => _terminalEnded(terminal.connectionId),
       onActivity: () => taskMonitor.activity(terminal.connectionId),
-      onCommandFinished: (exitCode) =>
-          taskMonitor.commandFinished(terminal.connectionId, exitCode: exitCode),
+      onCommandFinished: (exitCode) => taskMonitor.commandFinished(
+        terminal.connectionId,
+        exitCode: exitCode,
+      ),
       onCommand: (command) {
         unawaited(
           commandHistory.record(
@@ -1823,8 +1825,26 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           await Process.run('open', [file.path]);
           message('安装包已下载并打开：${file.path}');
         } else if (Platform.isWindows) {
-          await Process.start(file.path, updateInstallerArguments);
-          await Future<void>.delayed(const Duration(milliseconds: 700));
+          // Launch a detached helper first, then exit: the installer must not
+          // race a still-running app (which would keep file locks and fail
+          // silently under /VERYSILENT). The helper waits briefly, installs,
+          // and the installer's [Run] entry starts the new app.
+          await Process.start(
+            'powershell.exe',
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-WindowStyle',
+              'Hidden',
+              '-ExecutionPolicy',
+              'Bypass',
+              '-Command',
+              r'Start-Sleep -Seconds 2; Start-Process -FilePath $env:WTERM_UPDATE_EXE -ArgumentList @("/VERYSILENT","/SUPPRESSMSGBOXES","/CLOSEAPPLICATIONS","/RESTARTAPPLICATIONS") -Wait',
+            ],
+            environment: {'WTERM_UPDATE_EXE': file.path},
+          );
+          message('更新程序已启动，W Term 将退出并自动安装…');
+          await Future<void>.delayed(const Duration(milliseconds: 500));
           exit(0);
         }
       } catch (e) {

@@ -80,7 +80,8 @@ void main() {
   });
 
   test('Windows installer runs silently and restarts the app', () {
-    expect(updateInstallerArguments, contains('/SILENT'));
+    expect(updateInstallerArguments, contains('/VERYSILENT'));
+    expect(updateInstallerArguments, contains('/SUPPRESSMSGBOXES'));
     expect(updateInstallerArguments, contains('/CLOSEAPPLICATIONS'));
     expect(updateInstallerArguments, contains('/RESTARTAPPLICATIONS'));
   });
