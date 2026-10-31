@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.57（110）**。
 - 新增 `lib/app/clipboard_image.dart`；macOS MainFlutterWindow 与 iOS AppDelegate 注册 `dev.wterm/clipboard`，Windows 使用 PowerShell/System.Drawing。
 - 分享对话框新增复制图片按钮；未引入 super_clipboard。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **321 项**与 `flutter analyze` 通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41237558714](https://github.com/WuBarlynn/W-term/actions/runs/41237558714) 成功。发布包位于 `build/release-1.0.57/`。
 
 ## 49. 1.0.56 路径悬停与菜单按钮（2026-10-31）
 

@@ -6,7 +6,7 @@
 
 - 分享图片对话框新增“复制图片”，写入系统剪贴板。
 - macOS/iOS 使用自建 Flutter 方法通道；Windows 通过系统 PowerShell 与 System.Drawing 写入剪贴板，避免引入破坏构建的第三方插件。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41237558714](https://github.com/WuBarlynn/W-term/actions/runs/41237558714) 成功。剪贴板复制仍需实机验收。
 
 ## 1.0.56 路径悬停与菜单按钮（2026-10-31）
 
