@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/errors.dart';
@@ -64,6 +65,24 @@ class _TerminalShareDialogState extends State<TerminalShareDialog> {
       return data.buffer.asUint8List();
     } finally {
       image.dispose();
+    }
+  }
+
+  Future<void> _copy() async {
+    setState(() {
+      busy = true;
+      message = '';
+    });
+    try {
+      final bytes = await _capture();
+      final item = DataWriterItem();
+      item.add(Formats.png(bytes));
+      await ClipboardWriter.instance.write([item]);
+      if (mounted) setState(() => message = '图片已复制到剪贴板');
+    } catch (e) {
+      if (mounted) setState(() => message = '复制失败：${userFacingError(e)}');
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -425,6 +444,12 @@ class _TerminalShareDialogState extends State<TerminalShareDialog> {
                   onPressed: busy ? null : _exportText,
                   icon: const Icon(Icons.description_outlined, size: 18),
                   label: const Text('导出文本'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _copy,
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('复制图片'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
