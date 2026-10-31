@@ -476,3 +476,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 广播回归：删除 `TerminalPane.dispose` 中遗留的 `terminal.onOutput = session.send`，新增 `terminal_pane_input_route_test.dart`，验证窗格销毁后输入仍经过会话层广播路由。
 - 验证：`build/flutter-tests-1.0.27.log` **283 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.27（80）；Windows CI 41165695844 成功（IME 原生代码编译、启动冒烟、Inno Setup、Rust 测试）。
 - 未执行：Windows 微软拼音/其它输入法实机切换与恢复、Detached 窗口输入法、真实终端广播多会话点击。
+
+## 20. 1.0.28 多选下载队列（2026-10-31）
+
+- 三端版本 **1.0.28（81）**；本地产物 `build/release-1.0.28/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.28 。
+- 文件：桌面多选下载会创建 `DownloadBatch`，选择一次本地目录后后台逐项执行；下载队列对话框显示等待/下载中/完成/失败/取消与详情，可取消剩余（当前文件完成后停止），文件面板不再被 `busy` 锁住，可继续浏览并重新打开队列。
+- 限制：队列仍归当前 FilesPane/标签所有，换标签或关闭窗格会停止后续项；无百分比进度、无失败重试、无跨标签统一队列。
+- 验证：`build/flutter-tests-1.0.28.log` **285 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.28（81）；Windows CI 41167515357 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
+- 未执行：真实远端批量下载与并发浏览、目录递归队列、取消时机、Windows 安装升级。
