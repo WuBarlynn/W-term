@@ -591,7 +591,7 @@ UI、实际桥接、测试、文档与双端构建。
 
 - 三端版本 **1.0.51（104）**。
 - `_FilePreviewDialog` 新增可选 `openPath`，Office 桌面预览可调用系统默认应用；临时文件在对话框关闭后删除。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **318 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41220856417](https://github.com/WuBarlynn/W-term/actions/runs/41220856417) 成功。发布包位于 `build/release-1.0.51/`。
 
 ## 43. 1.0.50 界面色调与右键粘贴（2026-10-31）
 

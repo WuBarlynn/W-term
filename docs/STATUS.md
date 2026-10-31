@@ -7,7 +7,7 @@
 - SFTP 的 docx/xlsx/pptx 文本预览新增“用系统应用打开”，在桌面端以默认 Office 应用查看原始排版。
 - 临时文件在预览窗口关闭后清理；系统应用需在窗口关闭前完成读取。
 - 应用内仍保留文本/表格抽取预览，复杂排版不在应用内重建。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **318 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41220856417](https://github.com/WuBarlynn/W-term/actions/runs/41220856417) 成功。Office 系统应用打开仍需实机验收。
 
 ## 1.0.50 界面色调与右键粘贴（2026-10-31）
 
