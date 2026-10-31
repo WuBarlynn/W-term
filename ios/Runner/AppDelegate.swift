@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var folderPicker: WTermFolderPicker?
+  private var clipboardChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -23,6 +24,21 @@ import UniformTypeIdentifiers
       channel.setMethodCallHandler { call, result in picker.handle(call, result: result) }
     }
 
+
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WTermClipboard") {
+      let channel = FlutterMethodChannel(name: "dev.wterm/clipboard", binaryMessenger: registrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "writePng",
+              let data = call.arguments as? FlutterStandardTypedData,
+              let image = UIImage(data: data.data) else {
+          result(FlutterError(code: "clipboard_image", message: "图片数据无效", details: nil))
+          return
+        }
+        UIPasteboard.general.image = image
+        result(true)
+      }
+      clipboardChannel = channel
+    }
 
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WTermFonts") {
       let channel = FlutterMethodChannel(name: "dev.wterm/fonts", binaryMessenger: registrar.messenger())

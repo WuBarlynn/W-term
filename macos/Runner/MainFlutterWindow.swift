@@ -11,6 +11,7 @@ class MainFlutterWindow: NSWindow {
   private var showHotKeyHandler: EventHandlerRef?
   private var previousInputSource: TISInputSource?
   private var fontChannel: FlutterMethodChannel?
+  private var clipboardChannel: FlutterMethodChannel?
   private weak var mainFlutterController: FlutterViewController?
 
   override func awakeFromNib() {
@@ -35,6 +36,21 @@ class MainFlutterWindow: NSWindow {
       result(NSFontManager.shared.availableFontFamilies.sorted())
     }
     self.fontChannel = fontChannel
+
+    let clipboardChannel = FlutterMethodChannel(
+      name: "dev.wterm/clipboard",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    clipboardChannel.setMethodCallHandler { call, result in
+      guard call.method == "writePng",
+            let data = call.arguments as? FlutterStandardTypedData else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let pasteboard = NSPasteboard.general
+      pasteboard.clearContents()
+      result(pasteboard.setData(data.data, forType: .png))
+    }
+    self.clipboardChannel = clipboardChannel
 
     let biometricChannel = FlutterMethodChannel(
       name: "dev.wterm/biometrics",
