@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.54（107）**。
 - PluginSettings 新增 `showComposeBar`；TerminalPane 底部撰写栏发送 `sendInput`，受广播目标控制。
 - 系统监控新增复制 PID；端口页协议/回环筛选。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **321 项**与 `flutter analyze` 通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41229957525](https://github.com/WuBarlynn/W-term/actions/runs/41229957525) 成功。发布包位于 `build/release-1.0.54/`。
 
 ## 46. 1.0.53 Docker 操作与同步状态（2026-10-31）
 

@@ -7,7 +7,7 @@
 - 工作区偏好新增底部撰写栏，可编辑最多三行命令并发送到当前输入目标；随设置同步。
 - 系统监控进程页新增复制 PID；端口页新增 TCP/UDP 协议与仅回环筛选。
 - 保留 Docker 容器停止/重启与顶栏同步状态。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；macOS Apple Silicon 与 Intel DMG、iOS IPA 完成；Windows CI [41229957525](https://github.com/WuBarlynn/W-term/actions/runs/41229957525) 成功。撰写栏与监控筛选仍需实机验收。
 
 ## 1.0.53 Docker 操作与同步状态（2026-10-31）
 
