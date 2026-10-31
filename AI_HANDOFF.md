@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.46（99）**。
 - 新增 `TerminalShareDialog`：终端窗口/渐变卡片/极简纯色，深色/浅色、行号、水印、标题、保存与系统分享。
 - 保留原有快速终端截图分享；模板分享读取当前缓冲区文本，最多 36 行。
-- 验证：Flutter **316 项**与 `flutter analyze` 通过；三端构建与实机分享面板待记录。
+- 验证：Flutter **316 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41209699476](https://github.com/WuBarlynn/W-term/actions/runs/41209699476) 成功。发布包位于 `build/release-1.0.46/`。
 
 ## 38. 1.0.45 工作区偏好（2026-10-31）
 

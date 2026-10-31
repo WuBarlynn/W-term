@@ -7,7 +7,7 @@
 - 终端右键菜单新增“分享为图片（模板）”，支持终端窗口、渐变卡片、极简纯色三种模板。
 - 支持深色/浅色、行号、水印、自定义标题，可保存 PNG 或调用系统分享。
 - 保留原有“快速分享终端图片”，直接捕获当前终端视图。
-- 验证：Flutter 全量 **316 项**通过，`flutter analyze` 无问题；三端构建状态见下方记录。
+- 验证：Flutter 全量 **316 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41209699476](https://github.com/WuBarlynn/W-term/actions/runs/41209699476) 成功。模板分享与系统分享面板仍待实机验收。
 
 ## 1.0.45 工作区偏好（2026-10-31）
 
