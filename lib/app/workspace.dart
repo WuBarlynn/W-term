@@ -121,7 +121,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
-  Timer? _layoutSaveTimer, _updateTimer, _autoSyncTimer;
+  Timer? _layoutSaveTimer, _updateTimer, _autoSyncTimer, _syncStatusTimer;
+  SyncProfile? _syncProfile;
+  int _syncConflicts = 0;
+  bool _syncStatusBusy = false;
   bool _autoSyncBusy = false;
   bool _restoredLayout = false;
   String status = '';
@@ -146,6 +149,15 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
     }
     _restartAutoSync();
+    if (hostStore is FirstRunHost && hostStore is SyncStore) {
+      _syncStatusTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(_refreshSyncStatus()),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_refreshSyncStatus());
+      });
+    }
     if (hostStore is FirstRunHost && !onboarding.completed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || onboarding.completed) return;
@@ -203,6 +215,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     _autoSyncTimer?.cancel();
+    _syncStatusTimer?.cancel();
     unawaited(_saveLayout());
     attempt++;
     final operation = activeOperationId;
@@ -1068,6 +1081,25 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     unawaited(_runAutoSync());
   }
 
+  Future<void> _refreshSyncStatus() async {
+    if (!mounted || _syncStatusBusy || hostStore is! SyncStore) return;
+    _syncStatusBusy = true;
+    try {
+      final store = hostStore as SyncStore;
+      final profile = await store.syncSettings();
+      final review = await store.syncConflicts();
+      if (!mounted) return;
+      setState(() {
+        _syncProfile = profile;
+        _syncConflicts = review?.items.length ?? 0;
+      });
+    } catch (_) {
+      // The sync dialog reports configuration errors when opened.
+    } finally {
+      _syncStatusBusy = false;
+    }
+  }
+
   Future<void> _runAutoSync() async {
     if (!mounted ||
         _autoSyncBusy ||
@@ -1109,6 +1141,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       if (mounted) message('自动同步失败：${userFacingError(e)}');
     } finally {
       _autoSyncBusy = false;
+      unawaited(_refreshSyncStatus());
     }
   }
 
@@ -3261,6 +3294,37 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                       _tabItem(tabs[index], index, wide),
                 ),
         ),
+        if (_syncProfile?.configured == true)
+          IconButton(
+            tooltip: _syncConflicts > 0
+                ? '同步冲突：$_syncConflicts 项'
+                : _syncProfile!.pending
+                ? '待处理同步'
+                : 'GitHub 同步已就绪',
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              _syncConflicts > 0
+                  ? Icons.priority_high
+                  : _syncProfile!.pending
+                  ? Icons.cloud_sync_outlined
+                  : Icons.cloud_done_outlined,
+              size: 18,
+              color: _syncConflicts > 0
+                  ? Theme.of(context).colorScheme.error
+                  : null,
+            ),
+            onPressed: () async {
+              if (hostStore is! SyncStore) return;
+              final store = hostStore as SyncStore;
+              await showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => SyncDialog(store: store),
+              );
+              await _refreshSyncStatus();
+            },
+          ),
         IconButton(
           tooltip: '新建连接',
           padding: EdgeInsets.zero,

@@ -57,6 +57,7 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
   int get latencyIndex => _tabs.indexWhere((tab) => tab.$2 == '__latency__');
   int get resourceIndex => _tabs.indexWhere((tab) => tab.$2 == '__resources__');
   int get processIndex => _tabs.indexWhere((tab) => tab.$1 == '进程');
+  int get dockerIndex => _tabs.indexWhere((tab) => tab.$1 == 'Docker');
   int get portIndex => _tabs.indexWhere((tab) => tab.$1 == '端口');
   final filter = TextEditingController();
   String processSort = 'cpu';
@@ -79,6 +80,69 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
     return filtered.isEmpty
         ? '没有匹配“${filter.text.trim()}”的行'
         : filtered.join('\n');
+  }
+
+  Future<void> dockerAction(String action) async {
+    final names = dockerContainerNames(output[dockerIndex] ?? '');
+    if (names.isEmpty) {
+      setState(() => error = '没有可操作的容器，请先刷新 Docker 列表');
+      return;
+    }
+    String selected = names.first;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(action == 'stop' ? '停止 Docker 容器' : '重启 Docker 容器'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selected,
+                decoration: const InputDecoration(labelText: '容器'),
+                items: [
+                  for (final name in names)
+                    DropdownMenuItem(value: name, child: Text(name)),
+                ],
+                onChanged: (value) =>
+                    setDialogState(() => selected = value ?? names.first),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                action == 'stop'
+                    ? '会立即停止该容器，可能中断正在运行的服务。'
+                    : '会重启该容器；短时服务不可用。',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action == 'stop' ? '停止' : '重启'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await native.runCommand(
+        connectionId: widget.connectionId,
+        command: "sh -c 'docker $action -- $selected'",
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(action == 'stop' ? '已发送停止请求' : '已发送重启请求')),
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    }
   }
 
   Future<void> killProcess() async {
@@ -405,7 +469,9 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                 child: const SizedBox.expand(),
               ),
             ),
-          if (index == processIndex || index == portIndex)
+          if (index == processIndex ||
+              index == portIndex ||
+              index == dockerIndex)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -422,6 +488,24 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
+                  if (index == dockerIndex) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: loading.contains(index)
+                          ? null
+                          : () => dockerAction('stop'),
+                      icon: const Icon(Icons.stop_circle_outlined, size: 16),
+                      label: const Text('停止'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: loading.contains(index)
+                          ? null
+                          : () => dockerAction('restart'),
+                      icon: const Icon(Icons.restart_alt, size: 16),
+                      label: const Text('重启'),
+                    ),
+                  ],
                   if (index == processIndex) ...[
                     const SizedBox(width: 8),
                     DropdownButton<String>(

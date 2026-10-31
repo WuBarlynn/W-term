@@ -85,3 +85,23 @@ class MonitorSample {
 
 String formatPercent(double? value) =>
     value == null ? '—' : '${value.toStringAsFixed(1)}%';
+
+/// Container names from `docker ps --format "table {{.Names}}\t..."`.
+List<String> dockerContainerNames(String output) {
+  final names = <String>[];
+  final seen = <String>{};
+  for (final line in output.split('\n')) {
+    final value = line.trim();
+    if (value.isEmpty || !value.contains('\t')) continue;
+    final first = value.split(RegExp(r'\s+')).first;
+    if (first.toUpperCase() == 'NAMES' || first.toUpperCase() == 'CONTAINER') {
+      continue;
+    }
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$').hasMatch(first)) {
+      continue;
+    }
+    if (seen.add(first)) names.add(first);
+    if (names.length >= 100) break;
+  }
+  return names;
+}

@@ -52,4 +52,13 @@ Cached:           200 kB
     expect(ProcSnapshot.parse(''), isNull);
     expect(ProcSnapshot.parse('cpu nope\nMemTotal: 1 kB'), isNull);
   });
+
+  test('docker container names are parsed and validated', () {
+    const output = 'NAMES\tIMAGE\tSTATUS\n'
+        'web-1\tnginx:latest\tUp 2 hours\n'
+        'db.primary\tpostgres:16\tUp 2 hours\n'
+        'bad;name\timage\tUp\n';
+    expect(dockerContainerNames(output), ['web-1', 'db.primary']);
+    expect(dockerContainerNames('Cannot connect to the Docker daemon'), isEmpty);
+  });
 }
