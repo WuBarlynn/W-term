@@ -5,6 +5,7 @@ import '../app/shell_integration.dart';
 import 'keyword_highlight_dialog.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
+import 'terminal_share_dialog.dart';
 import '../app/terminal_appearance.dart';
 import '../app/font_catalog.dart';
 import 'terminal_appearance_dialog.dart';
@@ -763,6 +764,38 @@ class _TerminalPaneState extends State<TerminalPane> {
         ).showSnackBar(SnackBar(content: Text('保存失败：${userFacingError(e)}')));
       }
     }
+  }
+
+  Future<void> shareImageTemplates() async {
+    final raw = <String>[];
+    final bufferLines = widget.session.terminal.buffer.lines;
+    for (var index = 0; index < bufferLines.length; index++) {
+      final line = bufferLines[index];
+      if (line.isWrapped && raw.isNotEmpty) {
+        raw[raw.length - 1] += line.getText();
+      } else {
+        raw.add(line.getText());
+      }
+    }
+    final lines = raw.where((line) => line.trim().isNotEmpty).toList();
+    if (lines.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('终端没有可分享的内容')));
+      }
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => TerminalShareDialog(
+        title: widget.session.title,
+        lines: lines,
+        theme: terminalAppearance.activeTheme,
+        fontFamily: _terminalFontFamily,
+        fontSize: terminalAppearance.fontSize.toDouble(),
+      ),
+    );
   }
 
   Future<void> shareImage() async {
@@ -1724,7 +1757,11 @@ class _TerminalPaneState extends State<TerminalPane> {
                                             ),
                                           const PopupMenuItem(
                                             value: 'share-image',
-                                            child: Text('分享终端为图片'),
+                                            child: Text('快速分享终端图片'),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'share-image-templates',
+                                            child: Text('分享为图片（模板）'),
                                           ),
                                           const PopupMenuItem(
                                             value: 'plugins',
@@ -1754,6 +1791,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                                         await saveSelectionAsSnippet();
                                       } else if (selected == 'share-image') {
                                         await shareImage();
+                                      } else if (selected == 'share-image-templates') {
+                                        await shareImageTemplates();
                                       } else if (selected == 'plugins') {
                                         if (!context.mounted) return;
                                         await showDialog<void>(
