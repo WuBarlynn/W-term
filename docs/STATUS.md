@@ -6,7 +6,7 @@
 
 - SFTP 上传与下载新增 operationId 进度记录，Dart 队列每 200 ms 轮询并显示百分比、已传输/总大小。
 - 上传与下载任务窗口继续显示完成路径或失败原因；目录递归下载保留文件计数进度。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；真实 AsyncSSH/SFTP/转发/MFA 19 项与保险库桥接测试通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41232657889](https://github.com/WuBarlynn/W-term/actions/runs/41232657889) 成功。字节进度仍需实机观察。
 
 ## 1.0.54 撰写栏与监控筛选（2026-10-31）
 

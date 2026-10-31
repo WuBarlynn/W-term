@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.55（108）**。
 - Rust 新增 `transfer_progress` 与 upload/download progress API，按 64 KiB 块报告；完成后清理进度。
 - Dart 队列以 operationId 每 200 ms 轮询，更新任务详情；目录下载保留按文件计数。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **321 项**与 `flutter analyze` 通过；真实 AsyncSSH/SFTP/转发/MFA 19 项与保险库桥接通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41232657889](https://github.com/WuBarlynn/W-term/actions/runs/41232657889) 成功。发布包位于 `build/release-1.0.55/`。
 
 ## 47. 1.0.54 撰写栏与监控筛选（2026-10-31）
 
