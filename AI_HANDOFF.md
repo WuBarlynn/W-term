@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.47（100）**。
 - TerminalPane 每 10 秒通过独立 exec 通道采样延迟/CPU/内存；`showStatusBar` 可关闭。
 - TerminalAppearance 新增 `cursorStyle`、`bottomPadding`、`scrollback`；回滚行数只在创建会话时读取。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **316 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41211222082](https://github.com/WuBarlynn/W-term/actions/runs/41211222082) 成功。发布包位于 `build/release-1.0.47/`。
 
 ## 39. 1.0.46 分享图片模板（2026-10-31）
 

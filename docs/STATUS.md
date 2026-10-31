@@ -8,7 +8,7 @@
 - 终端外观新增光标样式（方块/竖线/下划线）、底部留白（0–64）与回滚行数（1,000–50,000）。
 - 回滚行数在新建会话时生效；现有会话保持原缓冲。
 - 外观与状态栏偏好随 GitHub 加密设置同步。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **316 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41211222082](https://github.com/WuBarlynn/W-term/actions/runs/41211222082) 成功。状态栏采样与光标/留白/回滚需实机验收。
 
 ## 1.0.46 分享图片模板（2026-10-31）
 
