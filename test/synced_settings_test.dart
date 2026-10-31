@@ -18,6 +18,7 @@ void main() {
     await store.applySynced({
       'palette': 'nord',
       'fontSize': 15,
+      'lineHeight': 1.5,
       'uiTheme': 'dark',
       'terminalFont': 'Menlo',
       'skin': 'aurora',
@@ -25,6 +26,7 @@ void main() {
     });
     expect(store.palette, 'nord');
     expect(store.fontSize, 15);
+    expect(store.lineHeight, 1.5);
     expect(store.uiTheme, 'dark');
     expect(store.terminalFont, 'Menlo');
     expect(store.skin, 'aurora');

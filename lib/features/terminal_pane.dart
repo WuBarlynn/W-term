@@ -1839,6 +1839,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                                     textStyle: TerminalStyle(
                                       fontSize: terminalAppearance.fontSize
                                           .toDouble(),
+                                      height: terminalAppearance.lineHeight,
                                       fontFamily: _terminalFontFamily,
                                       fontFamilyFallback: _terminalFontFallback,
                                     ),

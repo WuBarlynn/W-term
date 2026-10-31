@@ -21,6 +21,7 @@ class TerminalAppearanceDialog extends StatefulWidget {
 class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String palette = widget.store.palette;
   late int size = widget.store.fontSize;
+  late double lineHeight = widget.store.lineHeight;
   late String uiTheme = widget.store.uiTheme;
   late String skin = widget.store.skin;
   late bool copyOnSelect = widget.store.copyOnSelect;
@@ -258,6 +259,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextCustomColors: customColors,
         nextCopyOnSelect: copyOnSelect,
         nextCursorStyle: cursorStyle,
+        nextLineHeight: lineHeight,
         nextBottomPadding: bottomPadding,
         nextScrollback: scrollback,
         nextUiToneFollowsTerminal: uiToneFollowsTerminal,
@@ -453,6 +455,19 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     ? null
                     : (v) => setState(() => size = v.round()),
               ),
+              Text('行高：${lineHeight.toStringAsFixed(1)}'),
+              Slider(
+                min: 0.9,
+                max: 2,
+                divisions: 11,
+                value: lineHeight,
+                label: lineHeight.toStringAsFixed(1),
+                onChanged: busy
+                    ? null
+                    : (v) => setState(
+                        () => lineHeight = (v * 10).round() / 10,
+                      ),
+              ),
               DropdownButtonFormField<String>(
                 initialValue: cursorStyle,
                 decoration: const InputDecoration(labelText: '光标样式'),
@@ -521,6 +536,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                   style: TextStyle(
                     color: theme.foreground,
                     fontSize: size.toDouble(),
+                    height: lineHeight,
                     fontFamily: terminalFont.text.trim().isEmpty
                         ? platformDefaultTerminalFont()
                         : terminalFont.text.trim(),

@@ -135,6 +135,7 @@ class TerminalAppearance extends ChangeNotifier {
   String skin = 'none';
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
+  double lineHeight = 1.2;
   bool copyOnSelect = false;
   String cursorStyle = 'block';
   int bottomPadding = 0;
@@ -398,6 +399,11 @@ class TerminalAppearance extends ChangeNotifier {
           {'block', 'underline', 'verticalBar'}.contains(storedCursor)) {
         cursorStyle = storedCursor;
       }
+      final storedLineHeight = value['lineHeight'];
+      if (storedLineHeight is num && storedLineHeight >= 0.9 &&
+          storedLineHeight <= 2) {
+        lineHeight = storedLineHeight.toDouble();
+      }
       final storedPadding = value['bottomPadding'];
       if (storedPadding is int && storedPadding >= 0 && storedPadding <= 64) {
         bottomPadding = storedPadding;
@@ -419,6 +425,7 @@ class TerminalAppearance extends ChangeNotifier {
   Map<String, Object?> toJson() => {
     'palette': palette,
     'fontSize': fontSize,
+    'lineHeight': lineHeight,
     'uiTheme': uiTheme,
     'uiFont': uiFont,
     'terminalFont': terminalFont,
@@ -485,6 +492,9 @@ class TerminalAppearance extends ChangeNotifier {
       nextCursorStyle: data['cursorStyle'] is String
           ? data['cursorStyle'] as String
           : cursorStyle,
+      nextLineHeight: data['lineHeight'] is num
+          ? (data['lineHeight'] as num).toDouble()
+          : lineHeight,
       nextBottomPadding: data['bottomPadding'] is int
           ? data['bottomPadding'] as int
           : bottomPadding,
@@ -506,12 +516,14 @@ class TerminalAppearance extends ChangeNotifier {
     Map<String, int>? nextCustomColors,
     bool? nextCopyOnSelect,
     String? nextCursorStyle,
+    double? nextLineHeight,
     int? nextBottomPadding,
     int? nextScrollback,
     bool? nextUiToneFollowsTerminal,
   }) {
     final nextMode = nextUiTheme ?? uiTheme;
     final nextCursor = nextCursorStyle ?? cursorStyle;
+    final nextLine = (nextLineHeight ?? lineHeight).clamp(0.9, 2.0).toDouble();
     final nextPadding = (nextBottomPadding ?? bottomPadding).clamp(0, 64);
     final nextScroll = (nextScrollback ?? scrollback).clamp(1000, 100000);
     final nextColors = nextCustomColors ?? customColors;
@@ -526,6 +538,8 @@ class TerminalAppearance extends ChangeNotifier {
     if (!names.containsKey(nextPalette) ||
         nextSize < 10 ||
         nextSize > 28 ||
+        nextLine < 0.9 ||
+        nextLine > 2.0 ||
         !{'system', 'dark', 'light'}.contains(nextMode) ||
         !{'block', 'underline', 'verticalBar'}.contains(nextCursor) ||
         !validColors) {
@@ -547,6 +561,7 @@ class TerminalAppearance extends ChangeNotifier {
           'customColors': nextColors,
           'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
           'cursorStyle': nextCursor,
+          'lineHeight': nextLine,
           'bottomPadding': nextPadding,
           'scrollback': nextScroll,
           'uiToneFollowsTerminal':
@@ -565,6 +580,7 @@ class TerminalAppearance extends ChangeNotifier {
       customColors = Map.unmodifiable(nextColors);
       copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
       cursorStyle = nextCursor;
+      lineHeight = nextLine;
       bottomPadding = nextPadding;
       scrollback = nextScroll;
       uiToneFollowsTerminal =
