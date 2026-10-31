@@ -450,8 +450,7 @@ fn sync_settings_roundtrip_and_merge() {
     let plan = merge(&base, &local, &base).unwrap();
     assert!(plan.is_resolved());
     apply_merge(&mut a, &plan).unwrap();
-    let stored: Value =
-        serde_json::from_str(&read_record(&a, "settings").unwrap()).unwrap();
+    let stored: Value = serde_json::from_str(&read_record(&a, "settings").unwrap()).unwrap();
     assert_eq!(stored, settings);
     let recaptured = capture(&a, plan.snapshot().unwrap(), DEVICE_A).unwrap();
     assert!(recaptured

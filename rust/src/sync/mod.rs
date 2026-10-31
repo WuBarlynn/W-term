@@ -16,8 +16,8 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use zeroize::{Zeroize, Zeroizing};
 
-pub use vault::{apply_merge, capture};
 pub(crate) use vault::validate_settings;
+pub use vault::{apply_merge, capture};
 pub const FORMAT_VERSION: u32 = 1;
 const MAX_BYTES: usize = 16 * 1024 * 1024;
 const MAX_RECORDS: usize = 32_000;
