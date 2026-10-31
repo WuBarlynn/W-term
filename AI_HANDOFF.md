@@ -532,3 +532,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 执行器仍由发起下载的 FilesPane state 闭包持有，应用退出即停止；不跨重启恢复，无百分比进度与失败重试。
 - 验证：`build/flutter-tests-1.0.34.log` **291 项** Flutter 测试通过（含应用级队列测试），`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.34（87）；Windows CI 41178684577 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：真实远端跨标签并发下载、关闭文件面板后的完成状态刷新、Windows 实体机输入与自动更新。
+
+## 27. 1.0.35 终端链接自动下划线（2026-10-31）
+
+- 三端版本 **1.0.35（88）**；本地产物 `build/release-1.0.35/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.35 。
+- 终端输出中的 http/https 链接在可见行绘制下划线：按 TerminalView 的 `renderTerminal.getOffset` 定位，随输出、滚动和尺寸变化重绘；备用缓冲区跳过；插件设置“终端链接自动下划线”默认开启，可关闭。
+- 新增 `terminal_links.dart` 纯逻辑（末尾标点/括号修剪、超长行保护）与 3 项测试；终端组件测试覆盖覆盖层存在。
+- 验证：`build/flutter-tests-1.0.35.log` **295 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.35（88）；Windows CI 41180550899 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：真实长行/换行链接、多屏滚动、备用缓冲区切换与不同字体的像素级下划线位置；Windows 实体机输入与自动更新仍待用户复测。
