@@ -31,6 +31,7 @@ import '../app/terminal_session.dart';
 import '../app/pinned_commands.dart';
 import '../app/plugins.dart';
 import '../app/system_metrics.dart';
+import '../app/shortcuts.dart';
 import '../app/terminal_links.dart';
 import '../src/rust/api/client.dart' as native;
 import '../app/errors.dart';
@@ -1685,47 +1686,28 @@ class _TerminalPaneState extends State<TerminalPane> {
                                           widget.onShortcut!('focus', null);
                                           return KeyEventResult.handled;
                                         }
+                                        final customAction =
+                                            shortcutSettings.match(
+                                              keyId:
+                                                  event.logicalKey.keyId,
+                                              metaPressed:
+                                                  keyboard.isMetaPressed,
+                                              controlPressed:
+                                                  keyboard.isControlPressed,
+                                              shiftPressed:
+                                                  keyboard.isShiftPressed,
+                                              altPressed:
+                                                  keyboard.isAltPressed,
+                                            );
+                                        if (customAction != null) {
+                                          widget.onShortcut!(
+                                            customAction,
+                                            null,
+                                          );
+                                          return KeyEventResult.handled;
+                                        }
                                         if (primary) {
                                           final key = event.logicalKey;
-                                          if (key == LogicalKeyboardKey.keyT) {
-                                            widget.onShortcut!('new', null);
-                                            return KeyEventResult.handled;
-                                          }
-                                          if (key == LogicalKeyboardKey.keyW) {
-                                            widget.onShortcut!(
-                                              'close-tab',
-                                              null,
-                                            );
-                                            return KeyEventResult.handled;
-                                          }
-                                          if (key == LogicalKeyboardKey.keyO &&
-                                              keyboard.isShiftPressed) {
-                                            widget.onShortcut!(
-                                              'sessions',
-                                              null,
-                                            );
-                                            return KeyEventResult.handled;
-                                          }
-                                          if (keyboard.isShiftPressed &&
-                                              key ==
-                                                  LogicalKeyboardKey
-                                                      .bracketLeft) {
-                                            widget.onShortcut!(
-                                              'prev-tab',
-                                              null,
-                                            );
-                                            return KeyEventResult.handled;
-                                          }
-                                          if (keyboard.isShiftPressed &&
-                                              key ==
-                                                  LogicalKeyboardKey
-                                                      .bracketRight) {
-                                            widget.onShortcut!(
-                                              'next-tab',
-                                              null,
-                                            );
-                                            return KeyEventResult.handled;
-                                          }
                                           const digits = [
                                             LogicalKeyboardKey.digit1,
                                             LogicalKeyboardKey.digit2,

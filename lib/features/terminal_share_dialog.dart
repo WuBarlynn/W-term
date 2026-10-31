@@ -107,6 +107,45 @@ class _TerminalShareDialogState extends State<TerminalShareDialog> {
     }
   }
 
+  Future<void> _exportText() async {
+    setState(() {
+      busy = true;
+      message = '';
+    });
+    try {
+      final text = widget.lines.join('\n');
+      final path = '${(await getTemporaryDirectory()).path}/'
+          'wterm-terminal-${DateTime.now().millisecondsSinceEpoch}.txt';
+      final file = File(path);
+      await file.writeAsString(text, flush: true);
+      if (Platform.isIOS || Platform.isAndroid) {
+        if (!mounted) return;
+        final box = context.findRenderObject() as RenderBox;
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path)],
+            text: _title.text.trim(),
+            sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+          ),
+        );
+      } else {
+        final location = await getSaveLocation(
+          suggestedName: 'wterm-terminal.txt',
+          acceptedTypeGroups: const [
+            XTypeGroup(label: '文本', extensions: ['txt']),
+          ],
+        );
+        if (location == null) return;
+        await File(location.path).writeAsString(text, flush: true);
+        if (mounted) setState(() => message = '文本已保存：${location.path}');
+      }
+    } catch (e) {
+      if (mounted) setState(() => message = '导出失败：${userFacingError(e)}');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> _share() async {
     setState(() {
       busy = true;
@@ -380,6 +419,12 @@ class _TerminalShareDialogState extends State<TerminalShareDialog> {
                 TextButton(
                   onPressed: busy ? null : () => Navigator.pop(context),
                   child: const Text('关闭'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _exportText,
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('导出文本'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(

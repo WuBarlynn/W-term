@@ -20,6 +20,7 @@ import 'app/sync_automation.dart';
 import 'app/pinned_commands.dart';
 import 'app/plugins.dart';
 import 'app/onboarding.dart';
+import 'app/shortcuts.dart';
 
 Map<String, String>? detachedPayload(List<String> args) {
   final index = args.indexOf('--wterm-detached');
@@ -63,6 +64,7 @@ Future<void> main(List<String> args) async {
     await syncAutomation.load();
     await pluginSettings.load();
     await onboarding.load();
+    await shortcutSettings.load();
     runApp(
       detached == null
           ? const WTermApp()

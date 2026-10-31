@@ -406,6 +406,10 @@ pub(crate) fn validate_settings(json: &str) -> Result<()> {
         object.get("ai").is_none_or(Value::is_object),
         "同步设置中的 AI 配置无效"
     );
+    ensure!(
+        object.get("shortcuts").is_none_or(Value::is_object),
+        "同步设置中的快捷键配置无效"
+    );
     ensure!(object.len() <= 8, "同步设置字段过多");
     Ok(())
 }

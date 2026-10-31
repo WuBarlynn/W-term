@@ -1,6 +1,7 @@
 import 'font_catalog.dart';
 import 'imported_fonts.dart';
 import 'onboarding.dart';
+import 'shortcuts.dart';
 import 'interactive_auth.dart';
 import 'connection_route.dart';
 import 'forward_store.dart';
@@ -19,6 +20,7 @@ import '../features/proxy_dialog.dart';
 import '../features/plugin_settings_dialog.dart';
 import '../features/settings_dialog.dart';
 import '../features/onboarding_dialog.dart';
+import '../features/shortcut_settings_dialog.dart';
 import '../features/workspace_settings_dialog.dart';
 import '../features/terminal_appearance_dialog.dart';
 import '../features/auth_challenge_dialog.dart';
@@ -161,6 +163,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         );
       });
     }
+    shortcutSettings.addListener(_shortcutsChanged);
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
     pendingDeepLink.addListener(_deepLinkReceived);
@@ -183,6 +186,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    shortcutSettings.removeListener(_shortcutsChanged);
     taskMonitor.removeListener(_taskCompleted);
     taskMonitor.cancelAll();
     trayConnectRequests.removeListener(_trayConnectRequested);
@@ -1756,6 +1760,34 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
+  void _shortcutsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Map<ShortcutActivator, VoidCallback> _shortcutBindings() {
+    final result = <ShortcutActivator, VoidCallback>{};
+    for (final action in shortcutActions) {
+      final binding = shortcutSettings.bindings[action.id];
+      if (binding == null || !binding.enabled) continue;
+      final key = LogicalKeyboardKey.findKeyByKeyId(binding.keyId);
+      if (key == null) continue;
+      result[SingleActivator(
+        key,
+        meta: binding.meta,
+        control: binding.control,
+        shift: binding.shift,
+        alt: binding.alt,
+      )] = () {
+        if (action.id == 'new') {
+          unawaited(connect());
+        } else {
+          _handleShortcut(action.id, null);
+        }
+      };
+    }
+    return result;
+  }
+
   void _handleShortcut(String action, int? index) {
     if (!mounted) return;
     if (action == 'new') {
@@ -2684,6 +2716,18 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       ],
     ),
     SettingsSection(
+      title: '快捷键',
+      icon: Icons.keyboard_outlined,
+      entries: [
+        SettingsEntry(
+          action: 'shortcuts',
+          title: '快捷键',
+          subtitle: '录制、禁用或恢复连接与标签快捷键',
+          icon: Icons.keyboard_outlined,
+        ),
+      ],
+    ),
+    SettingsSection(
       title: '工作区',
       icon: Icons.dashboard_customize_outlined,
       entries: [
@@ -2808,6 +2852,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             await showDialog<void>(
               context: context,
               builder: (_) => const PluginSettingsDialog(),
+            );
+          } else if (action == 'shortcuts') {
+            await showDialog<void>(
+              context: context,
+              builder: (_) => const ShortcutSettingsDialog(),
             );
           } else if (action == 'workspace') {
             await showDialog<void>(
@@ -3278,9 +3327,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 760;
     return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): connect,
-      },
+      bindings: _shortcutBindings(),
       child: Scaffold(
         key: scaffoldKey,
         drawer: wide

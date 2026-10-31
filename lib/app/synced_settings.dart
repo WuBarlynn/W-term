@@ -4,6 +4,7 @@ import 'ai_assistant.dart';
 import 'keyword_highlights.dart';
 import 'pinned_commands.dart';
 import 'plugins.dart';
+import 'shortcuts.dart';
 import 'terminal_appearance.dart';
 
 /// Aggregates device preferences that travel through the encrypted GitHub
@@ -45,6 +46,7 @@ class SyncedSettings {
       'plugins': await pluginSettings.exportSynced(),
       'pinned': await pinnedCommands.exportSynced(),
       'highlights': await keywordHighlights.exportSynced(),
+      'shortcuts': shortcutSettings.toJson(),
       'ai': ?ai,
     });
   }
@@ -56,6 +58,7 @@ class SyncedSettings {
     await pluginSettings.applySynced(value['plugins']);
     await pinnedCommands.applySynced(value['pinned']);
     await keywordHighlights.applySynced(value['highlights']);
+    await shortcutSettings.applySynced(value['shortcuts']);
     final ai = SyncedAiCodec.decode(value['ai']);
     if (ai != null) await const AiStore().saveProfiles(ai);
   }
