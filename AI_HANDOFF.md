@@ -556,3 +556,11 @@ UI、实际桥接、测试、文档与双端构建。
 - Dart：`CommandSnippet.tags`、`SnippetStore.saveSnippet(tags:)`、保险库读写；片段编辑器新增逗号分隔标签；片段列表显示标签，可用当前主机标签或片段标签筛选。
 - 验证：`build/flutter-tests-1.0.37.log` **297 项** Flutter 测试通过，`flutter analyze` 无问题；Rust `snippets_are_encrypted_backed_up_and_reject_control_characters` 通过；macOS 自签名 Release + DMG；iOS IPA 1.0.37（90）；Windows CI 41183500739 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 全量测试）。
 - 未执行：真实多主机标签筛选、旧保险库升级后的标签显示、同步/备份跨设备标签一致性；Windows 实体机输入/自动更新仍待用户复测。
+
+## 30. 1.0.38 Office 文本预览（2026-10-31）
+
+- 三端版本 **1.0.38（91）**；本地产物 `build/release-1.0.38/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.38 。
+- SFTP 选中 docx/xlsx/pptx 时下载到临时文件，本地解析 OOXML：docx 段落、xlsx 首个工作表（共享字符串/数字/内联字符串）、pptx 幻灯片文本；≤50 MB，输出限制 300k 字符，复杂排版/图片/公式不保留。
+- 旧版 .doc/.xls/.ppt 仍走系统打开；临时文件在关闭预览后删除。
+- 验证：`build/flutter-tests-1.0.38.log` **301 项** Flutter 测试通过（含自建 ZIP 的 docx/xlsx/pptx 解析测试），`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.38（91）；Windows CI 41185043886 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：真实 Office 文件（复杂表格、合并单元格、多工作表、加密文档）与三端真机渲染；Windows 实体机输入/自动更新仍待复测。

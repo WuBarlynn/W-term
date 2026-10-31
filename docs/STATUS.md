@@ -6,7 +6,7 @@
 
 - SFTP 选中 docx/xlsx/pptx 时下载到临时文件，本地解析 OOXML：docx 段落、xlsx 首个工作表表格、pptx 幻灯片文本；≤50 MB，复杂排版/图片/公式不保留。
 - 旧版 .doc/.xls/.ppt 仍走系统打开；关闭预览后删除临时文件。
-- 验证：Flutter 全量 **301 项**通过（含 OOXML 解析测试）；三端构建与发布证据见 1.0.38 记录；真实 Office 文件与真机渲染未验收。
+- 验证：Flutter 全量 **301 项**通过（含 OOXML 解析测试，`build/flutter-tests-1.0.38.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41185043886](https://github.com/WuBarlynn/W-term/actions/runs/41185043886) 成功（构建/启动冒烟/静默安装卸载/Rust 测试）。真实 Office 文件与真机渲染未验收。
 
 ## 1.0.37 片段标签（2026-10-31）
 
