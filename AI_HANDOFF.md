@@ -437,3 +437,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 字体：内置 JetBrains Mono（常规/粗体）与 Noto Sans SC，界面/终端/CJK 字体改为可搜索选择并枚举 macOS/iOS/Windows 系统字体；Windows 界面默认微软雅黑 UI，终端默认 Cascadia Mono，CJK 回退优先微软雅黑。
 - 验证：`build/flutter-tests-1.0.22-final.log` **275 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + 严格签名校验、DMG；iOS Runner.app/IPA 版本 1.0.22（75）；Windows CI **41157390012** 成功（Release 构建、启动冒烟、Inno Setup、Rust cargo 测试），安装包 1.0.22（75）。
 - 未执行/限制：分屏拖拽/分隔条、广播多真实 SSH 会话、Touch ID/Face ID、Windows 安装升级与 GitHub 更新下载均未在真机/真实网络点击验收；仅完成代码、单元/组件测试与构建级验证。Cloud Term 剩余差距仍以 `docs/CLOUDTERM_FEATURE_AUDIT.md` 的“1.0.22 仍未完成”为准，不得宣称全功能等价或最终 V1.0。
+
+## 15. 1.0.23 fish 目录上报与 Markdown 预览（2026-10-31）
+
+- 三端版本 **1.0.23（76）**；本地产物 `build/release-1.0.23/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.23 。
+- 目录上报：启用对话框可选 bash/zsh 或 fish；fish 通过 `--on-event fish_prompt` 注入 OSC 7，不修改远程启动文件。仍没有自动探测当前 shell。
+- 文件预览：SFTP 文本预览识别 `.md/.markdown/.mdown`，默认 Markdown 渲染并可切源码；Markdown 链接仅允许 http/https 外开；图片仍由 Markdown 组件按文档加载。
+- 验证：`build/flutter-tests-1.0.23.log` **277 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 版本 1.0.23（76）；Windows CI 41158687700 成功（构建/启动冒烟/Inno Setup/Rust 测试），版本 1.0.23（76）。
+- 未执行：fish 真实远端、Markdown 复杂文档/图片/链接、Windows 安装升级与真机 UI 点击。Cloud Term 剩余差距仍以审计文档“1.0.23 仍未完成”为准。

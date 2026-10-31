@@ -6,7 +6,7 @@
 
 - 目录上报：启用时可选 bash/zsh 或 fish；fish 使用 `--on-event fish_prompt` 注入 OSC 7，不修改远程启动文件。
 - 文件预览：`.md/.markdown/.mdown` 默认 Markdown 渲染，可切换源码；链接仅允许 http/https 外部打开；其它文本保持原预览。
-- 验证：Flutter 全量 **277 项**通过；macOS/iOS/Windows 构建与发布证据见 1.0.23 发布记录；fish/Markdown 未在真实远端与真机点击验收。
+- 验证：Flutter 全量 **277 项**通过（`build/flutter-tests-1.0.23.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41158687700](https://github.com/WuBarlynn/W-term/actions/runs/41158687700) 成功。fish 远端与 Markdown 真机点击未验收。
 
 ## 1.0.22 分屏、广播、桌面更新与字体（2026-10-31）
 
