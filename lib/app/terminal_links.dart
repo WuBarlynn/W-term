@@ -70,8 +70,37 @@ class PathSpan {
   const PathSpan(this.start, this.end, this.path);
 }
 
+PathSpan? _quotedPathSpan(String line, int column, int maxLength) {
+  for (var start = 0; start < line.length; start++) {
+    final quote = line[start];
+    if (quote != '"' && quote != "'") continue;
+    final end = line.indexOf(quote, start + 1);
+    if (end < 0) return null;
+    if (column > start && column < end) {
+      final path = line.substring(start + 1, end);
+      if (path.isEmpty ||
+          path.length > maxLength ||
+          path.contains('<') ||
+          path.contains('>') ||
+          path.contains('|') ||
+          (!path.contains('/') &&
+              !RegExp(r'\.[A-Za-z0-9]{1,8}$').hasMatch(path))) {
+        return null;
+      }
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return null;
+      }
+      return PathSpan(start + 1, end, path);
+    }
+    start = end;
+  }
+  return null;
+}
+
 PathSpan? _pathSpan(String line, int column, {int maxLength = 4096}) {
   if (line.isEmpty || line.length > 8192) return null;
+  final quoted = _quotedPathSpan(line, column, maxLength);
+  if (quoted != null) return quoted;
   RegExpMatch? best;
   for (final match in _pathPattern.allMatches(line)) {
     if (column < match.start || column >= match.end) continue;
@@ -118,6 +147,8 @@ PathSpan? findPathSpanAt(String line, int column, {int maxLength = 4096}) =>
 /// selected explicitly instead.
 String? findPathAt(String line, int column, {int maxLength = 4096}) {
   if (line.isEmpty || line.length > 8192) return null;
+  final quoted = _quotedPathSpan(line, column, maxLength);
+  if (quoted != null) return quoted.path;
   RegExpMatch? best;
   for (final match in _pathPattern.allMatches(line)) {
     if (column < match.start || column >= match.end) continue;

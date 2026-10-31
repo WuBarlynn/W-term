@@ -26,6 +26,21 @@ void main() {
     expect(findLinkSpans('https://a.test/${'x' * 9000}'), isEmpty);
   });
 
+  test('quoted paths with spaces resolve as a single path', () {
+    const line =
+        'open "/Users/me/My Docs/report final.pdf" and \'/tmp/a b.txt\' done';
+    final doubleQuoted = line.indexOf('My Docs') + 3;
+    expect(
+      findPathAt(line, doubleQuoted),
+      '/Users/me/My Docs/report final.pdf',
+    );
+    final singleQuoted = line.indexOf('a b.txt') + 1;
+    expect(findPathAt(line, singleQuoted), '/tmp/a b.txt');
+    final span = findPathSpanAt(line, doubleQuoted)!;
+    expect(line.substring(span.start, span.end), span.path);
+    expect(findPathAt('said "hello world" today', 9), isNull);
+  });
+
   test('path lookup resolves tokens under the clicked column', () {
     const line = 'drwxr-xr-x 1 a b 4096 README.md /var/log/app.log';
     expect(findPathAt(line, 26), 'README.md');
