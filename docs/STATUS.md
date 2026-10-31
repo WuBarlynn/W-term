@@ -7,7 +7,7 @@
 - Windows：新增“Windows 硬件键盘输入”兼容开关（默认关闭）。开启后 TerminalView 走 `hardwareKeyboardOnly`，绕过 Flutter 文本输入/IME；用于输入法异常时恢复打字，中文组字可能不可用。
 - PDF：预览窗口按屏幕尺寸自适应，手机/iPad 不再使用固定 920×720。
 - 沿用 1.0.30/1.0.31：IME 原生切换已回退，自动更新走退出后独立安装器，Windows CI 含静默安装/卸载冒烟。
-- 验证：Flutter 全量 **289 项**通过；三端构建与发布证据见 1.0.32 记录；Windows 实体机输入仍需复测。
+- 验证：Flutter 全量 **289 项**通过（`build/flutter-tests-1.0.32.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41175238616](https://github.com/WuBarlynn/W-term/actions/runs/41175238616) 成功（构建/启动冒烟/静默安装卸载冒烟/Rust 测试）。Windows 实体机输入仍需复测。
 
 ## 1.0.31 PDF 内嵌预览与 Windows 安装 CI（2026-10-31）
 

@@ -508,3 +508,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 注意：1.0.30 已回退阻断输入的 Windows IME 原生切换，并将更新改为“退出后独立 PowerShell 安装器 + VERYSILENT + 安装后启动”；1.0.31 沿用。自动更新从旧版本到新版本的完整链路与 Windows 实体机输入仍需用户复测。
 - 验证：`build/flutter-tests-1.0.31.log` **289 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.31（84）；Windows CI 41173520983 成功（pdfrx Windows 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
 - 未执行：真实 PDF 文件在 macOS/iOS/Windows 的渲染与滚动、超 100 MB 拒绝、Windows 输入与自动更新端到端点击。
+
+## 24. 1.0.32 Windows 输入兼容与 PDF 预览适配（2026-10-31）
+
+- 三端版本 **1.0.32（85）**；本地产物 `build/release-1.0.32/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.32 。
+- Windows 输入：插件设置新增“Windows 硬件键盘输入”（默认关闭）。开启后 TerminalView 使用 `hardwareKeyboardOnly`，绕过 Flutter 文本输入/IME，用于输入法异常时恢复打字；中文组字可能不可用。1.0.30 已移除会阻断输入的 Windows IME 原生切换。
+- PDF：预览对话框按屏幕尺寸自适应（手机/iPad 不再固定 920×720）；PDFium 内嵌渲染与 100 MB 限制沿用 1.0.31。
+- 验证：`build/flutter-tests-1.0.32.log` **289 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.32（85）；Windows CI 41175238616 成功（pdfrx 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
+- 未执行：Windows 实体机正常输入与兼容模式、中文 IME、PDF 真机渲染、从旧版本自动更新端到端。
