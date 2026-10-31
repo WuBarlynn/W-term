@@ -524,3 +524,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 组件测试 `terminal_pane_input_route_test.dart` 覆盖宽窗口 Dock 渲染。
 - 验证：`build/flutter-tests-1.0.33.log` **290 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.33（86）；Windows CI 41177156729 成功（pdfrx 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
 - 未执行：真实窗口缩放、Dock 点击/长按、标签绑定的多主机切换。
+
+## 26. 1.0.34 跨标签下载队列（2026-10-31）
+
+- 三端版本 **1.0.34（87）**；本地产物 `build/release-1.0.34/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.34 。
+- 下载队列提升为应用级 `downloadQueue`：切换标签或关闭原文件面板后继续执行，任意文件面板可通过“传输任务”重新打开队列并取消剩余；上传任务仍属当前文件面板。
+- 执行器仍由发起下载的 FilesPane state 闭包持有，应用退出即停止；不跨重启恢复，无百分比进度与失败重试。
+- 验证：`build/flutter-tests-1.0.34.log` **291 项** Flutter 测试通过（含应用级队列测试），`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.34（87）；Windows CI 41178684577 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：真实远端跨标签并发下载、关闭文件面板后的完成状态刷新、Windows 实体机输入与自动更新。
