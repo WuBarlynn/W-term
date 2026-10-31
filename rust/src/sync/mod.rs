@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use zeroize::{Zeroize, Zeroizing};
 
 pub use vault::{apply_merge, capture};
+pub(crate) use vault::validate_settings;
 pub const FORMAT_VERSION: u32 = 1;
 const MAX_BYTES: usize = 16 * 1024 * 1024;
 const MAX_RECORDS: usize = 32_000;
@@ -28,6 +29,7 @@ pub enum Kind {
     Identity,
     Snippet,
     Folders,
+    Settings,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -126,11 +128,14 @@ impl Snapshot {
             if record.key.kind == Kind::Folders {
                 ensure!(record.key.id == "tree", "文件夹集合 ID 无效");
             }
+            if record.key.kind == Kind::Settings {
+                ensure!(record.key.id == "app", "设置集合 ID 无效");
+            }
         }
         for (kind, count) in live_counts {
             let limit = match kind {
                 Kind::Snippet => 1000,
-                Kind::Folders => 1,
+                Kind::Folders | Kind::Settings => 1,
                 _ => 10000,
             };
             ensure!(count <= limit, "同步记录超过保险库容量限制");

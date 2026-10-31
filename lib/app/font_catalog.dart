@@ -87,16 +87,7 @@ String platformDefaultUiFont() {
   return 'Noto Sans SC';
 }
 
-String platformDefaultTerminalFont() {
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    return 'Cascadia Mono';
-  }
-  if (defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.iOS) {
-    return 'SF Mono';
-  }
-  return 'JetBrains Mono';
-}
+String platformDefaultTerminalFont() => 'Menlo';
 
 /// Enumerates installed font families through the native runner. Falls back to
 /// a curated list when the platform channel is unavailable (for example in a

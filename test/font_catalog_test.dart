@@ -12,7 +12,7 @@ void main() {
     expect(commonTerminalFonts, contains('JetBrains Mono'));
     expect(commonCjkFonts, contains('Noto Sans SC'));
     expect(platformDefaultUiFont(), isNotEmpty);
-    expect(platformDefaultTerminalFont(), isNotEmpty);
+    expect(platformDefaultTerminalFont(), 'Menlo');
     expect(monoFontFallback, contains('JetBrains Mono'));
     expect(monoFontFallback, contains('Cascadia Mono'));
     expect(monoFontFallback, contains('Menlo'));

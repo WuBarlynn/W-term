@@ -4,6 +4,7 @@ import 'connection_route.dart';
 import 'forward_store.dart';
 import 'plugins.dart';
 import 'terminal_session.dart';
+import 'terminal_appearance.dart';
 import 'command_history.dart';
 import 'update_checker.dart';
 import 'session_handoff.dart';
@@ -13,6 +14,9 @@ import 'package:window_manager/window_manager.dart';
 import 'workspace_layout.dart';
 import 'proxy_store.dart';
 import '../features/proxy_dialog.dart';
+import '../features/plugin_settings_dialog.dart';
+import '../features/settings_dialog.dart';
+import '../features/terminal_appearance_dialog.dart';
 import '../features/auth_challenge_dialog.dart';
 import '../features/forwarding_dialog.dart';
 import 'errors.dart';
@@ -21,6 +25,7 @@ import 'host_store.dart';
 import 'identity_store.dart';
 import 'snippet_store.dart';
 import 'sync_store.dart';
+import 'synced_settings.dart';
 import '../features/sync_dialog.dart';
 import '../features/snippets_dialog.dart';
 import '../features/command_history_dialog.dart';
@@ -122,6 +127,15 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     unawaited(commandHistory.load());
     if (hostStore is VaultMaintenance) {
       unawaited(autoBackup.ensureRecent(hostStore as VaultMaintenance));
+    }
+    if (hostStore case final SyncedSettingsHost syncHost) {
+      syncHost.attachSyncedSettings(
+        exportSettings: SyncedSettings.export,
+        importSettings: (json) async {
+          await SyncedSettings.import(json);
+          if (mounted) setState(() {});
+        },
+      );
     }
     _restartAutoSync();
     taskMonitor.addListener(_taskCompleted);
@@ -2595,35 +2609,154 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
-  List<PopupMenuEntry<String>> _settingsItems() => [
-    popupItem(
-      'focus',
-      focusMode ? Icons.fullscreen_exit : Icons.fullscreen,
-      focusMode ? '退出聚焦模式' : '聚焦模式',
+  List<SettingsSection> _settingsSections() => [
+    SettingsSection(
+      title: '常规',
+      icon: Icons.tune,
+      entries: [
+        SettingsEntry(
+          action: 'appearance',
+          title: '终端外观',
+          subtitle: '配色、字体、字号与选中即复制',
+          icon: Icons.palette_outlined,
+        ),
+        SettingsEntry(
+          action: 'plugins',
+          title: '插件设置',
+          subtitle: 'JSON、IP 查询、文件预览、补全、通知与输入',
+          icon: Icons.extension_outlined,
+        ),
+        SettingsEntry(
+          action: 'focus',
+          title: focusMode ? '退出聚焦模式' : '聚焦模式',
+          subtitle: '隐藏侧栏，仅显示终端',
+          icon: focusMode ? Icons.fullscreen_exit : Icons.fullscreen,
+        ),
+        SettingsEntry(action: 'sessions', title: '已打开终端', icon: Icons.list_alt),
+        SettingsEntry(action: 'history', title: '命令历史', icon: Icons.history),
+      ],
     ),
-    popupItem('sessions', Icons.list_alt, '已打开终端'),
-    popupItem('history', Icons.history, '命令历史'),
-    if (supportsDesktopUpdates)
-      popupItem('update', Icons.system_update, '检查更新（GitHub）'),
-    if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
-    if (hostStore is SyncStore) ...[
-      popupItem('sync', Icons.sync, 'GitHub 同步'),
-      CheckedPopupMenuItem(
-        value: 'auto-sync',
-        checked: syncAutomation.enabled,
-        child: const Text('自动同步（15 分钟）'),
+    SettingsSection(
+      title: '连接与文件',
+      icon: Icons.link,
+      entries: [
+        if (hostStore is ConnectionProxyStore)
+          SettingsEntry(
+            action: 'proxy',
+            title: '连接代理',
+            subtitle: '命名 HTTP CONNECT / SOCKS5 代理',
+            icon: Icons.route_outlined,
+          ),
+        SettingsEntry(
+          action: 'known',
+          title: '服务器指纹',
+          icon: Icons.verified_user_outlined,
+        ),
+        if (hostStore is SnippetStore)
+          SettingsEntry(action: 'snippets', title: '命令片段', icon: Icons.code),
+        SettingsEntry(action: 'temporary', title: '临时终端', icon: Icons.bolt),
+        if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+          SettingsEntry(
+            action: 'local-terminal',
+            title: '本地终端',
+            icon: Icons.computer,
+          ),
+      ],
+    ),
+    if (hostStore is SyncStore)
+      SettingsSection(
+        title: '同步',
+        icon: Icons.sync,
+        entries: [
+          SettingsEntry(
+            action: 'sync',
+            title: 'GitHub 同步',
+            subtitle: '私有仓库端到端加密同步',
+            icon: Icons.sync,
+          ),
+        ],
       ),
-    ],
-    if (hostStore is ConnectionProxyStore)
-      popupItem('proxy', Icons.route_outlined, '连接代理'),
-    if (hostStore is VaultMaintenance)
-      popupItem('vault', Icons.security_outlined, '保险库与备份'),
-    popupItem('known', Icons.verified_user_outlined, '服务器指纹'),
-    popupItem('temporary', Icons.bolt, '临时终端'),
-    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
-      popupItem('local-terminal', Icons.computer, '本地终端'),
-    if (widget.onLock != null) popupItem('lock', Icons.lock_outline, '锁定保险库'),
+    if (hostStore is VaultMaintenance || widget.onLock != null)
+      SettingsSection(
+        title: '安全',
+        icon: Icons.security,
+        entries: [
+          if (hostStore is VaultMaintenance)
+            SettingsEntry(
+              action: 'vault',
+              title: '保险库与备份',
+              subtitle: '修改主密码、导出与恢复备份',
+              icon: Icons.security_outlined,
+            ),
+          if (widget.onLock != null)
+            SettingsEntry(
+              action: 'lock',
+              title: '锁定保险库',
+              icon: Icons.lock_outline,
+              closeOnAction: true,
+            ),
+        ],
+      ),
+    if (supportsDesktopUpdates)
+      SettingsSection(
+        title: '更新',
+        icon: Icons.system_update,
+        entries: [
+          SettingsEntry(
+            action: 'update',
+            title: '检查更新',
+            subtitle: 'GitHub Release',
+            icon: Icons.system_update,
+          ),
+        ],
+      ),
   ];
+
+  Future<void> _openSettings(bool drawer) async {
+    if (drawer) {
+      scaffoldKey.currentState?.closeDrawer();
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AppSettingsDialog(
+        sections: _settingsSections(),
+        autoSyncEnabled: syncAutomation.enabled,
+        showAutoSync: hostStore is SyncStore,
+        version: '$appVersion ($appBuild)',
+        onAutoSyncChanged: (enabled) async {
+          if (hostStore is! SyncStore) return false;
+          final profile = await (hostStore as SyncStore).syncSettings();
+          if (!profile.configured || !profile.initialized) {
+            message('请先在 GitHub 同步中完成初始化。');
+            return false;
+          }
+          await syncAutomation.setEnabled(enabled);
+          _restartAutoSync();
+          return true;
+        },
+        onAction: (action) async {
+          if (action == 'appearance') {
+            await showDialog<void>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) =>
+                  TerminalAppearanceDialog(store: terminalAppearance),
+            );
+          } else if (action == 'plugins') {
+            await showDialog<void>(
+              context: context,
+              builder: (_) => const PluginSettingsDialog(),
+            );
+          } else {
+            await sidebarAction(action, false);
+          }
+        },
+      ),
+    );
+  }
 
   Widget _collapsedSidebar() => Container(
     width: 48,
@@ -2646,11 +2779,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           onPressed: connecting ? null : connect,
         ),
         const Spacer(),
-        PopupMenuButton<String>(
-          tooltip: '设置与工具',
+        IconButton(
+          tooltip: '设置',
           icon: const Icon(Icons.tune, size: 18),
-          onSelected: (value) => sidebarAction(value, false),
-          itemBuilder: (_) => _settingsItems(),
+          onPressed: () => _openSettings(false),
         ),
         if (widget.onLock != null)
           IconButton(
@@ -2755,11 +2887,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                 children: [
                   const AppVersionLabel(),
                   const Spacer(),
-                  PopupMenuButton<String>(
-                    tooltip: '设置与工具',
+                  IconButton(
+                    tooltip: '设置',
                     icon: const Icon(Icons.tune, size: 18),
-                    onSelected: (value) => sidebarAction(value, drawer),
-                    itemBuilder: (_) => _settingsItems(),
+                    onPressed: () => _openSettings(drawer),
                   ),
                   if (widget.onLock != null)
                     IconButton(

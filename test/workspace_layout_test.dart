@@ -65,12 +65,16 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.byTooltip('设置与工具'));
-      await tester.tap(find.byTooltip('设置与工具'));
+      await tester.ensureVisible(find.byTooltip('设置'));
+      await tester.tap(find.byTooltip('设置'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('连接代理'));
+      expect(find.text('设置'), findsWidgets);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('settings-nav-连接与文件')),
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-连接与文件')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('连接代理'));
+      await tester.tap(find.byKey(const ValueKey('settings-entry-proxy')));
       await tester.pumpAndSettle();
       expect(find.byType(ProxyDialog), findsOneWidget);
       expect(find.text('直接连接'), findsOneWidget);
@@ -93,10 +97,16 @@ void main() {
         await tester.tap(find.byTooltip('主机管理'));
         await tester.pumpAndSettle();
       }
-      await tester.ensureVisible(find.byTooltip('设置与工具'));
-      await tester.tap(find.byTooltip('设置与工具'));
+      await tester.ensureVisible(find.byTooltip('设置'));
+      await tester.tap(find.byTooltip('设置'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('命令片段'));
+      expect(find.text('设置'), findsWidgets);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('settings-nav-连接与文件')),
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-连接与文件')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings-entry-snippets')));
       await tester.pumpAndSettle();
       expect(find.text('Offline command'), findsOneWidget);
       await tester.tap(find.text('Offline command'));

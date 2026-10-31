@@ -14,6 +14,13 @@ class SyncProfile {
   });
 }
 
+abstract interface class SyncedSettingsHost {
+  void attachSyncedSettings({
+    required Future<String> Function() exportSettings,
+    required Future<void> Function(String json) importSettings,
+  });
+}
+
 abstract interface class SyncStore {
   Future<SyncDisconnectInfo> disconnectPreview();
   Future<void> disconnectSync(String revision, String confirmation);

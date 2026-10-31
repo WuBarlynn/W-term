@@ -56,6 +56,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     title: const Text('插件'),
     content: SizedBox(
       width: 460,

@@ -90,6 +90,26 @@ class PinnedCommands extends ChangeNotifier {
     }
   }
 
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'entries': entries.map((entry) => entry.toJson()).toList(),
+  };
+
+  Future<void> applySynced(Object? data) async {
+    if (data is! Map || data['entries'] is! List) return;
+    final next = (data['entries'] as List)
+        .whereType<Map>()
+        .map((row) => PinnedCommand.fromJson(Map<String, dynamic>.from(row)))
+        .whereType<PinnedCommand>()
+        .take(50)
+        .toList();
+    entries
+      ..clear()
+      ..addAll(next);
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> pin(PinnedCommand command) {
     final exists = entries.any(
       (entry) =>

@@ -9,6 +9,7 @@ fn kind_name(kind: &Kind) -> &'static str {
         Kind::Identity => "identity",
         Kind::Snippet => "snippet",
         Kind::Folders => "folders",
+        Kind::Settings => "settings",
     }
 }
 fn selected(keys: Vec<SyncScopeKey>) -> Result<BTreeSet<Key>> {
@@ -42,7 +43,7 @@ fn view(db: &Connection, selection: Option<Vec<SyncScopeKey>>) -> Result<SyncSco
     let mut known: BTreeSet<Key> = full
         .records
         .iter()
-        .filter(|r| r.value.is_some() && r.key.kind != Kind::Folders)
+        .filter(|r| r.value.is_some() && !matches!(r.key.kind, Kind::Folders | Kind::Settings))
         .map(|r| r.key.clone())
         .collect();
     // Keep rules for removed records visible and removable; never silently drop them.

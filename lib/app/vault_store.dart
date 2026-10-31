@@ -57,10 +57,13 @@ class NativeVaultSession
         PrivateKeyExportStore,
         SnippetStore,
         SyncStore,
+        SyncedSettingsHost,
         ConnectionProxyStore,
         ForwardRuleStore {
   final String _token;
   final QuickUnlock _quick;
+  Future<String> Function()? _exportSettings;
+  Future<void> Function(String json)? _importSettings;
   @override
   final bool legacyImported;
   NativeVaultSession(
@@ -68,6 +71,37 @@ class NativeVaultSession
     this.legacyImported, {
     QuickUnlock? quickUnlock,
   }) : _quick = quickUnlock ?? QuickUnlock();
+  @override
+  void attachSyncedSettings({
+    required Future<String> Function() exportSettings,
+    required Future<void> Function(String json) importSettings,
+  }) {
+    _exportSettings = exportSettings;
+    _importSettings = importSettings;
+  }
+
+  Future<void> _captureSettings() async {
+    final export = _exportSettings;
+    if (export == null) return;
+    final json = await export();
+    await native.vaultWrite(token: _token, kind: 'settings', json: json);
+  }
+
+  Future<void> _applySettings() async {
+    final import = _importSettings;
+    if (import == null) return;
+    final json = await native.vaultRead(token: _token, kind: 'settings');
+    if (json.trim().isEmpty) return;
+    await import(json);
+  }
+
+  Future<T> _withSyncedSettings<T>(Future<T> Function() action) async {
+    await _captureSettings();
+    final result = await action();
+    await _applySettings();
+    return result;
+  }
+
   @override
   Future<List<forward_native.ForwardRule>> forwardRules(String hostId) =>
       forward_native.forwardRules(token: _token, hostId: hostId);
@@ -248,12 +282,20 @@ class NativeVaultSession
   Future<String> checkSync() => sync_native.syncCheck(token: _token);
   @override
   Future<String> initializeSync(String mode, String secret) =>
-      sync_native.syncInitialize(token: _token, mode: mode, secret: secret);
+      _withSyncedSettings(
+        () => sync_native.syncInitialize(
+          token: _token,
+          mode: mode,
+          secret: secret,
+        ),
+      );
   @override
-  Future<void> confirmSyncRecovery(String code) =>
-      sync_native.syncConfirmRecovery(token: _token, code: code);
+  Future<void> confirmSyncRecovery(String code) => _withSyncedSettings(
+    () => sync_native.syncConfirmRecovery(token: _token, code: code),
+  );
   @override
-  Future<String> runSync() => sync_native.syncRun(token: _token);
+  Future<String> runSync() =>
+      _withSyncedSettings(() => sync_native.syncRun(token: _token));
   @override
   Future<SyncReview?> syncConflicts() async {
     final r = await sync_native.syncConflicts(token: _token);
@@ -274,21 +316,24 @@ class NativeVaultSession
 
   @override
   Future<String> resolveSync(String reviewId, List<SyncChoice> choices) =>
-      sync_native.syncResolve(
-        token: _token,
-        reviewId: reviewId,
-        choices: [
-          for (final c in choices)
-            sync_native.SyncConflictChoice(
-              kind: c.kind,
-              id: c.id,
-              side: c.side,
-            ),
-        ],
+      _withSyncedSettings(
+        () => sync_native.syncResolve(
+          token: _token,
+          reviewId: reviewId,
+          choices: [
+            for (final c in choices)
+              sync_native.SyncConflictChoice(
+                kind: c.kind,
+                id: c.id,
+                side: c.side,
+              ),
+          ],
+        ),
       );
   @override
-  Future<String> adoptSyncKey(String mode, String secret) =>
-      sync_native.syncAdoptKey(token: _token, mode: mode, secret: secret);
+  Future<String> adoptSyncKey(String mode, String secret) => _withSyncedSettings(
+    () => sync_native.syncAdoptKey(token: _token, mode: mode, secret: secret),
+  );
   @override
   Future<void> cancelSync() => sync_native.syncCancel(token: _token);
   @override

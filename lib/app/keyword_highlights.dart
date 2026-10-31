@@ -88,6 +88,28 @@ class KeywordHighlightSettings extends ChangeNotifier {
     }
   }
 
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'enabled': enabled,
+    'keywords': keywords,
+    'colorArgb': colorArgb,
+  };
+
+  Future<void> applySynced(Object? data) async {
+    if (data is! Map) return;
+    final rawKeywords = data['keywords'];
+    final color = data['colorArgb'];
+    await save(
+      nextEnabled: data['enabled'] == true,
+      nextKeywords: rawKeywords is List
+          ? rawKeywords.whereType<String>().toList()
+          : const [],
+      nextColorArgb: color is int && color >= 0 && color <= 0xffffffff
+          ? color
+          : colorArgb,
+    );
+  }
+
   Future<void> save({
     required bool nextEnabled,
     required List<String> nextKeywords,

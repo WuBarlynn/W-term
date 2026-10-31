@@ -88,6 +88,7 @@ class _SyncConflictsDialogState extends State<SyncConflictsDialog> {
     'identity' => '身份 / 密钥',
     'snippet' => '命令片段',
     'folders' => '文件夹树',
+    'settings' => '应用设置',
     _ => '记录',
   };
   Widget entry(SyncConflictEntry item, int index) => Card(

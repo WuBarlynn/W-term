@@ -426,3 +426,32 @@ fn sync_merge_rejects_combined_collection_larger_than_vault_limit() {
     assert!(remote.encode().is_ok());
     assert!(merge(&empty(), &local, &remote).is_err());
 }
+
+#[test]
+fn sync_settings_roundtrip_and_merge() {
+    let (_dir, mut a, _b, base) = pair();
+    let settings = json!({
+        "version": 1,
+        "appearance": {"palette": "nord", "fontSize": 15},
+        "plugins": {"linkUnderline": true},
+        "pinned": {"version": 1, "entries": []},
+        "highlights": {"enabled": false, "keywords": [], "colorArgb": 4294958438u32}
+    });
+    put_record(&a, "settings", &settings.to_string()).unwrap();
+    let local = capture(&a, &base, DEVICE_A).unwrap();
+    assert!(local
+        .records
+        .iter()
+        .any(|r| r.key.kind == Kind::Settings && r.value.is_some()));
+    let plan = merge(&base, &local, &base).unwrap();
+    assert!(plan.is_resolved());
+    apply_merge(&mut a, &plan).unwrap();
+    let stored: Value =
+        serde_json::from_str(&read_record(&a, "settings").unwrap()).unwrap();
+    assert_eq!(stored, settings);
+    let recaptured = capture(&a, plan.snapshot().unwrap(), DEVICE_A).unwrap();
+    assert!(recaptured
+        .records
+        .iter()
+        .any(|r| r.key.kind == Kind::Settings));
+}

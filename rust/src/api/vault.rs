@@ -201,7 +201,7 @@ pub(crate) fn cancel_sync(token: &str) -> Result<()> {
 }
 fn check_kind(kind: &str) -> Result<()> {
     ensure!(
-        matches!(kind, "hosts" | "folders" | "snippets"),
+        matches!(kind, "hosts" | "folders" | "snippets" | "settings"),
         "Unknown vault record"
     );
     Ok(())
@@ -278,6 +278,10 @@ pub(crate) fn validate_host_routes(hosts: &[Host]) -> Result<()> {
 pub(crate) fn validate(kind: &str, json: &str) -> Result<()> {
     check_kind(kind)?;
     ensure!(json.len() <= 4 * 1024 * 1024, "主机数据过大");
+    if kind == "settings" {
+        crate::sync::validate_settings(json)?;
+        return Ok(());
+    }
     if kind == "hosts" {
         let hosts: Vec<Host> =
             serde_json::from_str(json).map_err(|_| anyhow!("主机数据格式无效"))?;

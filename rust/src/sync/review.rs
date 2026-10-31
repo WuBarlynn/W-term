@@ -288,6 +288,7 @@ fn kind(k: &Kind) -> &'static str {
         Kind::Identity => "identity",
         Kind::Snippet => "snippet",
         Kind::Folders => "folders",
+        Kind::Settings => "settings",
     }
 }
 fn short(s: &str) -> String {
@@ -328,6 +329,7 @@ pub(super) fn summary(k: &Kind, value: Option<&Value>) -> String {
             text(v, "name"),
             v["command"].as_str().unwrap_or_default().chars().count()
         ),
+        Kind::Settings => "W Term 设置\n外观、插件与命令偏好".into(),
         Kind::Folders => {
             let a = v.as_array().expect("validated folders");
             format!(
@@ -351,6 +353,9 @@ fn differences(c: &Conflict) -> Vec<String> {
     if c.key.kind == Kind::Folders {
         return vec!["文件夹树".into()];
     }
+    if c.key.kind == Kind::Settings {
+        return vec!["应用设置".into()];
+    }
     let fields: &[(&str, &str)] = match c.key.kind {
         Kind::Host => &[
             ("name", "名称"),
@@ -371,7 +376,7 @@ fn differences(c: &Conflict) -> Vec<String> {
             ("passphrase", "私钥口令（内容隐藏）"),
         ],
         Kind::Snippet => &[("name", "名称"), ("command", "命令（内容隐藏）")],
-        Kind::Folders => unreachable!(),
+        Kind::Folders | Kind::Settings => unreachable!(),
     };
     fields
         .iter()

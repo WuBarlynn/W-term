@@ -396,6 +396,66 @@ class TerminalAppearance extends ChangeNotifier {
     }
   }
 
+  Map<String, Object?> toJson() => {
+    'palette': palette,
+    'fontSize': fontSize,
+    'uiTheme': uiTheme,
+    'uiFont': uiFont,
+    'terminalFont': terminalFont,
+    'cjkFont': cjkFont,
+    'skin': skin,
+    'customColors': customColors,
+    'copyOnSelect': copyOnSelect,
+  };
+
+  Future<void> applySynced(Object? data) async {
+    if (data is! Map) return;
+    final nextPalette = data['palette'];
+    final nextSize = data['fontSize'];
+    if (nextPalette is! String ||
+        !names.containsKey(nextPalette) ||
+        nextSize is! int ||
+        nextSize < 10 ||
+        nextSize > 28) {
+      return;
+    }
+    final nextTheme = data['uiTheme'];
+    final nextSkin = data['skin'];
+    final rawColors = data['customColors'];
+    final colors = <String, int>{};
+    if (rawColors is Map) {
+      for (final entry in rawColors.entries) {
+        final key = entry.key;
+        final color = entry.value;
+        if (key is String &&
+            customColorLabels.containsKey(key) &&
+            color is int &&
+            color >= 0 &&
+            color <= 0xffffffff) {
+          colors[key] = color;
+        }
+      }
+    }
+    await save(
+      nextPalette,
+      nextSize,
+      nextUiTheme: nextTheme is String && {'system', 'dark', 'light'}.contains(nextTheme)
+          ? nextTheme
+          : uiTheme,
+      nextUiFont: data['uiFont'] is String ? data['uiFont'] as String : uiFont,
+      nextTerminalFont: data['terminalFont'] is String
+          ? data['terminalFont'] as String
+          : terminalFont,
+      nextCjkFont: data['cjkFont'] is String ? data['cjkFont'] as String : cjkFont,
+      nextSkin: nextSkin is String &&
+              (nextSkin == 'none' || builtInSkins.containsKey(nextSkin))
+          ? nextSkin
+          : skin,
+      nextCustomColors: rawColors is Map ? colors : customColors,
+      nextCopyOnSelect: data['copyOnSelect'] == true,
+    );
+  }
+
   Future<void> save(
     String nextPalette,
     int nextSize, {

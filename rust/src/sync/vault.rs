@@ -54,7 +54,7 @@ fn identity(value: &Value) -> Result<Identity> {
     Ok(item)
 }
 pub(super) fn validate_value(key: &Key, value: &Value) -> Result<()> {
-    if key.kind != Kind::Folders {
+    if !matches!(key.kind, Kind::Folders | Kind::Settings) {
         ensure!(
             value.get("id").and_then(Value::as_str) == Some(key.id.as_str()),
             "同步记录 ID 不一致"
@@ -80,6 +80,10 @@ pub(super) fn validate_value(key: &Key, value: &Value) -> Result<()> {
         Kind::Identity => {
             identity(value)?;
             Ok(())
+        }
+        Kind::Settings => {
+            let json = Zeroizing::new(serde_json::to_string(value)?);
+            validate_settings(&json)
         }
     }
 }
@@ -143,6 +147,20 @@ pub(super) fn current(db: &Connection) -> Result<Vec<Record>> {
                 value: Some(value),
             });
         }
+    }
+    let settings = Zeroizing::new(read_record(db, "settings")?);
+    if !settings.trim().is_empty() && settings.as_str() != "[]" {
+        validate_settings(&settings)?;
+        let value: Value =
+            serde_json::from_str(&settings).map_err(|_| anyhow::anyhow!("同步设置格式无效"))?;
+        records.push(Record {
+            key: Key {
+                kind: Kind::Settings,
+                id: "app".into(),
+            },
+            revision: revision.clone(),
+            value: Some(value),
+        });
     }
     let mut stmt =
         db.prepare("SELECT id,name,username,kind,password,private_key,passphrase FROM identities")?;
@@ -312,6 +330,7 @@ pub(super) fn apply_in_transaction(tx: &Connection, plan: &MergePlan) -> Result<
     let mut hosts = vec![];
     let mut snippets = vec![];
     let mut folders = Value::Array(vec![]);
+    let mut settings = None;
     tx.execute("DELETE FROM identities", [])?;
     for record in &merged.records {
         let Some(value) = &record.value else {
@@ -347,6 +366,7 @@ pub(super) fn apply_in_transaction(tx: &Connection, plan: &MergePlan) -> Result<
             Kind::Host => hosts.push(value),
             Kind::Snippet => snippets.push(value),
             Kind::Folders => folders = value.clone(),
+            Kind::Settings => settings = Some(value.clone()),
         }
     }
     for (kind, value) in [
@@ -357,5 +377,31 @@ pub(super) fn apply_in_transaction(tx: &Connection, plan: &MergePlan) -> Result<
         let json = Zeroizing::new(value);
         put_record(tx, kind, &json)?;
     }
+    if let Some(value) = settings {
+        let json = Zeroizing::new(serde_json::to_string(&value)?);
+        validate_settings(&json)?;
+        put_record(tx, "settings", &json)?;
+    } else {
+        tx.execute("DELETE FROM records WHERE kind='settings'", [])?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_settings(json: &str) -> Result<()> {
+    ensure!(json.len() <= 256 * 1024, "同步设置超过 256 KiB");
+    let value: Value =
+        serde_json::from_str(json).map_err(|_| anyhow::anyhow!("同步设置格式无效"))?;
+    let object = value.as_object().context("同步设置格式无效")?;
+    ensure!(
+        object.get("version").and_then(Value::as_u64) == Some(1),
+        "不支持的同步设置版本"
+    );
+    for key in ["appearance", "plugins", "pinned", "highlights"] {
+        ensure!(
+            object.get(key).is_some_and(Value::is_object),
+            "同步设置缺少必要字段"
+        );
+    }
+    ensure!(object.len() <= 8, "同步设置字段过多");
     Ok(())
 }

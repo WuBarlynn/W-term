@@ -31,7 +31,10 @@ impl Policy {
     fn validate(&self) -> Result<()> {
         ensure!(self.local_only.len() <= MAX_RECORDS, "仅本机规则过多");
         for key in &self.local_only {
-            ensure!(key.kind != Kind::Folders, "暂不支持单独排除文件夹树");
+            ensure!(
+                !matches!(key.kind, Kind::Folders | Kind::Settings),
+                "暂不支持单独排除文件夹树或应用设置"
+            );
             ensure!(
                 !key.id.is_empty() && key.id.len() <= 4096,
                 "仅本机记录 ID 无效"

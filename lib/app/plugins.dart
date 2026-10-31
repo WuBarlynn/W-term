@@ -22,7 +22,7 @@ class PluginSettings extends ChangeNotifier {
   bool commandCompletion = true;
   bool taskNotifications = true;
   bool imeAutoEnglish = false;
-  bool windowsHardwareInput = false;
+  bool windowsHardwareInput = Platform.isWindows;
   bool linkUnderline = true;
   bool dragUpload = true;
   int maxUploadSizeMb = 0;
@@ -47,7 +47,10 @@ class PluginSettings extends ChangeNotifier {
           commandCompletion = value['commandCompletion'] != false;
           taskNotifications = value['taskNotifications'] != false;
           imeAutoEnglish = value['imeAutoEnglish'] == true;
-          windowsHardwareInput = value['windowsHardwareInput'] == true;
+          final hardwareInput = value['windowsHardwareInput'];
+          windowsHardwareInput = hardwareInput is bool
+              ? hardwareInput
+              : Platform.isWindows;
           linkUnderline = value['linkUnderline'] != false;
           dragUpload = value['dragUpload'] != false;
           final maxUpload = value['maxUploadSizeMb'];
@@ -60,6 +63,40 @@ class PluginSettings extends ChangeNotifier {
       loaded = true;
       notifyListeners();
     }
+  }
+
+  Map<String, Object?> toJson() => {
+    'jsonFormatter': jsonFormatter,
+    'ipLookup': ipLookup,
+    'filePreview': filePreview,
+    'commandCompletion': commandCompletion,
+    'taskNotifications': taskNotifications,
+    'imeAutoEnglish': imeAutoEnglish,
+    'windowsHardwareInput': windowsHardwareInput,
+    'linkUnderline': linkUnderline,
+    'dragUpload': dragUpload,
+    'maxUploadSizeMb': maxUploadSizeMb,
+  };
+
+  Future<void> applySynced(Object? data) async {
+    if (data is! Map) return;
+    final maxUpload = data['maxUploadSizeMb'];
+    await save(
+      json: data['jsonFormatter'] != false,
+      ip: data['ipLookup'] != false,
+      preview: data['filePreview'] != false,
+      completion: data['commandCompletion'] != false,
+      notifications: data['taskNotifications'] != false,
+      imeAutoEnglishNext: data['imeAutoEnglish'] == true,
+      windowsHardwareInputNext: data['windowsHardwareInput'] is bool
+          ? data['windowsHardwareInput'] as bool
+          : windowsHardwareInput,
+      linkUnderlineNext: data['linkUnderline'] != false,
+      dragUploadNext: data['dragUpload'] != false,
+      maxUploadSizeMbNext: maxUpload is int
+          ? maxUpload.clamp(0, 10240)
+          : maxUploadSizeMb,
+    );
   }
 
   Future<void> save({
@@ -81,6 +118,7 @@ class PluginSettings extends ChangeNotifier {
     taskNotifications = notifications ?? taskNotifications;
     imeAutoEnglish = imeAutoEnglishNext ?? imeAutoEnglish;
     windowsHardwareInput = windowsHardwareInputNext ?? windowsHardwareInput;
+    linkUnderline = linkUnderlineNext ?? linkUnderline;
     dragUpload = dragUploadNext ?? dragUpload;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
