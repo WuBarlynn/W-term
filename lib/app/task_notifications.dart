@@ -31,6 +31,7 @@ class TaskMonitor extends ChangeNotifier {
   final DateTime Function() _now;
   final bool Function() _enabled;
   final Duration idleDelay, minimumDuration;
+  final Duration Function()? durationProvider;
   final Map<String, _TrackedTask> _tasks = {};
   final List<TaskCompletion> _pending = [];
 
@@ -39,6 +40,7 @@ class TaskMonitor extends ChangeNotifier {
     bool Function()? enabled,
     this.idleDelay = const Duration(seconds: 3),
     this.minimumDuration = const Duration(seconds: 10),
+    this.durationProvider,
   }) : _now = now ?? DateTime.now,
        _enabled = enabled ?? (() => pluginSettings.taskNotifications);
 
@@ -93,7 +95,7 @@ class TaskMonitor extends ChangeNotifier {
     if (task == null) return;
     task.idle?.cancel();
     final elapsed = _now().difference(task.startedAt);
-    if (elapsed < minimumDuration) return;
+    if (elapsed < (durationProvider?.call() ?? minimumDuration)) return;
     _pending.add(
       TaskCompletion(
         sessionId: sessionId,
@@ -119,4 +121,7 @@ class TaskMonitor extends ChangeNotifier {
   }
 }
 
-final taskMonitor = TaskMonitor();
+final taskMonitor = TaskMonitor(
+  durationProvider: () =>
+      Duration(seconds: pluginSettings.notificationThresholdSeconds),
+);

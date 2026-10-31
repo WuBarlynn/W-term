@@ -19,6 +19,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool preview = pluginSettings.filePreview;
   late bool completion = pluginSettings.commandCompletion;
   late bool notifications = pluginSettings.taskNotifications;
+  late int notificationThreshold = pluginSettings.notificationThresholdSeconds;
   late bool imeAutoEnglish = pluginSettings.imeAutoEnglish;
   late bool windowsHardwareInput = pluginSettings.windowsHardwareInput;
   late bool linkUnderline = pluginSettings.linkUnderline;
@@ -42,6 +43,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         preview: preview,
         completion: completion,
         notifications: notifications,
+        notificationThresholdSecondsNext: notificationThreshold,
         imeAutoEnglishNext: imeAutoEnglish,
         windowsHardwareInputNext: windowsHardwareInput,
         linkUnderlineNext: linkUnderline,
@@ -104,6 +106,25 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
                 : (value) => setState(() => notifications = value),
             title: const Text('任务完成通知'),
             subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
+          ),
+          DropdownButtonFormField<int>(
+            initialValue: notificationThreshold,
+            decoration: const InputDecoration(labelText: '任务通知阈值'),
+            items: const [
+              DropdownMenuItem(value: 3, child: Text('3 秒')),
+              DropdownMenuItem(value: 5, child: Text('5 秒')),
+              DropdownMenuItem(value: 10, child: Text('10 秒')),
+              DropdownMenuItem(value: 15, child: Text('15 秒')),
+              DropdownMenuItem(value: 30, child: Text('30 秒')),
+              DropdownMenuItem(value: 60, child: Text('1 分钟')),
+              DropdownMenuItem(value: 300, child: Text('5 分钟')),
+              DropdownMenuItem(value: 600, child: Text('10 分钟')),
+              DropdownMenuItem(value: 3600, child: Text('60 分钟')),
+            ],
+            onChanged: saving
+                ? null
+                : (value) =>
+                      setState(() => notificationThreshold = value ?? 15),
           ),
           SwitchListTile(
             value: dragUpload,

@@ -21,6 +21,7 @@ class PluginSettings extends ChangeNotifier {
   bool jsonFormatter = true, ipLookup = true, filePreview = true;
   bool commandCompletion = true;
   bool taskNotifications = true;
+  int notificationThresholdSeconds = 15;
   bool imeAutoEnglish = false;
   bool windowsHardwareInput = Platform.isWindows;
   bool linkUnderline = true;
@@ -56,6 +57,10 @@ class PluginSettings extends ChangeNotifier {
           filePreview = value['filePreview'] != false;
           commandCompletion = value['commandCompletion'] != false;
           taskNotifications = value['taskNotifications'] != false;
+          final threshold = value['notificationThresholdSeconds'];
+          notificationThresholdSeconds = threshold is int
+              ? threshold.clamp(3, 3600)
+              : 15;
           imeAutoEnglish = value['imeAutoEnglish'] == true;
           final hardwareInput = value['windowsHardwareInput'];
           windowsHardwareInput = hardwareInput is bool
@@ -91,6 +96,7 @@ class PluginSettings extends ChangeNotifier {
     'filePreview': filePreview,
     'commandCompletion': commandCompletion,
     'taskNotifications': taskNotifications,
+    'notificationThresholdSeconds': notificationThresholdSeconds,
     'imeAutoEnglish': imeAutoEnglish,
     'windowsHardwareInput': windowsHardwareInput,
     'linkUnderline': linkUnderline,
@@ -119,6 +125,10 @@ class PluginSettings extends ChangeNotifier {
       preview: data['filePreview'] != false,
       completion: data['commandCompletion'] != false,
       notifications: data['taskNotifications'] != false,
+      notificationThresholdSecondsNext:
+          data['notificationThresholdSeconds'] is int
+          ? data['notificationThresholdSeconds'] as int
+          : notificationThresholdSeconds,
       imeAutoEnglishNext: data['imeAutoEnglish'] == true,
       windowsHardwareInputNext: data['windowsHardwareInput'] is bool
           ? data['windowsHardwareInput'] as bool
@@ -147,6 +157,7 @@ class PluginSettings extends ChangeNotifier {
     required bool preview,
     bool? completion,
     bool? notifications,
+    int? notificationThresholdSecondsNext,
     bool? imeAutoEnglishNext,
     bool? windowsHardwareInputNext,
     bool? linkUnderlineNext,
@@ -168,6 +179,9 @@ class PluginSettings extends ChangeNotifier {
     filePreview = preview;
     commandCompletion = completion ?? commandCompletion;
     taskNotifications = notifications ?? taskNotifications;
+    notificationThresholdSeconds =
+        (notificationThresholdSecondsNext ?? notificationThresholdSeconds)
+            .clamp(3, 3600);
     imeAutoEnglish = imeAutoEnglishNext ?? imeAutoEnglish;
     windowsHardwareInput = windowsHardwareInputNext ?? windowsHardwareInput;
     linkUnderline = linkUnderlineNext ?? linkUnderline;
@@ -195,6 +209,7 @@ class PluginSettings extends ChangeNotifier {
         'filePreview': preview,
         'commandCompletion': commandCompletion,
         'taskNotifications': taskNotifications,
+        'notificationThresholdSeconds': notificationThresholdSeconds,
         'imeAutoEnglish': imeAutoEnglish,
         'windowsHardwareInput': windowsHardwareInput,
         'linkUnderline': linkUnderline,

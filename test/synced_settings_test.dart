@@ -60,6 +60,7 @@ void main() {
       'selectionPin': false,
       'selectionSnippet': false,
       'selectionShare': false,
+      'notificationThresholdSeconds': 30,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -78,6 +79,7 @@ void main() {
     expect(store.selectionPin, isFalse);
     expect(store.selectionSnippet, isFalse);
     expect(store.selectionShare, isFalse);
+    expect(store.notificationThresholdSeconds, 30);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 

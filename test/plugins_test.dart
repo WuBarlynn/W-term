@@ -51,6 +51,7 @@ void main() {
       expect(store.selectionPin, isTrue);
       expect(store.selectionSnippet, isTrue);
       expect(store.selectionShare, isTrue);
+      expect(store.notificationThresholdSeconds, 15);
       expect(store.maxUploadSizeMb, 0);
       expect(uploadTooLarge(101 * 1024 * 1024, 100), isTrue);
       expect(uploadTooLarge(100 * 1024 * 1024, 100), isFalse);
@@ -73,6 +74,7 @@ void main() {
         selectionPinNext: false,
         selectionSnippetNext: false,
         selectionShareNext: false,
+        notificationThresholdSecondsNext: 60,
         maxUploadSizeMbNext: 500,
       );
       final restored = PluginSettings(file: () async => file);
@@ -94,6 +96,7 @@ void main() {
       expect(restored.selectionPin, isFalse);
       expect(restored.selectionSnippet, isFalse);
       expect(restored.selectionShare, isFalse);
+      expect(restored.notificationThresholdSeconds, 60);
       expect(restored.maxUploadSizeMb, 500);
     } finally {
       await dir.delete(recursive: true);

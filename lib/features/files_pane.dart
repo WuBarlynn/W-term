@@ -18,6 +18,7 @@ import 'remote_entry_actions.dart';
 import 'file_browser_filter.dart';
 import 'remote_permissions_dialog.dart';
 import 'remote_text_editor.dart';
+import 'image_preview_dialog.dart';
 
 import 'package:desktop_drop/desktop_drop.dart';
 
@@ -870,6 +871,10 @@ class FilesPaneState extends State<FilesPane> {
       await previewOffice(entry);
       return;
     }
+    if (isImagePath(entry.name)) {
+      await previewImage(entry);
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -893,6 +898,45 @@ class FilesPaneState extends State<FilesPane> {
       if (mounted) setState(() => error = userFacingError(e));
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> previewImage(native.RemoteEntry entry) async {
+    if (entry.size > 50 * 1024 * 1024) {
+      setState(() => error = '图片超过 50 MB，请先下载到本地再打开');
+      return;
+    }
+    Directory? temporary;
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '准备图片预览…';
+    });
+    try {
+      temporary = await createAppTemporaryDirectory('wterm-image-');
+      final extension = entry.name.contains('.')
+          ? entry.name.substring(entry.name.lastIndexOf('.'))
+          : '.img';
+      final local = '${temporary.path}/preview$extension';
+      await native.downloadFile(
+        connectionId: widget.connectionId,
+        remotePath: entry.path,
+        localPath: local,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ImagePreviewDialog(title: entry.name, path: local),
+      );
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+      if (temporary != null) {
+        await temporary
+            .delete(recursive: true)
+            .catchError((Object _) => temporary!);
+      }
     }
   }
 

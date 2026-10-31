@@ -5,6 +5,7 @@ import '../app/shell_integration.dart';
 import 'keyword_highlight_dialog.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
+import 'image_preview_dialog.dart';
 import 'terminal_share_dialog.dart';
 import '../app/terminal_appearance.dart';
 import '../app/font_catalog.dart';
@@ -639,20 +640,9 @@ class _TerminalPaneState extends State<TerminalPane> {
         if (!mounted) return;
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text(path.split('/').last),
-            content: InteractiveViewer(
-              child: Image.file(
-                file,
-                errorBuilder: (_, _, _) => const Text('无法解码图片'),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('关闭'),
-              ),
-            ],
+          builder: (_) => ImagePreviewDialog(
+            title: path.split('/').last,
+            path: file.path,
           ),
         );
         await file.delete().catchError((Object _) => file);
