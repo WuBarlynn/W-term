@@ -593,7 +593,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 新增 `lib/features/font_market_dialog.dart` 在线字体库，六个 SIL OFL 字体从上游 GitHub 仓库下载并复用本机字体注册。
 - 上传批次提升到 `uploadQueue` 应用级单例；文件面板释放不再取消在途批次，传输循环在面板关闭后继续且不再调用 `setState`/冲突弹窗。
 - `exportSynced` 等待在途保存，设置导出读取最新外观/固定命令/高亮。
-- 验证：待发布记录补充。
+- 验证：Flutter **310 项**、`flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41201797723](https://github.com/WuBarlynn/W-term/actions/runs/41201797723) 成功。发布包位于 `build/release-1.0.43/`。在线字体下载与跨标签上传队列仍需实机验收。
 
 ## 35. 1.0.42 设置工作区、设置同步与默认输入字体（2026-10-31）
 
