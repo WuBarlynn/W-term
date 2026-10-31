@@ -122,6 +122,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
     pendingDeepLink.addListener(_deepLinkReceived);
+    const MethodChannel('dev.wterm/biometrics')
+        .setMethodCallHandler(_handleNativeMethod);
     unawaited(_restoreLayout());
     _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
   }
@@ -133,6 +135,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     taskMonitor.cancelAll();
     trayConnectRequests.removeListener(_trayConnectRequested);
     pendingDeepLink.removeListener(_deepLinkReceived);
+    const MethodChannel('dev.wterm/biometrics').setMethodCallHandler(null);
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     _autoSyncTimer?.cancel();
@@ -872,6 +875,74 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void _trayConnectRequested() {
     if (!mounted || connecting) return;
     unawaited(connect());
+  }
+
+  Future<bool> _handleNativeMethod(MethodCall call) async {
+    if (call.method != 'attachTerminalWindow') return false;
+    final args = call.arguments;
+    final raw = args is Map ? args['payload'] : null;
+    if (raw is! String) return false;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return false;
+      final connectionId = '${decoded['connectionId'] ?? ''}';
+      final host = '${decoded['host'] ?? ''}';
+      final username = '${decoded['username'] ?? ''}';
+      final snapshot = '${decoded['snapshot'] ?? ''}';
+      if (connectionId.isEmpty || host.isEmpty) return false;
+      final existing = _sessionById(connectionId);
+      if (existing != null) {
+        final tab = _tabForSession(connectionId);
+        if (tab != null && mounted) {
+          setState(() => selected = tabs.indexOf(tab));
+        }
+        return true;
+      }
+      late final TerminalSession terminal;
+      terminal = TerminalSession.attach(
+        connectionId: connectionId,
+        host: host,
+        username: username,
+        snapshot: snapshot,
+        onEnded: () => _terminalEnded(connectionId),
+        onActivity: () => taskMonitor.activity(connectionId),
+        onZmodemOffer: (offer) => unawaited(_handleZmodemOffer(offer)),
+        onZmodemRequest: _requestZmodemFiles,
+        onCommand: (command) {
+          unawaited(
+            commandHistory.record(
+              command: command,
+              host: host,
+              username: username,
+            ),
+          );
+          taskMonitor.commandSubmitted(
+            connectionId,
+            command,
+            title: username.isEmpty ? host : '$username@$host',
+          );
+        },
+      );
+      final session = _Session(connectionId, host, username, '', terminal);
+      if (!mounted) {
+        terminal.dispose();
+        return false;
+      }
+      setState(() {
+        sessions.add(session);
+        tabs.add(
+          WorkspaceTab(
+            id: HostProfile.newId(),
+            root: SessionPane(session.id),
+            activeSessionId: session.id,
+          ),
+        );
+        selected = tabs.length - 1;
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _restartAutoSync() {

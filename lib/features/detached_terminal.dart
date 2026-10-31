@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -45,7 +46,7 @@ class DetachedTerminalPage extends StatefulWidget {
 class _DetachedTerminalPageState extends State<DetachedTerminalPage>
     with WindowListener {
   static const _window = MethodChannel('dev.wterm/detached-window');
-  late final TerminalSession session;
+  late TerminalSession session;
   bool closing = false;
 
   @override
@@ -92,6 +93,48 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage>
     }
   }
 
+  Future<void> returnToMain() async {
+    if (closing || Platform.isWindows) return;
+    setState(() => closing = true);
+    final snapshot = await session.detachForHandoff();
+    final payload = jsonEncode({
+      'connectionId': session.connectionId,
+      'host': session.host,
+      'username': session.username,
+      'snapshot': snapshot,
+      'title': session.title,
+    });
+    try {
+      final accepted =
+          await _window.invokeMethod<bool>('returnToMain', {
+            'payload': payload,
+          }) ??
+          false;
+      if (accepted) {
+        session.dispose();
+        return;
+      }
+    } on PlatformException {
+      // Fall through to reattach in this window.
+    } on MissingPluginException {
+      // Fall through to reattach in this window.
+    }
+    if (!mounted) return;
+    session.dispose();
+    session = TerminalSession.attach(
+      connectionId: jsonDecode(payload)['connectionId'] as String,
+      host: jsonDecode(payload)['host'] as String,
+      username: jsonDecode(payload)['username'] as String,
+      snapshot: snapshot,
+      onEnded: () {
+        if (mounted) setState(() {});
+      },
+    );
+    setState(() => closing = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('收回失败，会话已保留在当前窗口')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = session.title;
@@ -122,6 +165,12 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage>
                     ),
                   ),
                 ),
+                if (!Platform.isWindows)
+                  TextButton.icon(
+                    onPressed: closing ? null : returnToMain,
+                    icon: const Icon(Icons.call_received, size: 16),
+                    label: const Text('收回主窗口'),
+                  ),
                 TextButton.icon(
                   onPressed: closing ? null : close,
                   icon: const Icon(Icons.link_off, size: 16),

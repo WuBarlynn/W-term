@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
   private var showHotKeyRef: EventHotKeyRef?
   private var showHotKeyHandler: EventHandlerRef?
   private var previousInputSource: TISInputSource?
+  private weak var mainFlutterController: FlutterViewController?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -20,6 +21,7 @@ class MainFlutterWindow: NSWindow {
     self.minSize = NSSize(width: 620, height: 460)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    mainFlutterController = flutterViewController
 
     let biometricChannel = FlutterMethodChannel(
       name: "dev.wterm/biometrics",
@@ -167,10 +169,27 @@ class MainFlutterWindow: NSWindow {
     let channel = FlutterMethodChannel(
       name: "dev.wterm/detached-window",
       binaryMessenger: controller.engine.binaryMessenger)
-    channel.setMethodCallHandler { [weak window] call, result in
+    channel.setMethodCallHandler { [weak self, weak window] call, result in
       if call.method == "close" {
         DispatchQueue.main.async { window?.close() }
         result(nil)
+      } else if call.method == "returnToMain" {
+        guard let args = call.arguments as? [String: Any],
+              let payload = args["payload"] as? String,
+              let main = self?.mainFlutterController else {
+          result(false)
+          return
+        }
+        let mainChannel = FlutterMethodChannel(
+          name: "dev.wterm/biometrics",
+          binaryMessenger: main.engine.binaryMessenger)
+        mainChannel.invokeMethod("attachTerminalWindow", arguments: ["payload": payload]) { value in
+          let accepted = (value as? Bool) ?? false
+          if accepted {
+            DispatchQueue.main.async { window?.close() }
+          }
+          result(accepted)
+        }
       } else {
         result(FlutterMethodNotImplemented)
       }
