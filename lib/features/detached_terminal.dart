@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../app/session_handoff.dart';
 import '../app/terminal_session.dart';
 import 'terminal_pane.dart';
 
@@ -58,6 +59,7 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage>
       host: widget.payload['host'] ?? '',
       username: widget.payload['username'] ?? '',
       snapshot: widget.payload['snapshot'] ?? '',
+      hostId: widget.payload['hostId'] ?? '',
       onEnded: () {
         if (mounted) setState(() {});
       },
@@ -94,38 +96,59 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage>
   }
 
   Future<void> returnToMain() async {
-    if (closing || Platform.isWindows) return;
+    if (closing) return;
     setState(() => closing = true);
-    final snapshot = await session.detachForHandoff();
-    final payload = jsonEncode({
-      'connectionId': session.connectionId,
-      'host': session.host,
-      'username': session.username,
-      'snapshot': snapshot,
-      'title': session.title,
-    });
+    String snapshot;
     try {
-      final accepted =
-          await _window.invokeMethod<bool>('returnToMain', {
-            'payload': payload,
-          }) ??
-          false;
-      if (accepted) {
-        session.dispose();
-        return;
+      snapshot = await session.detachForHandoff();
+    } catch (e) {
+      if (mounted) {
+        setState(() => closing = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('无法收回会话：$e')));
       }
-    } on PlatformException {
-      // Fall through to reattach in this window.
-    } on MissingPluginException {
+      return;
+    }
+    final payload = SessionHandoffPayload(
+      connectionId: session.connectionId,
+      host: session.host,
+      username: session.username,
+      hostId: session.hostId,
+      snapshot: snapshot,
+      title: session.title,
+    );
+    var accepted = false;
+    try {
+      if (Platform.isWindows) {
+        accepted =
+            await const WindowMethodChannel(
+              'dev.wterm/window-recall',
+              mode: ChannelMode.unidirectional,
+            ).invokeMethod<bool>('recall', payload.encode()) ??
+            false;
+      } else {
+        accepted =
+            await _window.invokeMethod<bool>('returnToMain', {
+              'payload': payload.encode(),
+            }) ??
+            false;
+      }
+    } catch (_) {
       // Fall through to reattach in this window.
     }
     if (!mounted) return;
+    if (accepted) {
+      session.dispose();
+      if (Platform.isWindows) unawaited(windowManager.close());
+      return;
+    }
     session.dispose();
     session = TerminalSession.attach(
-      connectionId: jsonDecode(payload)['connectionId'] as String,
-      host: jsonDecode(payload)['host'] as String,
-      username: jsonDecode(payload)['username'] as String,
-      snapshot: snapshot,
+      connectionId: payload.connectionId,
+      host: payload.host,
+      username: payload.username,
+      hostId: payload.hostId,
+      snapshot: payload.snapshot,
       onEnded: () {
         if (mounted) setState(() {});
       },
@@ -165,12 +188,11 @@ class _DetachedTerminalPageState extends State<DetachedTerminalPage>
                     ),
                   ),
                 ),
-                if (!Platform.isWindows)
-                  TextButton.icon(
-                    onPressed: closing ? null : returnToMain,
-                    icon: const Icon(Icons.call_received, size: 16),
-                    label: const Text('收回主窗口'),
-                  ),
+                TextButton.icon(
+                  onPressed: closing ? null : returnToMain,
+                  icon: const Icon(Icons.call_received, size: 16),
+                  label: const Text('收回主窗口'),
+                ),
                 TextButton.icon(
                   onPressed: closing ? null : close,
                   icon: const Icon(Icons.link_off, size: 16),

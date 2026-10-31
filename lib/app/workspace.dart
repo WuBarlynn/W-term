@@ -5,6 +5,10 @@ import 'plugins.dart';
 import 'terminal_session.dart';
 import 'command_history.dart';
 import 'update_checker.dart';
+import 'session_handoff.dart';
+
+import 'package:window_manager/window_manager.dart';
+
 import 'workspace_layout.dart';
 import 'proxy_store.dart';
 import '../features/proxy_dialog.dart';
@@ -124,6 +128,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     pendingDeepLink.addListener(_deepLinkReceived);
     const MethodChannel('dev.wterm/biometrics')
         .setMethodCallHandler(_handleNativeMethod);
+    if (Platform.isWindows) {
+      unawaited(
+        const WindowMethodChannel(
+          'dev.wterm/window-recall',
+          mode: ChannelMode.unidirectional,
+        ).setMethodCallHandler(_handleWindowRecall),
+      );
+    }
     unawaited(_restoreLayout());
     if (supportsDesktopUpdates) {
       _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
@@ -138,6 +150,14 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     trayConnectRequests.removeListener(_trayConnectRequested);
     pendingDeepLink.removeListener(_deepLinkReceived);
     const MethodChannel('dev.wterm/biometrics').setMethodCallHandler(null);
+    if (Platform.isWindows) {
+      unawaited(
+        const WindowMethodChannel(
+          'dev.wterm/window-recall',
+          mode: ChannelMode.unidirectional,
+        ).setMethodCallHandler(null),
+      );
+    }
     _layoutSaveTimer?.cancel();
     _updateTimer?.cancel();
     _autoSyncTimer?.cancel();
@@ -886,14 +906,31 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     final args = call.arguments;
     final raw = args is Map ? args['payload'] : null;
     if (raw is! String) return false;
+    return _attachReturnedTerminal(raw);
+  }
+
+  Future<bool> _handleWindowRecall(MethodCall call) async {
+    if (call.method != 'recall') {
+      throw MissingPluginException('Unknown recall method ${call.method}');
+    }
+    final raw = call.arguments;
+    if (raw is! String) return false;
+    final accepted = await _attachReturnedTerminal(raw);
+    if (accepted && mounted && Platform.isWindows) {
+      unawaited(windowManager.show().catchError((Object _) {}));
+      unawaited(windowManager.focus().catchError((Object _) {}));
+    }
+    return accepted;
+  }
+
+  Future<bool> _attachReturnedTerminal(String raw) async {
+    final handoff = SessionHandoffPayload.decode(raw);
+    if (handoff == null) return false;
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return false;
-      final connectionId = '${decoded['connectionId'] ?? ''}';
-      final host = '${decoded['host'] ?? ''}';
-      final username = '${decoded['username'] ?? ''}';
-      final snapshot = '${decoded['snapshot'] ?? ''}';
-      if (connectionId.isEmpty || host.isEmpty) return false;
+      final connectionId = handoff.connectionId;
+      final host = handoff.host;
+      final username = handoff.username;
+      final snapshot = handoff.snapshot;
       final existing = _sessionById(connectionId);
       if (existing != null) {
         final tab = _tabForSession(connectionId);
@@ -927,7 +964,24 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           );
         },
       );
-      final session = _Session(connectionId, host, username, '', terminal);
+      HostProfile? profile;
+      if (handoff.hostId.isNotEmpty) {
+        try {
+          profile = (await hostStore.read())
+              .where((item) => item.id == handoff.hostId)
+              .firstOrNull;
+        } catch (_) {
+          // The host may have been deleted; keep the live session.
+        }
+      }
+      final session = _Session(
+        connectionId,
+        host,
+        username,
+        handoff.hostId,
+        terminal,
+        profile: profile,
+      );
       _bindInputRouting(session);
       if (!mounted) {
         terminal.dispose();
@@ -1420,6 +1474,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       'connectionId': session.id,
       'host': session.host,
       'username': session.username,
+      'hostId': session.hostId,
       'snapshot': snapshot,
       'title': title,
     });
