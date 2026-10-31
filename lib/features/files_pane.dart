@@ -26,6 +26,9 @@ import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pdfrx/pdfrx.dart';
+
+import '../app/office_preview.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/temporary_directory.dart';
@@ -782,6 +785,10 @@ class FilesPaneState extends State<FilesPane> {
       await previewPdf(entry);
       return;
     }
+    if (isOfficePreviewName(entry.name)) {
+      await previewOffice(entry);
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -805,6 +812,56 @@ class FilesPaneState extends State<FilesPane> {
       if (mounted) setState(() => error = userFacingError(e));
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> previewOffice(native.RemoteEntry entry) async {
+    if (entry.size > maxOfficePreviewBytes) {
+      if (mounted) {
+        setState(() => error = 'Office 文件超过 50 MB，请先下载到本地再打开');
+      }
+      return;
+    }
+    Directory? temporary;
+    setState(() {
+      busy = true;
+      error = null;
+      activity = '准备 Office 预览…';
+    });
+    try {
+      temporary = await createAppTemporaryDirectory('wterm-office-');
+      final local = '${temporary.path}/${_safeLocalName(entry.name)}';
+      await native.downloadFile(
+        connectionId: widget.connectionId,
+        remotePath: entry.path,
+        localPath: local,
+      );
+      final text = officePreviewText(
+        entry.name,
+        await File(local).readAsBytes(),
+      );
+      if (!mounted) return;
+      if (text == null || text.trim().isEmpty) {
+        setState(() => error = '无法从该 Office 文件提取可预览文本');
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _FilePreviewDialog(
+          title: '${entry.name}（文本预览）',
+          text: 'Office 文本/表格预览，复杂排版、图片和公式不会保留。\n\n$text',
+          markdown: false,
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+      if (temporary != null) {
+        await temporary
+            .delete(recursive: true)
+            .catchError((Object _) => temporary!);
+      }
     }
   }
 
