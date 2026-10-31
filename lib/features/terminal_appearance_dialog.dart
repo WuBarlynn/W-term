@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app/font_catalog.dart';
+import '../app/imported_fonts.dart';
 import '../app/terminal_appearance.dart';
 import '../app/errors.dart';
 
@@ -29,6 +32,11 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   );
   late final cjkFont = TextEditingController(text: widget.store.cjkFont);
   List<String> fontFamilies = curatedFontFamilies();
+  bool importingFont = false;
+
+  List<String> get _fontChoices =>
+      {...fontFamilies, ...importedFonts.names}.toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
   @override
   void initState() {
@@ -63,6 +71,162 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
 
   bool busy = false;
   String? error;
+
+  Future<String?> _askFontName(String initial) async {
+    final controller = TextEditingController(text: initial);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('字体名称'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 64,
+          decoration: const InputDecoration(
+            labelText: '显示名称',
+            hintText: '例如 JetBrains Mono',
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null) return null;
+    final error = validateImportedFontName(name);
+    if (error != null) {
+      if (mounted) setState(() => this.error = error);
+      return null;
+    }
+    return name.trim();
+  }
+
+  Future<void> _importFontFile() async {
+    XFile? file;
+    try {
+      file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(label: '字体', extensions: ['ttf', 'otf', 'ttc']),
+        ],
+      );
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+      return;
+    }
+    if (file == null || !mounted) return;
+    final base = file.name.contains('.')
+        ? file.name.substring(0, file.name.lastIndexOf('.'))
+        : file.name;
+    final name = await _askFontName(base);
+    if (name == null || !mounted) return;
+    setState(() {
+      importingFont = true;
+      error = null;
+    });
+    try {
+      await importedFonts.importFile(File(file.path), name);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => importingFont = false);
+    }
+  }
+
+  Future<void> _importFontUrl() async {
+    final url = TextEditingController();
+    final family = TextEditingController();
+    var dialogError = '';
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('从 URL 安装字体'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: url,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: '字体文件 URL',
+                    hintText: 'https://example.com/font.ttf',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: family,
+                  maxLength: 64,
+                  decoration: const InputDecoration(labelText: '字体显示名称'),
+                ),
+                if (dialogError.isNotEmpty)
+                  Text(
+                    dialogError,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                const Text(
+                  '仅支持 http/https 的 TTF/OTF/TTC，最大 32 MB。',
+                  style: TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final uri = Uri.tryParse(url.text.trim());
+                if (uri == null ||
+                    (uri.scheme != 'http' && uri.scheme != 'https')) {
+                  update(() => dialogError = '请输入 http/https 地址');
+                  return;
+                }
+                final nameError = validateImportedFontName(family.text);
+                if (nameError != null) {
+                  update(() => dialogError = nameError);
+                  return;
+                }
+                Navigator.pop(context, [url.text.trim(), family.text.trim()]);
+              },
+              child: const Text('开始下载'),
+            ),
+          ],
+        ),
+      ),
+    );
+    url.dispose();
+    family.dispose();
+    if (result == null || !mounted) return;
+    setState(() {
+      importingFont = true;
+      error = null;
+    });
+    try {
+      await importedFonts.importUrl(Uri.parse(result[0]), result[1]);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => importingFont = false);
+    }
+  }
+
   Future<void> save() async {
     setState(() => busy = true);
     try {
@@ -176,7 +340,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 enabled: !busy,
                 label: '界面字体',
                 hint: '留空使用 ${platformDefaultUiFont()}',
-                fonts: fontFamilies,
+                fonts: _fontChoices,
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 10),
@@ -185,7 +349,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 enabled: !busy,
                 label: '终端字体',
                 hint: '留空使用 ${platformDefaultTerminalFont()}',
-                fonts: fontFamilies,
+                fonts: _fontChoices,
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 10),
@@ -194,14 +358,62 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 enabled: !busy,
                 label: 'CJK 回退字体（可选）',
                 hint: 'Noto Sans SC / Microsoft YaHei',
-                fonts: fontFamilies,
+                fonts: _fontChoices,
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 6),
               Text(
                 '已内置 JetBrains Mono、Noto Sans SC；'
-                '检测到 ${fontFamilies.length} 个可用字体族，点击右侧按钮选择。',
+                '检测到 ${_fontChoices.length} 个可用字体族，点击右侧按钮选择。',
                 style: const TextStyle(fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: busy || importingFont ? null : _importFontFile,
+                    icon: const Icon(Icons.font_download_outlined, size: 18),
+                    label: const Text('导入字体文件'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: busy || importingFont ? null : _importFontUrl,
+                    icon: const Icon(Icons.link, size: 18),
+                    label: const Text('从 URL 安装'),
+                  ),
+                  if (importingFont)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                ],
+              ),
+              if (importedFonts.entries.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final font in importedFonts.entries)
+                      InputChip(
+                        label: Text(font.name),
+                        onDeleted: busy || importingFont
+                            ? null
+                            : () async {
+                                await importedFonts.remove(font);
+                                if (mounted) setState(() {});
+                              },
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 4),
+              const Text(
+                '导入字体仅复制到本机应用数据；请确认拥有该字体的使用授权。',
+                style: TextStyle(fontSize: 11),
               ),
               const SizedBox(height: 20),
               Text('字号：$size'),
@@ -604,10 +816,8 @@ class _FontField extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final choice = await showDialog<String>(
       context: context,
-      builder: (_) => _FontPickerDialog(
-        fonts: fonts,
-        selected: controller.text.trim(),
-      ),
+      builder: (_) =>
+          _FontPickerDialog(fonts: fonts, selected: controller.text.trim()),
     );
     if (choice == null) return;
     controller.text = choice;

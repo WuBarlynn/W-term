@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'imported_fonts.dart';
+
 /// Fonts shipped with the app. They are registered through pubspec and are
 /// available even when the operating system has no CJK or coding font.
 const bundledFonts = <String>['JetBrains Mono', 'Noto Sans SC'];
@@ -61,8 +63,7 @@ List<String> curatedFontFamilies() {
     ...commonUiFonts,
     ...commonTerminalFonts,
     ...commonCjkFonts,
-  }.toList()
-    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   return families;
 }
 
@@ -92,25 +93,25 @@ String platformDefaultTerminalFont() {
 /// a curated list when the platform channel is unavailable (for example in a
 /// widget test or on an unsupported host).
 Future<List<String>> availableFontFamilies() async {
-  final cached = _systemFonts;
-  if (cached != null) return cached;
-  final families = <String>{...bundledFonts, ...commonUiFonts, ...commonTerminalFonts, ...commonCjkFonts};
-  if (Platform.isMacOS || Platform.isWindows || Platform.isIOS) {
+  final families = <String>{...curatedFontFamilies(), ...importedFonts.names};
+  var system = _systemFonts;
+  if (system == null &&
+      (Platform.isMacOS || Platform.isWindows || Platform.isIOS)) {
     try {
       final result = await _channel.invokeMethod<List<dynamic>>('listFamilies');
       if (result != null) {
-        for (final value in result) {
-          if (value is String && value.trim().isNotEmpty) {
-            families.add(value.trim());
-          }
-        }
+        system = [
+          for (final value in result)
+            if (value is String && value.trim().isNotEmpty) value.trim(),
+        ];
+        _systemFonts = system;
       }
     } catch (_) {
       // The bundled + curated list is still selectable.
     }
   }
+  families.addAll(system ?? const []);
   final sorted = families.toList()
     ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-  _systemFonts = sorted;
   return sorted;
 }

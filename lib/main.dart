@@ -13,6 +13,7 @@ import 'app/deep_links.dart';
 import 'app/system_notifications.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
+import 'app/imported_fonts.dart';
 import 'app/font_catalog.dart';
 import 'app/keyword_highlights.dart';
 import 'app/sync_automation.dart';
@@ -55,6 +56,7 @@ Future<void> main(List<String> args) async {
   try {
     await RustLib.init();
     await terminalAppearance.load();
+    await importedFonts.load();
     await pinnedCommands.load();
     await keywordHighlights.load();
     await syncAutomation.load();
