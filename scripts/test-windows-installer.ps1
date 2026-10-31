@@ -4,7 +4,16 @@ if (-not $installer) { throw 'Installer was not produced' }
 $target = Join-Path $env:RUNNER_TEMP ("wterm-silent-" + [Guid]::NewGuid().ToString('N'))
 $process = Start-Process -FilePath $installer.FullName `
   -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', "/DIR=$target") `
-  -Wait -PassThru
+  -PassThru
+$deadline = (Get-Date).AddMinutes(3)
+while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
+  Start-Sleep -Milliseconds 500
+  $process.Refresh()
+}
+if (-not $process.HasExited) {
+  Stop-Process -Id $process.Id -Force
+  throw 'Silent installer timed out'
+}
 if ($process.ExitCode -ne 0) {
   throw "Silent installer exited with $($process.ExitCode)"
 }
