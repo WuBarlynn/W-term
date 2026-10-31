@@ -34,5 +34,9 @@ void main() {
     expect(findPathAt('version 1.0.43 released', 10), isNull);
     expect(findPathAt('visit example.com now', 8), isNull);
     expect(findPathAt('plain words only', 3), isNull);
+    final span = findPathSpanAt(line, 40);
+    expect(span, isNotNull);
+    expect(span!.path, '/var/log/app.log');
+    expect(line.substring(span.start, span.end), span.path);
   });
 }

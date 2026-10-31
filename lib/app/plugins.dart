@@ -32,6 +32,9 @@ class PluginSettings extends ChangeNotifier {
   bool showStatusBar = true;
   bool rightClickPaste = false;
   bool showComposeBar = false;
+  bool selectionPin = true;
+  bool selectionSnippet = true;
+  bool selectionShare = true;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -67,6 +70,9 @@ class PluginSettings extends ChangeNotifier {
           showStatusBar = value['showStatusBar'] != false;
           rightClickPaste = value['rightClickPaste'] == true;
           showComposeBar = value['showComposeBar'] == true;
+          selectionPin = value['selectionPin'] != false;
+          selectionSnippet = value['selectionSnippet'] != false;
+          selectionShare = value['selectionShare'] != false;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -96,6 +102,9 @@ class PluginSettings extends ChangeNotifier {
     'showStatusBar': showStatusBar,
     'rightClickPaste': rightClickPaste,
     'showComposeBar': showComposeBar,
+    'selectionPin': selectionPin,
+    'selectionSnippet': selectionSnippet,
+    'selectionShare': selectionShare,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -123,6 +132,9 @@ class PluginSettings extends ChangeNotifier {
       showStatusBarNext: data['showStatusBar'] != false,
       rightClickPasteNext: data['rightClickPaste'] == true,
       showComposeBarNext: data['showComposeBar'] == true,
+      selectionPinNext: data['selectionPin'] != false,
+      selectionSnippetNext: data['selectionSnippet'] != false,
+      selectionShareNext: data['selectionShare'] != false,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -146,6 +158,9 @@ class PluginSettings extends ChangeNotifier {
     bool? showStatusBarNext,
     bool? rightClickPasteNext,
     bool? showComposeBarNext,
+    bool? selectionPinNext,
+    bool? selectionSnippetNext,
+    bool? selectionShareNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -164,6 +179,9 @@ class PluginSettings extends ChangeNotifier {
     showStatusBar = showStatusBarNext ?? showStatusBar;
     rightClickPaste = rightClickPasteNext ?? rightClickPaste;
     showComposeBar = showComposeBarNext ?? showComposeBar;
+    selectionPin = selectionPinNext ?? selectionPin;
+    selectionSnippet = selectionSnippetNext ?? selectionSnippet;
+    selectionShare = selectionShareNext ?? selectionShare;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -188,6 +206,9 @@ class PluginSettings extends ChangeNotifier {
         'showStatusBar': showStatusBar,
         'rightClickPaste': rightClickPaste,
         'showComposeBar': showComposeBar,
+        'selectionPin': selectionPin,
+        'selectionSnippet': selectionSnippet,
+        'selectionShare': selectionShare,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

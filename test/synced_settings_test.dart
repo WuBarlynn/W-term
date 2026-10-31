@@ -57,6 +57,9 @@ void main() {
       'showStatusBar': false,
       'rightClickPaste': true,
       'showComposeBar': true,
+      'selectionPin': false,
+      'selectionSnippet': false,
+      'selectionShare': false,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -72,6 +75,9 @@ void main() {
     expect(store.showStatusBar, isFalse);
     expect(store.rightClickPaste, isTrue);
     expect(store.showComposeBar, isTrue);
+    expect(store.selectionPin, isFalse);
+    expect(store.selectionSnippet, isFalse);
+    expect(store.selectionShare, isFalse);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 

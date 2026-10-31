@@ -102,6 +102,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   ProcSnapshot? _lastProc;
   double? _cpuPercent, _memoryPercent;
   int? _latencyMs;
+  int _hoverPathLine = -1;
+  int _hoverPathStart = -1;
+  int _hoverPathEnd = -1;
   @override
   void initState() {
     super.initState();
@@ -487,6 +490,45 @@ class _TerminalPaneState extends State<TerminalPane> {
       ],
     ),
   );
+
+  void _hoverPath(PointerHoverEvent event) {
+    if (!pluginSettings.filePreview) return;
+    try {
+      final dynamic render = _terminalViewKey.currentState?.renderTerminal;
+      if (render == null) return;
+      final Offset local = render.globalToLocal(event.position) as Offset;
+      final dynamic cell = render.getCellOffset(local);
+      final y = cell.y as int;
+      final x = cell.x as int;
+      final lines = widget.session.terminal.buffer.lines;
+      if (y < 0 || y >= lines.length) {
+        _clearHoverPath();
+        return;
+      }
+      final span = findPathSpanAt(lines[y].getText(), x);
+      final start = span?.start ?? -1;
+      final end = span?.end ?? -1;
+      if (y == _hoverPathLine &&
+          start == _hoverPathStart &&
+          end == _hoverPathEnd) {
+        return;
+      }
+      _hoverPathLine = y;
+      _hoverPathStart = start;
+      _hoverPathEnd = end;
+      _linkRepaint.value++;
+    } catch (_) {
+      _clearHoverPath();
+    }
+  }
+
+  void _clearHoverPath() {
+    if (_hoverPathLine < 0 && _hoverPathStart < 0) return;
+    _hoverPathLine = -1;
+    _hoverPathStart = -1;
+    _hoverPathEnd = -1;
+    _linkRepaint.value++;
+  }
 
   Future<void> _openLinkAt(PointerUpEvent event) async {
     if (ended) return;
@@ -1649,7 +1691,10 @@ class _TerminalPaneState extends State<TerminalPane> {
                         color: terminalAppearance.activeTheme.background,
                         child: RepaintBoundary(
                           key: _terminalBoundary,
-                          child: Listener(
+                          child: MouseRegion(
+                            onHover: _hoverPath,
+                            onExit: (_) => _clearHoverPath(),
+                            child: Listener(
                             onPointerUp: _openLinkAt,
                             child: NotificationListener<ScrollNotification>(
                               onNotification: (_) {
@@ -1849,23 +1894,27 @@ class _TerminalPaneState extends State<TerminalPane> {
                                             value: 'open-link',
                                             child: Text('打开选中链接'),
                                           ),
-                                          const PopupMenuItem(
-                                            value: 'pin',
-                                            child: Text('固定选中命令'),
-                                          ),
-                                          if (widget.snippets != null)
+                                          if (pluginSettings.selectionPin)
+                                            const PopupMenuItem(
+                                              value: 'pin',
+                                              child: Text('固定选中命令'),
+                                            ),
+                                          if (widget.snippets != null &&
+                                              pluginSettings.selectionSnippet)
                                             const PopupMenuItem(
                                               value: 'save-snippet',
                                               child: Text('存为命令片段'),
                                             ),
-                                          const PopupMenuItem(
-                                            value: 'share-image',
-                                            child: Text('快速分享终端图片'),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'share-image-templates',
-                                            child: Text('分享为图片（模板）'),
-                                          ),
+                                          if (pluginSettings.selectionShare) ...[
+                                            const PopupMenuItem(
+                                              value: 'share-image',
+                                              child: Text('快速分享终端图片'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'share-image-templates',
+                                              child: Text('分享为图片（模板）'),
+                                            ),
+                                          ],
                                           const PopupMenuItem(
                                             value: 'plugins',
                                             child: Text('插件设置'),
@@ -1921,6 +1970,9 @@ class _TerminalPaneState extends State<TerminalPane> {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .primary,
+                                            hoverLine: _hoverPathLine,
+                                            hoverStart: _hoverPathStart,
+                                            hoverEnd: _hoverPathEnd,
                                             repaint: _linkRepaint,
                                           ),
                                         ),
@@ -1932,6 +1984,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                           ),
                         ),
                       ),
+                    ),
                     ),
                     if (dock)
                       Positioned(
@@ -2152,10 +2205,14 @@ class _LinkUnderlinePainter extends CustomPainter {
   final Terminal terminal;
   final Object? Function() render;
   final Color color;
+  final int hoverLine, hoverStart, hoverEnd;
   _LinkUnderlinePainter({
     required this.terminal,
     required this.render,
     required this.color,
+    required this.hoverLine,
+    required this.hoverStart,
+    required this.hoverEnd,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -2197,6 +2254,15 @@ class _LinkUnderlinePainter extends CustomPainter {
           final y = start.dy + lineHeight - 1.5;
           canvas.drawLine(Offset(start.dx, y), Offset(end.dx, y), paint);
         }
+        if (line == hoverLine && hoverStart >= 0 && hoverEnd > hoverStart) {
+          final start =
+              target.getOffset(CellOffset(hoverStart, line)) as Offset;
+          final end = target.getOffset(
+            CellOffset(hoverEnd.clamp(0, terminal.viewWidth), line),
+          ) as Offset;
+          final y = start.dy + lineHeight - 1.5;
+          canvas.drawLine(Offset(start.dx, y), Offset(end.dx, y), paint);
+        }
       }
     } catch (_) {
       // The render object can be between layouts; skip this frame.
@@ -2207,5 +2273,8 @@ class _LinkUnderlinePainter extends CustomPainter {
   bool shouldRepaint(covariant _LinkUnderlinePainter oldDelegate) =>
       oldDelegate.terminal != terminal ||
       oldDelegate.color != color ||
+      oldDelegate.hoverLine != hoverLine ||
+      oldDelegate.hoverStart != hoverStart ||
+      oldDelegate.hoverEnd != hoverEnd ||
       oldDelegate.render != render;
 }

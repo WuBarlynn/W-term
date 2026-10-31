@@ -64,6 +64,55 @@ String? _trimPath(String value) {
   return result;
 }
 
+class PathSpan {
+  final int start, end;
+  final String path;
+  const PathSpan(this.start, this.end, this.path);
+}
+
+PathSpan? _pathSpan(String line, int column, {int maxLength = 4096}) {
+  if (line.isEmpty || line.length > 8192) return null;
+  RegExpMatch? best;
+  for (final match in _pathPattern.allMatches(line)) {
+    if (column < match.start || column >= match.end) continue;
+    if (best == null ||
+        match.start < best.start ||
+        (match.start == best.start && match.end > best.end)) {
+      best = match;
+    }
+  }
+  if (best == null) return null;
+  final path = _trimPath(best.group(0)!);
+  if (path == null || path.length > maxLength) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return null;
+  if (!path.contains('/') &&
+      RegExp(
+        r'^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$',
+      ).hasMatch(path) &&
+      const {
+        'com',
+        'net',
+        'org',
+        'io',
+        'co',
+        'cn',
+        'dev',
+        'app',
+        'ai',
+        'edu',
+        'gov',
+      }.contains(path.split('.').last.toLowerCase())) {
+    return null;
+  }
+  final start = line.indexOf(path, best.start);
+  if (start < 0 || start + path.length > line.length) return null;
+  return PathSpan(start, start + path.length, path);
+}
+
+/// Same as [findPathAt] but returns the underlined character range.
+PathSpan? findPathSpanAt(String line, int column, {int maxLength = 4096}) =>
+    _pathSpan(line, column, maxLength: maxLength);
+
 /// Finds a path-like token under [column] in a terminal line. URLs are not
 /// returned; callers handle links separately. Paths containing spaces must be
 /// selected explicitly instead.

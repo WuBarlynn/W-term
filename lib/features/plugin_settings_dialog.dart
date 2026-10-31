@@ -23,6 +23,9 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool windowsHardwareInput = pluginSettings.windowsHardwareInput;
   late bool linkUnderline = pluginSettings.linkUnderline;
   late bool dragUpload = pluginSettings.dragUpload;
+  late bool selectionPin = pluginSettings.selectionPin;
+  late bool selectionSnippet = pluginSettings.selectionSnippet;
+  late bool selectionShare = pluginSettings.selectionShare;
   late int maxUploadSizeMb = pluginSettings.maxUploadSizeMb;
   bool saving = false;
   String? error;
@@ -43,6 +46,9 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         windowsHardwareInputNext: windowsHardwareInput,
         linkUnderlineNext: linkUnderline,
         dragUploadNext: dragUpload,
+        selectionPinNext: selectionPin,
+        selectionSnippetNext: selectionSnippet,
+        selectionShareNext: selectionShare,
         maxUploadSizeMbNext: maxUploadSizeMb,
       );
       if (notifications) unawaited(systemNotifications.setup());
@@ -121,6 +127,30 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             onChanged: saving
                 ? null
                 : (value) => setState(() => maxUploadSizeMb = value ?? 0),
+          ),
+          SwitchListTile(
+            value: selectionPin,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => selectionPin = value),
+            title: const Text('菜单：固定命令'),
+            subtitle: const Text('在划词与右键菜单中显示“固定选中命令”'),
+          ),
+          SwitchListTile(
+            value: selectionSnippet,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => selectionSnippet = value),
+            title: const Text('菜单：存为片段'),
+            subtitle: const Text('在划词与右键菜单中显示“存为命令片段”'),
+          ),
+          SwitchListTile(
+            value: selectionShare,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => selectionShare = value),
+            title: const Text('菜单：分享为图片'),
+            subtitle: const Text('在划词与右键菜单中显示图片分享入口'),
           ),
           const SizedBox(height: 8),
           SwitchListTile(
