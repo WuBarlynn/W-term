@@ -468,3 +468,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 范围：用户明确 **云同步暂时不用，只用 GitHub 同步**；Cloud Term 云账号、团队协作、Gist/S3、Web 端从当前交付目标移除，仅保留 GitHub 私有仓库加密同步、本机备份与恢复。审计文档已加范围调整说明。
 - 验证：`build/flutter-tests-1.0.26.log` **282 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.26（79）；Windows CI 41164117553 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
 - 未执行：真实设备文件选择、URL 字体下载与渲染、字体授权/损坏文件样本；字体导入只覆盖单元/组件测试。
+
+## 19. 1.0.27 Windows 输入法自动切换与广播回归（2026-10-31）
+
+- 三端版本 **1.0.27（80）**；本地产物 `build/release-1.0.27/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.27 。
+- Windows：主窗口注册 `dev.wterm/biometrics` 原生通道，终端聚焦时用 `ImmGetContext/ImmGetConversionStatus/ImmSetConversionStatus` 切到 ASCII，失焦/关闭时恢复进入前转换状态；跟随插件设置 `imeAutoEnglish`。Detached Windows 窗口未注册该原生通道，自动切换仅作用于主窗口。
+- 广播回归：删除 `TerminalPane.dispose` 中遗留的 `terminal.onOutput = session.send`，新增 `terminal_pane_input_route_test.dart`，验证窗格销毁后输入仍经过会话层广播路由。
+- 验证：`build/flutter-tests-1.0.27.log` **283 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.27（80）；Windows CI 41165695844 成功（IME 原生代码编译、启动冒烟、Inno Setup、Rust 测试）。
+- 未执行：Windows 微软拼音/其它输入法实机切换与恢复、Detached 窗口输入法、真实终端广播多会话点击。

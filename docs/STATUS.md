@@ -6,7 +6,7 @@
 
 - Windows：终端聚焦时通过 `ImmSetConversionStatus` 切到 ASCII，离开时恢复进入前状态；可在插件设置关闭。
 - 广播：移除窗格 dispose 中重置 `terminal.onOutput` 的遗留逻辑，新增组件测试确保窗格销毁后输入仍走会话路由。
-- 验证：Flutter 全量 **283 项**通过；三端构建与发布证据见 1.0.27 记录；Windows 输入法未在真实桌面点击验收。
+- 验证：Flutter 全量 **283 项**通过（`build/flutter-tests-1.0.27.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41165695844](https://github.com/WuBarlynn/W-term/actions/runs/41165695844) 成功（Windows IME 编译、启动冒烟、安装包、Rust 测试）。Windows 输入法未在真实桌面点击验收。
 
 ## 1.0.26 字体导入与 URL 安装（2026-10-31）
 
