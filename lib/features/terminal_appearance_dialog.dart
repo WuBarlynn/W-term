@@ -27,6 +27,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String cursorStyle = widget.store.cursorStyle;
   late int bottomPadding = widget.store.bottomPadding;
   late int scrollback = widget.store.scrollback;
+  late bool uiToneFollowsTerminal = widget.store.uiToneFollowsTerminal;
   late Map<String, int> customColors = widget.store.customColors.isEmpty
       ? TerminalAppearance.defaultCustomColors(widget.store.palette)
       : Map.of(widget.store.customColors);
@@ -259,6 +260,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextCursorStyle: cursorStyle,
         nextBottomPadding: bottomPadding,
         nextScrollback: scrollback,
+        nextUiToneFollowsTerminal: uiToneFollowsTerminal,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -492,6 +494,15 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     : (value) => setState(() => scrollback = value ?? 5000),
               ),
               const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('界面色调跟随终端'),
+                subtitle: const Text('用终端主题的背景与强调色调整应用界面'),
+                value: uiToneFollowsTerminal,
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => uiToneFollowsTerminal = value),
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('选中即复制'),

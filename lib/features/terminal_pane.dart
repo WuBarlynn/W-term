@@ -1788,6 +1788,10 @@ class _TerminalPaneState extends State<TerminalPane> {
                                       fontFamilyFallback: _terminalFontFallback,
                                     ),
                                     onSecondaryTapDown: (details, _) async {
+                                      if (pluginSettings.rightClickPaste) {
+                                        await paste();
+                                        return;
+                                      }
                                       final selected = await showMenu<String>(
                                         context: context,
                                         position: RelativeRect.fromLTRB(

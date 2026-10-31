@@ -139,6 +139,7 @@ class TerminalAppearance extends ChangeNotifier {
   String cursorStyle = 'block';
   int bottomPadding = 0;
   int scrollback = 5000;
+  bool uiToneFollowsTerminal = false;
   Map<String, int> customColors = const {};
   Future<void> _pending = Future.value();
 
@@ -391,6 +392,7 @@ class TerminalAppearance extends ChangeNotifier {
         fontSize = storedSize;
       }
       copyOnSelect = value['copyOnSelect'] == true;
+      uiToneFollowsTerminal = value['uiToneFollowsTerminal'] == true;
       final storedCursor = value['cursorStyle'];
       if (storedCursor is String &&
           {'block', 'underline', 'verticalBar'}.contains(storedCursor)) {
@@ -427,6 +429,7 @@ class TerminalAppearance extends ChangeNotifier {
     'cursorStyle': cursorStyle,
     'bottomPadding': bottomPadding,
     'scrollback': scrollback,
+    'uiToneFollowsTerminal': uiToneFollowsTerminal,
   };
 
   Future<Map<String, Object?>> exportSynced() async {
@@ -488,6 +491,7 @@ class TerminalAppearance extends ChangeNotifier {
       nextScrollback: data['scrollback'] is int
           ? data['scrollback'] as int
           : scrollback,
+      nextUiToneFollowsTerminal: data['uiToneFollowsTerminal'] == true,
     );
   }
 
@@ -504,6 +508,7 @@ class TerminalAppearance extends ChangeNotifier {
     String? nextCursorStyle,
     int? nextBottomPadding,
     int? nextScrollback,
+    bool? nextUiToneFollowsTerminal,
   }) {
     final nextMode = nextUiTheme ?? uiTheme;
     final nextCursor = nextCursorStyle ?? cursorStyle;
@@ -544,6 +549,8 @@ class TerminalAppearance extends ChangeNotifier {
           'cursorStyle': nextCursor,
           'bottomPadding': nextPadding,
           'scrollback': nextScroll,
+          'uiToneFollowsTerminal':
+              nextUiToneFollowsTerminal ?? uiToneFollowsTerminal,
         }),
         flush: true,
       );
@@ -560,6 +567,8 @@ class TerminalAppearance extends ChangeNotifier {
       cursorStyle = nextCursor;
       bottomPadding = nextPadding;
       scrollback = nextScroll;
+      uiToneFollowsTerminal =
+          nextUiToneFollowsTerminal ?? uiToneFollowsTerminal;
       notifyListeners();
     });
     _pending = operation;

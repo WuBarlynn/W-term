@@ -103,8 +103,12 @@ class WTermApp extends StatelessWidget {
   ThemeData theme(Brightness brightness) {
     final skin = builtInSkins[terminalAppearance.skin];
     final configuredFont = terminalAppearance.uiFont.trim();
+    final follow = terminalAppearance.uiToneFollowsTerminal;
+    final terminalTheme = terminalAppearance.activeTheme;
     final scheme = ColorScheme.fromSeed(
-      seedColor: Color(skin?.seed ?? 0xff167768),
+      seedColor: follow
+          ? terminalTheme.blue
+          : Color(skin?.seed ?? 0xff167768),
       brightness: brightness,
     );
     return ThemeData(
@@ -122,7 +126,9 @@ class WTermApp extends StatelessWidget {
         'Segoe UI',
       ],
       scaffoldBackgroundColor: skin == null
-          ? brightness == Brightness.light
+          ? follow
+                ? terminalTheme.background
+                : brightness == Brightness.light
                 ? const Color(0xfffafbfc)
                 : const Color(0xff171c22)
           : Colors.transparent,
@@ -145,15 +151,19 @@ class WTermApp extends StatelessWidget {
     listenable: terminalAppearance,
     builder: (context, _) {
       final skin = builtInSkins[terminalAppearance.skin];
-      final themeMode = skin == null
-          ? switch (terminalAppearance.uiTheme) {
+      final themeMode = skin != null
+          ? skin.dark
+              ? ThemeMode.dark
+              : ThemeMode.light
+          : terminalAppearance.uiToneFollowsTerminal
+          ? terminalAppearance.activeTheme.background.computeLuminance() < 0.5
+                ? ThemeMode.dark
+                : ThemeMode.light
+          : switch (terminalAppearance.uiTheme) {
               'dark' => ThemeMode.dark,
               'light' => ThemeMode.light,
               _ => ThemeMode.system,
-            }
-          : skin.dark
-          ? ThemeMode.dark
-          : ThemeMode.light;
+            };
       return MaterialApp(
         title: 'W Term',
         builder: (context, child) {

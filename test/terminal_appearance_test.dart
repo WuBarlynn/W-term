@@ -70,6 +70,7 @@ void main() {
       nextCursorStyle: 'verticalBar',
       nextBottomPadding: 24,
       nextScrollback: 20000,
+      nextUiToneFollowsTerminal: true,
     );
     expect(settings.activeTheme.background, const Color(0xff102030));
     expect(settings.activeTheme.selection, const Color(0x44112233));
@@ -81,6 +82,7 @@ void main() {
     expect(restored.cursorStyle, 'verticalBar');
     expect(restored.bottomPadding, 24);
     expect(restored.scrollback, 20000);
+    expect(restored.uiToneFollowsTerminal, isTrue);
     expect(restored.customColors['background'], 0xff102030);
     expect(restored.activeTheme.background, const Color(0xff102030));
 

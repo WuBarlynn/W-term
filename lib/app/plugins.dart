@@ -30,6 +30,7 @@ class PluginSettings extends ChangeNotifier {
   bool clickTabLocates = false;
   bool restoreLayout = true;
   bool showStatusBar = true;
+  bool rightClickPaste = false;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -63,6 +64,7 @@ class PluginSettings extends ChangeNotifier {
           clickTabLocates = value['clickTabLocates'] == true;
           restoreLayout = value['restoreLayout'] != false;
           showStatusBar = value['showStatusBar'] != false;
+          rightClickPaste = value['rightClickPaste'] == true;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -90,6 +92,7 @@ class PluginSettings extends ChangeNotifier {
     'clickTabLocates': clickTabLocates,
     'restoreLayout': restoreLayout,
     'showStatusBar': showStatusBar,
+    'rightClickPaste': rightClickPaste,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -115,6 +118,7 @@ class PluginSettings extends ChangeNotifier {
       clickTabLocatesNext: data['clickTabLocates'] == true,
       restoreLayoutNext: data['restoreLayout'] != false,
       showStatusBarNext: data['showStatusBar'] != false,
+      rightClickPasteNext: data['rightClickPaste'] == true,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -136,6 +140,7 @@ class PluginSettings extends ChangeNotifier {
     bool? clickTabLocatesNext,
     bool? restoreLayoutNext,
     bool? showStatusBarNext,
+    bool? rightClickPasteNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -152,6 +157,7 @@ class PluginSettings extends ChangeNotifier {
     clickTabLocates = clickTabLocatesNext ?? clickTabLocates;
     restoreLayout = restoreLayoutNext ?? restoreLayout;
     showStatusBar = showStatusBarNext ?? showStatusBar;
+    rightClickPaste = rightClickPasteNext ?? rightClickPaste;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -174,6 +180,7 @@ class PluginSettings extends ChangeNotifier {
         'clickTabLocates': clickTabLocates,
         'restoreLayout': restoreLayout,
         'showStatusBar': showStatusBar,
+        'rightClickPaste': rightClickPaste,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

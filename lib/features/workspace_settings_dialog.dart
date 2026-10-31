@@ -17,6 +17,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
   late bool clickTabLocates = pluginSettings.clickTabLocates;
   late bool restoreLayout = pluginSettings.restoreLayout;
   late bool showStatusBar = pluginSettings.showStatusBar;
+  late bool rightClickPaste = pluginSettings.rightClickPaste;
   bool saving = false;
   String error = '';
 
@@ -37,6 +38,7 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
         clickTabLocatesNext: clickTabLocates,
         restoreLayoutNext: restoreLayout,
         showStatusBarNext: showStatusBar,
+        rightClickPasteNext: rightClickPaste,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -99,6 +101,15 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
                 : (value) => setState(() => showStatusBar = value),
             title: const Text('显示实时状态栏'),
             subtitle: const Text('每 10 秒采样 SSH 延迟、CPU 与内存，依赖远端 /proc。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: rightClickPaste,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => rightClickPaste = value),
+            title: const Text('右键直接粘贴'),
+            subtitle: const Text('默认关闭右键菜单；开启后右键立即粘贴剪贴板。'),
           ),
           if (error.isNotEmpty)
             Text(
