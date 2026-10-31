@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.50（103）**。
 - TerminalAppearance 新增 `uiToneFollowsTerminal`；main 主题种子取终端主题蓝色，背景与明暗跟随终端。
 - 外观页三组主题预设；工作区偏好新增 `rightClickPaste`，默认关闭。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **318 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41218448555](https://github.com/WuBarlynn/W-term/actions/runs/41218448555) 成功。发布包位于 `build/release-1.0.50/`。
 
 ## 42. 1.0.49 快捷键覆盖扩展（2026-10-31）
 

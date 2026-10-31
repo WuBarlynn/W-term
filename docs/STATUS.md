@@ -8,7 +8,7 @@
 - 外观页新增深色、浅色、浅色+深色终端三组主题预设。
 - 工作区偏好新增“右键直接粘贴”，默认关闭；关闭时右键打开终端菜单。
 - 新增设置继续随 GitHub 加密设置同步。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **318 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41218448555](https://github.com/WuBarlynn/W-term/actions/runs/41218448555) 成功。界面色调与右键粘贴仍需实机验收。
 
 ## 1.0.49 快捷键覆盖扩展（2026-10-31）
 
