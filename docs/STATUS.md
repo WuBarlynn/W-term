@@ -6,7 +6,7 @@
 
 - 新增通用图片预览：支持缩放、左右旋转、保存/系统分享；终端路径预览与 SFTP 面板共用。
 - 任务完成通知阈值可在 3–3600 秒设置，默认 15 秒，并随设置同步。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41239854138](https://github.com/WuBarlynn/W-term/actions/runs/41239854138) 成功。图片旋转/保存与通知阈值仍需实机验收。
 
 ## 1.0.57 分享图片复制（2026-10-31）
 

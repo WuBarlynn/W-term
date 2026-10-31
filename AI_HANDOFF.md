@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.58（111）**。
 - 新增 `ImagePreviewDialog`；TerminalPane 与 FilesPane 图片预览复用，支持旋转与保存/分享。
 - PluginSettings 新增 `notificationThresholdSeconds`，TaskMonitor 通过 provider 读取。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **321 项**与 `flutter analyze` 通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41239854138](https://github.com/WuBarlynn/W-term/actions/runs/41239854138) 成功。发布包位于 `build/release-1.0.58/`。
 
 ## 50. 1.0.57 分享图片复制（2026-10-31）
 
