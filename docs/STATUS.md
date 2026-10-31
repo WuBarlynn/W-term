@@ -7,7 +7,7 @@
 - 系统监控 Docker 页支持选择容器并停止或重启，执行前确认，完成后刷新列表。
 - 顶栏同步图标显示 GitHub 同步已就绪、待处理或冲突数量；点击打开同步对话框。
 - 同步状态每 30 秒刷新，自动同步结束后立即刷新。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **321 项**通过，`flutter analyze` 无问题；macOS Apple Silicon 与 Intel 自签名 DMG、iOS IPA 完成；Windows CI [41227472025](https://github.com/WuBarlynn/W-term/actions/runs/41227472025) 成功。Docker 操作与同步状态提示仍需实机验收。
 
 ## 1.0.52 ZMODEM 真实互操作（2026-10-31）
 

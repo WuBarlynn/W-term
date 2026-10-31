@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.53（106）**。
 - 系统监控新增 `dockerAction`，从 Docker 输出解析容器名，确认后执行 stop/restart。
 - 工作区顶栏新增同步状态图标，基于 `syncSettings`/`syncConflicts` 每 30 秒刷新；仅真实保险库主机启用。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **321 项**与 `flutter analyze` 通过；macOS Apple Silicon/Intel DMG、iOS IPA 完成；Windows CI [41227472025](https://github.com/WuBarlynn/W-term/actions/runs/41227472025) 成功。发布包位于 `build/release-1.0.53/`。
 
 ## 45. 1.0.52 ZMODEM 真实互操作（2026-10-31）
 
