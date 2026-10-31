@@ -49,4 +49,20 @@ void main() {
       await directory.delete(recursive: true);
     }
   });
+
+  test('host rules apply only to matching tags and validate regex', () {
+    final lines = ['ERROR one', 'error two', 'timeout'];
+    final rules = [
+      const KeywordHighlightRule(['web'], r'error'),
+      const KeywordHighlightRule([], r'^timeout$'),
+    ];
+    final matches = findRegexMatches(lines, rules, {'web'});
+    expect(matches.any((m) => m.line == 0 && m.start == 0), isTrue);
+    expect(matches.any((m) => m.line == 1), isTrue);
+    expect(matches.any((m) => m.line == 2), isTrue);
+    final other = findRegexMatches(lines, rules, {'db'});
+    expect(other.any((m) => m.line == 0), isFalse);
+    expect(other.any((m) => m.line == 2), isTrue);
+    expect(findRegexMatches(lines, [const KeywordHighlightRule([], '[')], {}), isEmpty);
+  });
 }

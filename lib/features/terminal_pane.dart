@@ -223,7 +223,9 @@ class _TerminalPaneState extends State<TerminalPane> {
       for (final highlight in List.of(controller.highlights)) {
         highlight.dispose();
       }
-      if (!keywordHighlights.enabled || keywordHighlights.keywords.isEmpty) {
+      if (!keywordHighlights.enabled ||
+          (keywordHighlights.keywords.isEmpty &&
+              keywordHighlights.hostRules.isEmpty)) {
         return;
       }
       final lines = widget.session.terminal.buffer.lines;
@@ -232,7 +234,14 @@ class _TerminalPaneState extends State<TerminalPane> {
         for (var index = start; index < lines.length; index++)
           lines[index].getText(),
       ];
-      final matches = findKeywordMatches(texts, keywordHighlights.keywords);
+      final matches = [
+        ...findKeywordMatches(texts, keywordHighlights.keywords),
+        ...findRegexMatches(
+          texts,
+          keywordHighlights.hostRules,
+          widget.hostTags.toSet(),
+        ),
+      ];
       for (final match in matches) {
         final first = widget.session.terminal.buffer.createAnchor(
           match.start,

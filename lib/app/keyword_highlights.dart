@@ -47,10 +47,71 @@ List<KeywordMatch> findKeywordMatches(
   return matches;
 }
 
+class KeywordHighlightRule {
+  final List<String> tags;
+  final String pattern;
+  const KeywordHighlightRule(this.tags, this.pattern);
+
+  Map<String, Object?> toJson() => {'tags': tags, 'pattern': pattern};
+
+  static KeywordHighlightRule? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final pattern = raw['pattern'];
+    final tags = raw['tags'];
+    if (pattern is! String ||
+        pattern.trim().isEmpty ||
+        pattern.length > 256 ||
+        tags is! List) {
+      return null;
+    }
+    final cleaned = tags
+        .whereType<String>()
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty && tag.length <= 48)
+        .toSet()
+        .take(20)
+        .toList();
+    return KeywordHighlightRule(cleaned, pattern.trim());
+  }
+}
+
+/// Finds non-overlapping regex matches for rules whose tags intersect [hostTags].
+List<KeywordMatch> findRegexMatches(
+  List<String> lines,
+  List<KeywordHighlightRule> rules,
+  Set<String> hostTags, {
+  int maxMatches = 200,
+}) {
+  final applicable = rules.where(
+    (rule) => rule.tags.isEmpty || rule.tags.any(hostTags.contains),
+  );
+  final patterns = <RegExp>[];
+  for (final rule in applicable) {
+    try {
+      patterns.add(RegExp(rule.pattern, caseSensitive: false, multiLine: true));
+    } catch (_) {
+      // Invalid expressions are ignored until edited.
+    }
+  }
+  if (patterns.isEmpty) return const [];
+  final matches = <KeywordMatch>[];
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    for (final pattern in patterns) {
+      for (final match in pattern.allMatches(lines[lineIndex])) {
+        if (match.start == match.end) continue;
+        matches.add(KeywordMatch(lineIndex, match.start, match.end));
+        if (matches.length >= maxMatches) return matches;
+      }
+    }
+  }
+  return matches;
+}
+
 class KeywordHighlightSettings extends ChangeNotifier {
   final Future<File> Function() _file;
   bool enabled = false;
   List<String> keywords = const [];
+  List<KeywordHighlightRule> hostRules = const [];
   int colorArgb = 0xFFFFD166;
   Future<void> _pending = Future.value();
 
@@ -78,6 +139,14 @@ class KeywordHighlightSettings extends ChangeNotifier {
             .take(20)
             .toList();
       }
+      final rawRules = value['hostRules'];
+      if (rawRules is List) {
+        hostRules = rawRules
+            .map(KeywordHighlightRule.fromJson)
+            .whereType<KeywordHighlightRule>()
+            .take(20)
+            .toList();
+      }
       final color = value['colorArgb'];
       if (color is int && color >= 0 && color <= 0xffffffff) {
         colorArgb = color;
@@ -92,6 +161,7 @@ class KeywordHighlightSettings extends ChangeNotifier {
     'version': 1,
     'enabled': enabled,
     'keywords': keywords,
+    'hostRules': hostRules.map((rule) => rule.toJson()).toList(),
     'colorArgb': colorArgb,
   };
 
@@ -103,11 +173,18 @@ class KeywordHighlightSettings extends ChangeNotifier {
   Future<void> applySynced(Object? data) async {
     if (data is! Map) return;
     final rawKeywords = data['keywords'];
+    final rawRules = data['hostRules'];
     final color = data['colorArgb'];
     await save(
       nextEnabled: data['enabled'] == true,
       nextKeywords: rawKeywords is List
           ? rawKeywords.whereType<String>().toList()
+          : const [],
+      nextHostRules: rawRules is List
+          ? rawRules
+                .map(KeywordHighlightRule.fromJson)
+                .whereType<KeywordHighlightRule>()
+                .toList()
           : const [],
       nextColorArgb: color is int && color >= 0 && color <= 0xffffffff
           ? color
@@ -118,6 +195,7 @@ class KeywordHighlightSettings extends ChangeNotifier {
   Future<void> save({
     required bool nextEnabled,
     required List<String> nextKeywords,
+    List<KeywordHighlightRule> nextHostRules = const [],
     required int nextColorArgb,
   }) {
     final cleaned = nextKeywords
@@ -135,6 +213,10 @@ class KeywordHighlightSettings extends ChangeNotifier {
           'version': 1,
           'enabled': nextEnabled,
           'keywords': cleaned,
+          'hostRules': nextHostRules
+              .take(20)
+              .map((rule) => rule.toJson())
+              .toList(),
           'colorArgb': nextColorArgb,
         }),
         flush: true,
@@ -142,6 +224,7 @@ class KeywordHighlightSettings extends ChangeNotifier {
       await temporary.rename(file.path);
       enabled = nextEnabled;
       keywords = cleaned;
+      hostRules = nextHostRules.take(20).toList();
       colorArgb = nextColorArgb;
       notifyListeners();
     });

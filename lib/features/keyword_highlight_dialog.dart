@@ -14,6 +14,11 @@ class _KeywordHighlightDialogState extends State<KeywordHighlightDialog> {
   late final text = TextEditingController(
     text: keywordHighlights.keywords.join('\n'),
   );
+  late final rules = TextEditingController(
+    text: keywordHighlights.hostRules
+        .map((rule) => '${rule.tags.join(',')}=${rule.pattern}')
+        .join('\n'),
+  );
   late int color = keywordHighlights.colorArgb;
   bool saving = false;
   String? error;
@@ -29,10 +34,40 @@ class _KeywordHighlightDialogState extends State<KeywordHighlightDialog> {
   @override
   void dispose() {
     text.dispose();
+    rules.dispose();
     super.dispose();
   }
 
   Future<void> save() async {
+    final nextRules = <KeywordHighlightRule>[];
+    for (final raw in rules.text.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      final separator = line.indexOf('=');
+      final tagText = separator < 0 ? '' : line.substring(0, separator);
+      final pattern = separator < 0 ? line : line.substring(separator + 1);
+      if (pattern.trim().isEmpty) {
+        setState(() => error = '正则规则不能为空');
+        return;
+      }
+      try {
+        RegExp(pattern);
+      } catch (_) {
+        setState(() => error = '正则无效：$pattern');
+        return;
+      }
+      nextRules.add(
+        KeywordHighlightRule(
+          tagText
+              .split(RegExp(r'[,，]'))
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty)
+              .toList(),
+          pattern.trim(),
+        ),
+      );
+      if (nextRules.length >= 20) break;
+    }
     setState(() {
       saving = true;
       error = null;
@@ -41,6 +76,7 @@ class _KeywordHighlightDialogState extends State<KeywordHighlightDialog> {
       await keywordHighlights.save(
         nextEnabled: enabled,
         nextKeywords: text.text.split(RegExp(r'[\n,，;；]')),
+        nextHostRules: nextRules,
         nextColorArgb: color,
       );
       if (mounted) Navigator.pop(context);
@@ -80,6 +116,19 @@ class _KeywordHighlightDialogState extends State<KeywordHighlightDialog> {
                 labelText: '关键字',
                 hintText: 'ERROR\nWARNING\n失败',
                 helperText: '换行、逗号或分号分隔；不区分大小写',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: rules,
+              enabled: !saving,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: '主机规则（可选）',
+                hintText: 'web,prod=ERROR|CRITICAL\n=timeout',
+                helperText: '每行“标签,标签=正则”；标签留空表示所有主机',
                 alignLabelWithHint: true,
               ),
             ),
