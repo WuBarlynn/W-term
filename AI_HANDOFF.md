@@ -445,3 +445,10 @@ UI、实际桥接、测试、文档与双端构建。
 - 文件预览：SFTP 文本预览识别 `.md/.markdown/.mdown`，默认 Markdown 渲染并可切源码；Markdown 链接仅允许 http/https 外开；图片仍由 Markdown 组件按文档加载。
 - 验证：`build/flutter-tests-1.0.23.log` **277 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 版本 1.0.23（76）；Windows CI 41158687700 成功（构建/启动冒烟/Inno Setup/Rust 测试），版本 1.0.23（76）。
 - 未执行：fish 真实远端、Markdown 复杂文档/图片/链接、Windows 安装升级与真机 UI 点击。Cloud Term 剩余差距仍以审计文档“1.0.23 仍未完成”为准。
+
+## 16. 1.0.24 按主机标签绑定固定命令（2026-10-31）
+
+- 三端版本 **1.0.24（77）**；本地产物 `build/release-1.0.24/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.24 。
+- 固定命令：`PinnedCommand` 增加 `tag` 字段；在带标签的主机中固定选中命令时可选择全局、仅当前主机或某个主机标签；`forHost(hostId, tags:)` 按当前主机标签动态显示，标签固定不会出现在没有该标签的主机；持久化与去重包含 tag。
+- 验证：`build/flutter-tests-1.0.24.log` **278 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.24（77）；Windows CI 41160793313 成功（构建/启动冒烟/Inno Setup/Rust 测试），安装包 1.0.24（77）。
+- 未执行：标签绑定在真实多主机/真机点击验证；片段仍不能按标签过滤，右侧 Dock 未实现。Cloud Term 剩余差距以审计文档“1.0.24 仍未完成”为准。
