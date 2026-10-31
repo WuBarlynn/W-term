@@ -6,7 +6,7 @@
 
 - 目录上报与命令完成通知对话框新增“自动检测”：发送 OSC 9 探测 `$SHELL`，会话解析后自动选择 bash/zsh/fish 钩子；4 秒无响应提示手动选择。
 - 探测基于登录 shell，可能在嵌套 shell/登录 shell 不一致时误判；此时仍可手动选择。
-- 验证：Flutter 全量 **296 项**通过；三端构建与发布证据见 1.0.36 记录；真实 bash/zsh/fish 远端探测未验收。
+- 验证：Flutter 全量 **296 项**通过（`build/flutter-tests-1.0.36.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41181756085](https://github.com/WuBarlynn/W-term/actions/runs/41181756085) 成功（构建/启动冒烟/静默安装卸载冒烟/Rust 测试）。真实 bash/zsh/fish 远端探测未验收。
 
 ## 1.0.35 终端链接自动下划线（2026-10-31）
 

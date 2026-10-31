@@ -540,3 +540,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 新增 `terminal_links.dart` 纯逻辑（末尾标点/括号修剪、超长行保护）与 3 项测试；终端组件测试覆盖覆盖层存在。
 - 验证：`build/flutter-tests-1.0.35.log` **295 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.35（88）；Windows CI 41180550899 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：真实长行/换行链接、多屏滚动、备用缓冲区切换与不同字体的像素级下划线位置；Windows 实体机输入与自动更新仍待用户复测。
+
+## 28. 1.0.36 自动 shell 探测（2026-10-31）
+
+- 三端版本 **1.0.36（89）**；本地产物 `build/release-1.0.36/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.36 。
+- 目录上报与命令完成通知对话框新增“自动检测”：`TerminalSession` 解析 OSC 9 `shell;<path>`，TerminalPane 按 bash/zsh/fish 自动发送对应钩子；4 秒无响应提示手动选择。探测使用 `$SHELL`（登录 shell），嵌套/不一致时可能误判。
+- 修复：自动探测/自动注入使用 `session.send` 而非广播输入，避免把设置命令发给广播目标。
+- 验证：`build/flutter-tests-1.0.36.log` **296 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.36（89）；Windows CI 41181756085 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：真实 bash/zsh/fish 远端 OSC 9 探测与钩子安装、Windows 实体机输入/自动更新。
