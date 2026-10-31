@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -14,6 +13,7 @@ import 'app/deep_links.dart';
 import 'app/system_notifications.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
+import 'app/font_catalog.dart';
 import 'app/keyword_highlights.dart';
 import 'app/sync_automation.dart';
 import 'app/pinned_commands.dart';
@@ -95,8 +95,8 @@ class WTermApp extends StatelessWidget {
   final Widget? home;
   const WTermApp({super.key, this.home});
   ThemeData theme(Brightness brightness) {
-    final windows = defaultTargetPlatform == TargetPlatform.windows;
     final skin = builtInSkins[terminalAppearance.skin];
+    final configuredFont = terminalAppearance.uiFont.trim();
     final scheme = ColorScheme.fromSeed(
       seedColor: Color(skin?.seed ?? 0xff167768),
       brightness: brightness,
@@ -105,9 +105,16 @@ class WTermApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: scheme,
       brightness: brightness,
-      fontFamily: terminalAppearance.uiFont.trim().isNotEmpty
-          ? terminalAppearance.uiFont.trim()
-          : (windows ? 'Microsoft YaHei' : null),
+      fontFamily: configuredFont.isNotEmpty
+          ? configuredFont
+          : platformDefaultUiFont(),
+      fontFamilyFallback: const [
+        'Noto Sans SC',
+        'Microsoft YaHei UI',
+        'Microsoft YaHei',
+        'PingFang SC',
+        'Segoe UI',
+      ],
       scaffoldBackgroundColor: skin == null
           ? brightness == Brightness.light
                 ? const Color(0xfffafbfc)

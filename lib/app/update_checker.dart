@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
-const appVersion = '1.0.21';
-const appBuild = '74';
+const appVersion = '1.0.22';
+const appBuild = '75';
 
 class UpdateAsset {
   final String name, url;
@@ -56,6 +56,38 @@ bool isNewerVersion(String candidate, String current) {
   return false;
 }
 
+/// Update checks and installers are a desktop-only feature.
+bool get supportsDesktopUpdates =>
+    Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+
+/// Parses a GitHub `releases/latest` payload. Exposed for tests so asset
+/// selection can be verified without network access.
+UpdateInfo? parseUpdateRelease(Map<dynamic, dynamic> value) {
+  final tag = '${value['tag_name'] ?? ''}';
+  final url = '${value['html_url'] ?? ''}';
+  if (tag.isEmpty || url.isEmpty || !isNewerVersion(tag, appVersion)) {
+    return null;
+  }
+  final assets = <UpdateAsset>[];
+  final rawAssets = value['assets'];
+  if (rawAssets is List) {
+    for (final raw in rawAssets) {
+      if (raw is! Map) continue;
+      final name = raw['name'];
+      final download = raw['browser_download_url'];
+      if (name is String && download is String) {
+        assets.add(UpdateAsset(name, download));
+      }
+    }
+  }
+  return UpdateInfo(
+    version: tag,
+    url: url,
+    notes: '${value['body'] ?? ''}',
+    assets: assets,
+  );
+}
+
 Future<UpdateInfo?> checkForUpdate() async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
   try {
@@ -70,12 +102,7 @@ Future<UpdateInfo?> checkForUpdate() async {
     if (response.statusCode != 200) return null;
     final value = jsonDecode(await utf8.decoder.bind(response).join());
     if (value is! Map) return null;
-    final tag = '${value['tag_name'] ?? ''}';
-    final url = '${value['html_url'] ?? ''}';
-    if (tag.isEmpty || url.isEmpty || !isNewerVersion(tag, appVersion)) {
-      return null;
-    }
-    return UpdateInfo(version: tag, url: url, notes: '${value['body'] ?? ''}');
+    return parseUpdateRelease(value);
   } catch (_) {
     return null;
   } finally {

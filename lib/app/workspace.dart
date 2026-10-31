@@ -125,7 +125,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     const MethodChannel('dev.wterm/biometrics')
         .setMethodCallHandler(_handleNativeMethod);
     unawaited(_restoreLayout());
-    _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
+    if (supportsDesktopUpdates) {
+      _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
+    }
   }
 
   @override
@@ -366,6 +368,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       '',
       terminal,
     );
+    _bindInputRouting(session);
     setState(() {
       sessions.add(session);
       tabs.add(
@@ -676,6 +679,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         terminal,
         profile: profile,
       );
+      _bindInputRouting(session);
       final replacedTab = replace == null ? null : _tabForSession(replace.id);
       setState(() {
         if (replace != null && replacedTab != null) {
@@ -924,6 +928,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         },
       );
       final session = _Session(connectionId, host, username, '', terminal);
+      _bindInputRouting(session);
       if (!mounted) {
         terminal.dispose();
         return false;
@@ -1247,10 +1252,16 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   }
 
   void _handleTabDrop(
-    String sourceTabId,
+    String source,
     String targetSessionId,
     SplitEdge edge,
   ) {
+    final paneSessionId = paneDragSessionId(source);
+    if (paneSessionId != null) {
+      _movePaneToSplit(paneSessionId, targetSessionId, edge);
+      return;
+    }
+    final sourceTabId = source;
     final target = _tabForSession(targetSessionId);
     if (target != null && target.id == sourceTabId) {
       // Dropping the current tab on one of its own panes means "split this
@@ -1259,6 +1270,61 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       return;
     }
     _dropTab(sourceTabId, targetSessionId, edge);
+  }
+
+  /// Moves a pane onto another pane's edge. Works inside one tab (drag to
+  /// rearrange/resize a split) and across tabs (merge the pane into a tab).
+  void _movePaneToSplit(
+    String sessionId,
+    String targetSessionId,
+    SplitEdge edge,
+  ) {
+    if (sessionId == targetSessionId) return;
+    final source = _tabForSession(sessionId);
+    final target = _tabForSession(targetSessionId);
+    if (source == null || target == null) return;
+    if (source.id != target.id) {
+      _moveSessionToSplit(sessionId, targetSessionId, edge);
+      return;
+    }
+    if (sessionIdsOrdered(source.root).length <= 1) return;
+    final remaining = removeSession(source.root, sessionId);
+    if (remaining == null) return;
+    setState(() {
+      source.root = splitAt(
+        remaining,
+        targetSessionId,
+        edge,
+        SessionPane(sessionId),
+      );
+      source.activeSessionId = sessionId;
+      selected = tabs.indexOf(source);
+    });
+    _scheduleLayoutSave();
+  }
+
+  /// Dissolves a split without disconnecting anything: the active pane stays
+  /// in this tab and every other pane becomes its own tab.
+  void _unsplitAll(WorkspaceTab tab) {
+    final ids = sessionIdsOrdered(tab.root);
+    if (ids.length <= 1) return;
+    final keep = tab.activeSessionId;
+    final active = ids.contains(keep) ? keep : ids.first;
+    setState(() {
+      tab.root = SessionPane(active);
+      tab.activeSessionId = active;
+      for (final id in ids) {
+        if (id == active) continue;
+        tabs.add(
+          WorkspaceTab(
+            id: HostProfile.newId(),
+            root: SessionPane(id),
+            activeSessionId: id,
+          ),
+        );
+      }
+    });
+    _scheduleLayoutSave();
   }
 
   Future<void> _reconnect(_Session session) async {
@@ -1411,6 +1477,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         replacement,
         profile: session.profile,
       );
+      _bindInputRouting(next);
       setState(() {
         final index = sessions.indexOf(session);
         if (index >= 0) sessions[index] = next;
@@ -1529,6 +1596,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             terminal,
             profile: host,
           );
+          _bindInputRouting(session);
           tabSessions.add(session);
           return session.id;
         });
@@ -1589,30 +1657,37 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   }
 
   Future<void> _autoCheckUpdates() async {
-    if (!mounted) return;
+    if (!supportsDesktopUpdates || !mounted) return;
     final info = await checkForUpdate();
     if (!mounted || info == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('发现 W Term 新版本 ${info.version}'),
+        duration: const Duration(seconds: 12),
         action: SnackBarAction(
-          label: '查看',
-          onPressed: () => launchUrl(
-            Uri.parse(info.url),
-            mode: LaunchMode.externalApplication,
-          ),
+          label: '立即更新',
+          onPressed: () => unawaited(_promptUpdate(info)),
         ),
       ),
     );
   }
 
   Future<void> _checkUpdates() async {
+    if (!supportsDesktopUpdates) {
+      message('检查更新仅在桌面端可用；移动端请通过 App Store 更新。');
+      return;
+    }
     final info = await checkForUpdate();
     if (!mounted) return;
     if (info == null) {
-      message('当前已是最新版本或无法连接更新服务（$appVersion）。');
+      message('当前已是最新版本（$appVersion），或暂时无法连接 GitHub 更新服务。');
       return;
     }
+    await _promptUpdate(info);
+  }
+
+  Future<void> _promptUpdate(UpdateInfo info) async {
+    if (!mounted) return;
     final platform = Platform.isWindows
         ? 'windows'
         : Platform.isMacOS
@@ -1757,6 +1832,31 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       tab.activeSessionId = chosen;
     });
     _scheduleLayoutSave();
+  }
+
+  List<TerminalSession> _broadcastTargetsFor(_Session source) {
+    if (broadcastScope == BroadcastScope.off) return const [];
+    final tab = _tabForSession(source.id);
+    if (tab == null) return const [];
+    final ids = broadcastTargetIds(
+      sourceId: source.id,
+      scope: broadcastScope,
+      tabSessionIds: sessionIdsOrdered(tab.root),
+      allSessionIds: sessions.map((session) => session.id),
+      connectedSessionIds: {
+        for (final session in sessions)
+          if (session.connected) session.id,
+      },
+    );
+    final byId = {for (final session in sessions) session.id: session};
+    return [
+      for (final id in ids)
+        if (byId[id] != null) byId[id]!.terminal,
+    ];
+  }
+
+  void _bindInputRouting(_Session session) {
+    session.terminal.broadcastTargets = () => _broadcastTargetsFor(session);
   }
 
   Future<void> _setBroadcastScope(BroadcastScope scope) async {
@@ -2018,7 +2118,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         if (paneCount > 1)
           PopupMenuItem(
             value: 'unsplit',
-            child: _menuRow(Icons.close_fullscreen, '拆回当前窗格'),
+            child: _menuRow(Icons.close_fullscreen, '拆回当前窗格（移到新标签）'),
+          ),
+        if (paneCount > 1)
+          PopupMenuItem(
+            value: 'unsplit-all',
+            child: _menuRow(Icons.dashboard_customize_outlined, '拆分所有窗格为标签'),
           ),
         if (paneCount > 1)
           PopupMenuItem(
@@ -2057,6 +2162,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       await _showSplitMenu(tab, position);
     } else if (choice == 'unsplit') {
       _splitBack(tab.activeSessionId);
+    } else if (choice == 'unsplit-all') {
+      _unsplitAll(tab);
     } else if (choice == 'close-pane') {
       await _closePane(tab.activeSessionId);
     } else if (choice == 'close') {
@@ -2409,7 +2516,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     ),
     popupItem('sessions', Icons.list_alt, '已打开终端'),
     popupItem('history', Icons.history, '命令历史'),
-    popupItem('update', Icons.system_update, '检查更新'),
+    if (supportsDesktopUpdates)
+      popupItem('update', Icons.system_update, '检查更新（GitHub）'),
     if (hostStore is SnippetStore) popupItem('snippets', Icons.code, '命令片段'),
     if (hostStore is SyncStore) ...[
       popupItem('sync', Icons.sync, 'GitHub 同步'),
@@ -2677,9 +2785,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       key: ValueKey('tab-${tab.id}'),
       padding: const EdgeInsets.fromLTRB(3, 3, 0, 3),
       child: DragTarget<String>(
-        onWillAcceptWithDetails: (details) => details.data != tab.id,
+        onWillAcceptWithDetails: (details) =>
+            paneDragSessionId(details.data) != null || details.data != tab.id,
         onAcceptWithDetails: (details) =>
-            _dropTab(details.data, tab.activeSessionId, SplitEdge.right),
+            _handleTabDrop(details.data, tab.activeSessionId, SplitEdge.right),
         builder: (context, candidate, rejected) => Material(
           color: candidate.isNotEmpty
               ? scheme.primary.withValues(alpha: .22)
@@ -2746,6 +2855,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     onSplitBack: _splitBack,
     onClosePane: _closePane,
     onDropTab: _handleTabDrop,
+    onLayoutCommitted: _scheduleLayoutSave,
     focusMode: focusMode,
   );
 
@@ -3028,6 +3138,7 @@ class _TabView extends StatefulWidget {
     SplitEdge edge,
   )
   onDropTab;
+  final VoidCallback onLayoutCommitted;
   final bool focusMode;
   const _TabView({
     super.key,
@@ -3045,6 +3156,7 @@ class _TabView extends StatefulWidget {
     required this.onSplitBack,
     required this.onClosePane,
     required this.onDropTab,
+    required this.onLayoutCommitted,
     this.focusMode = false,
   });
   @override
@@ -3157,6 +3269,7 @@ class _TabViewState extends State<_TabView> {
           onLayoutChanged: () {
             if (mounted) setState(() {});
           },
+          onLayoutCommitted: widget.onLayoutCommitted,
         );
         if (widget.focusMode) return panes;
         final filesPane = FilesPane(
@@ -3268,6 +3381,7 @@ class _PaneTree extends StatelessWidget {
   onDropTab;
   final VoidCallback? onOpenFiles;
   final VoidCallback onLayoutChanged;
+  final VoidCallback onLayoutCommitted;
   const _PaneTree({
     required this.node,
     required this.tab,
@@ -3285,6 +3399,7 @@ class _PaneTree extends StatelessWidget {
     required this.onDropTab,
     this.onOpenFiles,
     required this.onLayoutChanged,
+    required this.onLayoutCommitted,
   });
 
   _Session? _byId(String id) =>
@@ -3315,7 +3430,8 @@ class _PaneTree extends StatelessWidget {
       snippets: snippets,
       active: active && tab.activeSessionId == session.id,
       broadcastScope: broadcastScope,
-      broadcastTargets: targets,
+      broadcastTargetCount: targets.length,
+      paneDragData: paneDragData(session.id),
       onBroadcastChanged: onBroadcastChanged,
       onShortcut: onShortcut,
       onReconnect: () => onReconnect(session.id),
@@ -3345,46 +3461,17 @@ class _PaneTree extends StatelessWidget {
             ? constraints.maxWidth
             : constraints.maxHeight;
         if (extent <= 0) return const SizedBox.shrink();
-        final first = (split.fraction * 1000).round().clamp(120, 880);
+        final first = (split.fraction * 1000).round().clamp(20, 980);
         final second = 1000 - first;
-        final divider = MouseRegion(
-          cursor: horizontal
-              ? SystemMouseCursors.resizeColumn
-              : SystemMouseCursors.resizeRow,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragUpdate: horizontal
-                ? (details) {
-                    split.fraction =
-                        (split.fraction + details.delta.dx / extent).clamp(
-                          .15,
-                          .85,
-                        );
-                    onLayoutChanged();
-                  }
-                : null,
-            onVerticalDragUpdate: horizontal
-                ? null
-                : (details) {
-                    split.fraction =
-                        (split.fraction + details.delta.dy / extent).clamp(
-                          .15,
-                          .85,
-                        );
-                    onLayoutChanged();
-                  },
-            child: SizedBox(
-              width: horizontal ? 6 : double.infinity,
-              height: horizontal ? double.infinity : 6,
-              child: Center(
-                child: Container(
-                  width: horizontal ? 1 : double.infinity,
-                  height: horizontal ? double.infinity : 1,
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-          ),
+        final divider = _SplitDivider(
+          axis: split.axis,
+          fraction: split.fraction,
+          extent: extent,
+          onChanged: (value) {
+            split.fraction = value;
+            onLayoutChanged();
+          },
+          onCommitted: onLayoutCommitted,
         );
         final firstChild = Expanded(
           flex: first,
@@ -3405,6 +3492,7 @@ class _PaneTree extends StatelessWidget {
             onDropTab: onDropTab,
             onOpenFiles: onOpenFiles,
             onLayoutChanged: onLayoutChanged,
+            onLayoutCommitted: onLayoutCommitted,
           ),
         );
         final secondChild = Expanded(
@@ -3426,6 +3514,7 @@ class _PaneTree extends StatelessWidget {
             onDropTab: onDropTab,
             onOpenFiles: onOpenFiles,
             onLayoutChanged: onLayoutChanged,
+            onLayoutCommitted: onLayoutCommitted,
           ),
         );
         return horizontal
@@ -3433,6 +3522,99 @@ class _PaneTree extends StatelessWidget {
             : Column(children: [firstChild, divider, secondChild]);
       },
     );
+  }
+}
+
+class _SplitDivider extends StatefulWidget {
+  final Axis axis;
+  final double fraction;
+  final double extent;
+  final ValueChanged<double> onChanged;
+  final VoidCallback onCommitted;
+  const _SplitDivider({
+    required this.axis,
+    required this.fraction,
+    required this.extent,
+    required this.onChanged,
+    required this.onCommitted,
+  });
+  @override
+  State<_SplitDivider> createState() => _SplitDividerState();
+}
+
+class _SplitDividerState extends State<_SplitDivider> {
+  bool hovering = false;
+  double? _liveFraction;
+
+  bool get horizontal => widget.axis == Axis.horizontal;
+
+  double _clamp(double value) {
+    final minimum = (72 / widget.extent).clamp(.02, .45);
+    return value.clamp(minimum, 1 - minimum);
+  }
+
+  void _update(double delta) {
+    if (widget.extent <= 0) return;
+    final next = _clamp((_liveFraction ?? widget.fraction) + delta / widget.extent);
+    setState(() => _liveFraction = next);
+    widget.onChanged(next);
+  }
+
+  void _commit() {
+    _liveFraction = null;
+    widget.onCommitted();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = hovering || _liveFraction != null;
+    final primary = Theme.of(context).colorScheme.primary;
+    final idle = Theme.of(context).colorScheme.outlineVariant;
+    return MouseRegion(
+      cursor: horizontal
+          ? SystemMouseCursors.resizeColumn
+          : SystemMouseCursors.resizeRow,
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: () {
+          widget.onChanged(.5);
+          widget.onCommitted();
+        },
+        onHorizontalDragStart: horizontal ? (_) => _commitDrag() : null,
+        onHorizontalDragUpdate: horizontal
+            ? (details) => _update(details.delta.dx)
+            : null,
+        onHorizontalDragEnd: horizontal ? (_) => _commit() : null,
+        onHorizontalDragCancel: horizontal ? _commit : null,
+        onVerticalDragStart: horizontal ? null : (_) => _commitDrag(),
+        onVerticalDragUpdate: horizontal
+            ? null
+            : (details) => _update(details.delta.dy),
+        onVerticalDragEnd: horizontal ? null : (_) => _commit(),
+        onVerticalDragCancel: horizontal ? null : _commit,
+        child: Tooltip(
+          message: '拖动调整窗格大小，双击恢复均分',
+          child: SizedBox(
+            width: horizontal ? 8 : double.infinity,
+            height: horizontal ? double.infinity : 8,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: horizontal ? (active ? 3 : 1) : double.infinity,
+                height: horizontal ? double.infinity : (active ? 3 : 1),
+                color: active ? primary : idle,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _commitDrag() {
+    _liveFraction = null;
   }
 }
 

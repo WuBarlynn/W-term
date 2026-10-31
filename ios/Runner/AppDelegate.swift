@@ -24,6 +24,17 @@ import UniformTypeIdentifiers
     }
 
 
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WTermFonts") {
+      let channel = FlutterMethodChannel(name: "dev.wterm/fonts", binaryMessenger: registrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "listFamilies" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        result(UIFont.familyNames.sorted())
+      }
+    }
+
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WTermBiometrics") {
       let channel = FlutterMethodChannel(name: "dev.wterm/biometrics", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler { call, result in

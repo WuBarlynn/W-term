@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
   private var showHotKeyRef: EventHotKeyRef?
   private var showHotKeyHandler: EventHandlerRef?
   private var previousInputSource: TISInputSource?
+  private var fontChannel: FlutterMethodChannel?
   private weak var mainFlutterController: FlutterViewController?
 
   override func awakeFromNib() {
@@ -22,6 +23,18 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     mainFlutterController = flutterViewController
+
+    let fontChannel = FlutterMethodChannel(
+      name: "dev.wterm/fonts",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    fontChannel.setMethodCallHandler { call, result in
+      guard call.method == "listFamilies" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(NSFontManager.shared.availableFontFamilies.sorted())
+    }
+    self.fontChannel = fontChannel
 
     let biometricChannel = FlutterMethodChannel(
       name: "dev.wterm/biometrics",

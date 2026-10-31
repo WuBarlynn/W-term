@@ -1,9 +1,53 @@
 #include "flutter_window.h"
 
+#include <algorithm>
 #include <optional>
+#include <string>
+#include <vector>
+
+#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_multi_window/desktop_multi_window_plugin.h"
+
+namespace {
+
+int CALLBACK CollectFontFamily(const LOGFONTW* logfont, const TEXTMETRICW*,
+                               DWORD, LPARAM lparam) {
+  auto* families = reinterpret_cast<std::vector<std::string>*>(lparam);
+  if (logfont->lfFaceName[0] == L'@') {
+    return 1;
+  }
+  const int size = WideCharToMultiByte(CP_UTF8, 0, logfont->lfFaceName, -1,
+                                       nullptr, 0, nullptr, nullptr);
+  if (size > 1) {
+    std::string name(static_cast<size_t>(size - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, logfont->lfFaceName, -1, name.data(), size,
+                        nullptr, nullptr);
+    if (std::find(families->begin(), families->end(), name) ==
+        families->end()) {
+      families->push_back(name);
+    }
+  }
+  return 1;
+}
+
+std::vector<std::string> ListFontFamilies() {
+  std::vector<std::string> families;
+  HDC dc = GetDC(nullptr);
+  if (dc != nullptr) {
+    LOGFONTW filter = {};
+    filter.lfCharSet = DEFAULT_CHARSET;
+    EnumFontFamiliesExW(dc, &filter,
+                        reinterpret_cast<FONTENUMPROCW>(CollectFontFamily),
+                        reinterpret_cast<LPARAM>(&families), 0);
+    ReleaseDC(nullptr, dc);
+  }
+  std::sort(families.begin(), families.end());
+  return families;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,6 +70,24 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  font_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "dev.wterm/fonts",
+          &flutter::StandardMethodCodec::GetInstance());
+  font_channel_->SetMethodCallHandler(
+      [](const flutter::MethodCall<flutter::EncodableValue>& call,
+         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+             result) {
+        if (call.method_name() != "listFamilies") {
+          result->NotImplemented();
+          return;
+        }
+        flutter::EncodableList values;
+        for (const auto& family : ListFontFamilies()) {
+          values.push_back(flutter::EncodableValue(family));
+        }
+        result->Success(flutter::EncodableValue(values));
+      });
   DesktopMultiWindowSetWindowCreatedCallback([](void* controller) {
     auto* flutter_view_controller =
         reinterpret_cast<flutter::FlutterViewController*>(controller);

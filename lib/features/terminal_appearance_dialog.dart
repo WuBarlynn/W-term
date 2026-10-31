@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../app/font_catalog.dart';
 import '../app/terminal_appearance.dart';
 import '../app/errors.dart';
 
@@ -25,6 +28,17 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
     text: widget.store.terminalFont,
   );
   late final cjkFont = TextEditingController(text: widget.store.cjkFont);
+  List<String> fontFamilies = curatedFontFamilies();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      availableFontFamilies().then((families) {
+        if (mounted) setState(() => fontFamilies = families);
+      }),
+    );
+  }
 
   @override
   void dispose() {
@@ -157,31 +171,37 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     : (value) => setState(() => uiTheme = value ?? 'system'),
               ),
               const SizedBox(height: 12),
-              TextField(
+              _FontField(
                 controller: uiFont,
                 enabled: !busy,
-                decoration: const InputDecoration(
-                  labelText: '界面字体（留空使用系统默认）',
-                  hintText: 'Microsoft YaHei',
-                ),
+                label: '界面字体',
+                hint: '留空使用 ${platformDefaultUiFont()}',
+                fonts: fontFamilies,
+                onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 10),
-              TextField(
+              _FontField(
                 controller: terminalFont,
                 enabled: !busy,
-                decoration: const InputDecoration(
-                  labelText: '终端字体（留空使用平台默认）',
-                  hintText: 'Menlo / Cascadia Mono',
-                ),
+                label: '终端字体',
+                hint: '留空使用 ${platformDefaultTerminalFont()}',
+                fonts: fontFamilies,
+                onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 10),
-              TextField(
+              _FontField(
                 controller: cjkFont,
                 enabled: !busy,
-                decoration: const InputDecoration(
-                  labelText: 'CJK 回退字体（可选）',
-                  hintText: 'Microsoft YaHei',
-                ),
+                label: 'CJK 回退字体（可选）',
+                hint: 'Noto Sans SC / Microsoft YaHei',
+                fonts: fontFamilies,
+                onChanged: () => setState(() {}),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '已内置 JetBrains Mono、Noto Sans SC；'
+                '检测到 ${fontFamilies.length} 个可用字体族，点击右侧按钮选择。',
+                style: const TextStyle(fontSize: 11),
               ),
               const SizedBox(height: 20),
               Text('字号：$size'),
@@ -208,11 +228,20 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 padding: const EdgeInsets.all(16),
                 color: theme.background,
                 child: Text(
-                  'user@server ~ %\n连接成功 · Hello, terminal!',
+                  'user@server ~ %\n连接成功 · Hello, terminal!\n'
+                  '中文渲染 abcdef 0123456789',
                   style: TextStyle(
                     color: theme.foreground,
                     fontSize: size.toDouble(),
-                    fontFamily: 'Menlo',
+                    fontFamily: terminalFont.text.trim().isEmpty
+                        ? platformDefaultTerminalFont()
+                        : terminalFont.text.trim(),
+                    fontFamilyFallback: [
+                      if (cjkFont.text.trim().isNotEmpty) cjkFont.text.trim(),
+                      'Noto Sans SC',
+                      'Microsoft YaHei',
+                      'monospace',
+                    ],
                   ),
                 ),
               ),
@@ -547,6 +576,147 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
         FilledButton(
           onPressed: () => Navigator.pop(context, _color.toColor()),
           child: const Text('确定'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FontField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+  final String label;
+  final String hint;
+  final List<String> fonts;
+  final VoidCallback? onChanged;
+  const _FontField({
+    required this.controller,
+    required this.enabled,
+    required this.label,
+    required this.hint,
+    required this.fonts,
+    this.onChanged,
+  });
+
+  Future<void> _pick(BuildContext context) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (_) => _FontPickerDialog(
+        fonts: fonts,
+        selected: controller.text.trim(),
+      ),
+    );
+    if (choice == null) return;
+    controller.text = choice;
+    onChanged?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextField(
+    controller: controller,
+    enabled: enabled,
+    onChanged: (_) => onChanged?.call(),
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: hint,
+      suffixIcon: IconButton(
+        tooltip: '选择已安装或内置字体',
+        onPressed: enabled ? () => _pick(context) : null,
+        icon: const Icon(Icons.font_download_outlined, size: 20),
+      ),
+    ),
+  );
+}
+
+class _FontPickerDialog extends StatefulWidget {
+  final List<String> fonts;
+  final String selected;
+  const _FontPickerDialog({required this.fonts, required this.selected});
+  @override
+  State<_FontPickerDialog> createState() => _FontPickerDialogState();
+}
+
+class _FontPickerDialogState extends State<_FontPickerDialog> {
+  late final TextEditingController search = TextEditingController();
+  late String query = '';
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = query.toLowerCase();
+    final filtered = widget.fonts
+        .where((font) => value.isEmpty || font.toLowerCase().contains(value))
+        .toList();
+    return AlertDialog(
+      title: const Text('选择字体'),
+      content: SizedBox(
+        width: 460,
+        height: 460,
+        child: Column(
+          children: [
+            TextField(
+              controller: search,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '搜索字体名称',
+                prefixIcon: Icon(Icons.search, size: 20),
+              ),
+              onChanged: (text) => setState(() => query = text),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final selected = widget.selected.isEmpty;
+                    return ListTile(
+                      dense: true,
+                      selected: selected,
+                      leading: const Icon(Icons.settings_backup_restore),
+                      title: const Text('系统默认（留空）'),
+                      onTap: () => Navigator.pop(context, ''),
+                    );
+                  }
+                  final font = filtered[index - 1];
+                  final selected = font == widget.selected;
+                  return ListTile(
+                    dense: true,
+                    selected: selected,
+                    leading: Text(
+                      'Aa',
+                      style: TextStyle(fontFamily: font, fontSize: 16),
+                    ),
+                    title: Text(
+                      font,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: font,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check, size: 18)
+                        : null,
+                    onTap: () => Navigator.pop(context, font),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
         ),
       ],
     );

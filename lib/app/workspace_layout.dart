@@ -4,6 +4,13 @@ enum SplitEdge { left, right, top, bottom }
 
 enum BroadcastScope { off, tab, all }
 
+/// Drag payloads use a prefix so a pane can be dropped on a tab or another
+/// pane without being confused with a tab id.
+String paneDragData(String sessionId) => 'pane:$sessionId';
+
+String? paneDragSessionId(String data) =>
+    data.startsWith('pane:') ? data.substring(5) : null;
+
 /// Sessions that receive a pane's keystrokes. The source pane is excluded and
 /// only currently connected sessions are eligible.
 List<String> broadcastTargetIds({

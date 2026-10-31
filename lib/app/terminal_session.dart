@@ -36,6 +36,10 @@ class TerminalSession extends ChangeNotifier {
   Pty? _pty;
   StreamSubscription<String>? _localOutput;
   final bool _offline;
+  final List<void Function(String text)> _inputListeners = [];
+  /// Resolves the broadcast targets at input time so pane moves, tab changes
+  /// and disconnects are always reflected without rebinding the terminal.
+  List<TerminalSession> Function()? broadcastTargets;
   String? _error;
   int? _lastColumns, _lastRows;
   String? currentDirectory;
@@ -87,7 +91,7 @@ class TerminalSession extends ChangeNotifier {
            'local-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
        _offline = false {
     _local = true;
-    terminal.onOutput = send;
+    terminal.onOutput = _handleTerminalInput;
     terminal.onResize = _resize;
     unawaited(_startLocalPty());
   }
@@ -151,7 +155,7 @@ class TerminalSession extends ChangeNotifier {
       ),
       onError: (Object error) => _finish(userFacingError(error)),
     );
-    terminal.onOutput = send;
+    terminal.onOutput = _handleTerminalInput;
     terminal.onResize = _resize;
     terminal.onPrivateOSC = (code, args) {
       if (code != '7' || args.isEmpty) return;
@@ -198,7 +202,7 @@ class TerminalSession extends ChangeNotifier {
            'offline-${DateTime.now().microsecondsSinceEpoch}-${_offlineSequence++}',
        _offline = true {
     _ended = true;
-    terminal.onOutput = send;
+    terminal.onOutput = _handleTerminalInput;
     terminal.write('\r\n\x1b[90m上次会话已断开，使用“重新连接”恢复。\x1b[0m\r\n');
   }
 
@@ -253,6 +257,32 @@ class TerminalSession extends ChangeNotifier {
     _zmodem = null;
     await _zmodemInput.close();
     await _wire.close();
+  }
+
+  /// Terminal-originated input (typing, paste, completion) is routed through
+  /// the session so broadcast targets receive the same bytes. The routing is
+  /// independent of panes, which means splitting, moving or closing a pane can
+  /// never disable broadcast.
+  void _handleTerminalInput(String text) => sendInput(text);
+
+  void sendInput(String text, {bool record = true}) {
+    if (_ended || _closed || text.isEmpty) return;
+    send(text, record: record);
+    for (final target in broadcastTargets?.call() ?? const <TerminalSession>[]) {
+      if (identical(target, this)) continue;
+      target.send(text, record: false);
+    }
+    for (final listener in List.of(_inputListeners)) {
+      listener(text);
+    }
+  }
+
+  void addInputListener(void Function(String text) listener) {
+    if (!_inputListeners.contains(listener)) _inputListeners.add(listener);
+  }
+
+  void removeInputListener(void Function(String text) listener) {
+    _inputListeners.remove(listener);
   }
 
   void send(String text, {bool record = true}) {

@@ -6,6 +6,7 @@ import 'keyword_highlight_dialog.dart';
 import 'snippets_dialog.dart';
 import 'terminal_search.dart';
 import '../app/terminal_appearance.dart';
+import '../app/font_catalog.dart';
 import 'terminal_appearance_dialog.dart';
 import 'system_monitor_dialog.dart';
 import 'tmux_dialog.dart';
@@ -39,7 +40,8 @@ class TerminalPane extends StatefulWidget {
   final SnippetStore? snippets;
   final bool active;
   final BroadcastScope broadcastScope;
-  final List<TerminalSession> broadcastTargets;
+  final int broadcastTargetCount;
+  final String? paneDragData;
   final ValueChanged<BroadcastScope>? onBroadcastChanged;
   final void Function(String action, int? index)? onShortcut;
   final VoidCallback? onReconnect;
@@ -55,7 +57,8 @@ class TerminalPane extends StatefulWidget {
     this.snippets,
     required this.active,
     this.broadcastScope = BroadcastScope.off,
-    this.broadcastTargets = const [],
+    this.broadcastTargetCount = 0,
+    this.paneDragData,
     this.onBroadcastChanged,
     this.onShortcut,
     this.onReconnect,
@@ -93,7 +96,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     pluginSettings.addListener(_pluginSettingsChanged);
     keywordHighlights.addListener(_highlightSettingsChanged);
     focus.addListener(_imeFocusChanged);
-    widget.session.terminal.onOutput = _output;
+    widget.session.addInputListener(_inputObserved);
     _wasActive = widget.active;
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -108,9 +111,9 @@ class _TerminalPaneState extends State<TerminalPane> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(sessionChanged);
-      oldWidget.session.terminal.onOutput = oldWidget.session.send;
+      oldWidget.session.removeInputListener(_inputObserved);
       widget.session.addListener(sessionChanged);
-      widget.session.terminal.onOutput = _output;
+      widget.session.addInputListener(_inputObserved);
     }
     if (widget.active && !_wasActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
@@ -118,13 +121,9 @@ class _TerminalPaneState extends State<TerminalPane> {
     _wasActive = widget.active;
   }
 
-  /// Routes terminal input through the pane so an explicit broadcast scope
-  /// writes the same bytes to every connected target.
-  void _output(String text) {
-    widget.session.send(text);
-    for (final target in widget.broadcastTargets) {
-      target.send(text, record: false);
-    }
+  /// Tracks input for completions/highlights. Sending and broadcasting stay in
+  /// [TerminalSession] so pane reconstruction cannot break the input route.
+  void _inputObserved(String text) {
     _inputTracker.feed(text);
     _refreshCompletions();
     _scheduleHighlights();
@@ -217,17 +216,10 @@ class _TerminalPaneState extends State<TerminalPane> {
     final insertion = completionInsertion(_inputTracker.current, completion);
     if (insertion.isEmpty) return;
     _sendInput(insertion);
-    _inputTracker.feed(insertion);
-    _refreshCompletions();
     focus.requestFocus();
   }
 
-  void _sendInput(String text) {
-    widget.session.send(text);
-    for (final target in widget.broadcastTargets) {
-      target.send(text, record: false);
-    }
-  }
+  void _sendInput(String text) => widget.session.sendInput(text);
 
   void _focus() {
     if (mounted && widget.active) focus.requestFocus();
@@ -251,6 +243,29 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   bool get ended => widget.session.ended;
+
+  String get _terminalFontFamily {
+    final configured = terminalAppearance.terminalFont.trim();
+    return configured.isEmpty ? platformDefaultTerminalFont() : configured;
+  }
+
+  List<String> get _terminalFontFallback {
+    final cjk = terminalAppearance.cjkFont.trim();
+    return [
+      if (cjk.isNotEmpty) cjk,
+      'Noto Sans SC',
+      if (Theme.of(context).platform == TargetPlatform.windows) ...[
+        'Microsoft YaHei UI',
+        'Microsoft YaHei',
+        'Consolas',
+      ] else if (Theme.of(context).platform == TargetPlatform.macOS ||
+          Theme.of(context).platform == TargetPlatform.iOS) ...[
+        'PingFang SC',
+        'Menlo',
+      ],
+      'monospace',
+    ];
+  }
 
   void sessionChanged() {
     if (mounted) setState(() {});
@@ -890,11 +905,86 @@ class _TerminalPaneState extends State<TerminalPane> {
     }
   }
 
+  Widget _titleContent(String text, bool broadcasting) => Row(
+    children: [
+      Flexible(
+        child: Text(
+          text,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: broadcasting
+                ? const Color(0xffffc66d)
+                : const Color(0xffa5adba),
+            fontSize: 12,
+          ),
+        ),
+      ),
+      if (widget.paneDragData != null) ...[
+        const SizedBox(width: 4),
+        MouseRegion(
+          cursor: SystemMouseCursors.grab,
+          child: Icon(
+            Icons.drag_indicator,
+            size: 14,
+            color: broadcasting
+                ? const Color(0xffffc66d)
+                : const Color(0xff6d7480),
+          ),
+        ),
+      ],
+    ],
+  );
+
+  Widget _paneTitle(String text, bool broadcasting) {
+    final data = widget.paneDragData;
+    if (data == null) {
+      return Expanded(child: _titleContent(text, broadcasting));
+    }
+    return Expanded(
+      child: Draggable<String>(
+        data: data,
+        dragAnchorStrategy: pointerDragAnchorStrategy,
+        feedback: Material(
+          elevation: 6,
+          borderRadius: BorderRadius.circular(6),
+          color: Theme.of(context).colorScheme.inverseSurface,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.terminal, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  widget.session.title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onInverseSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        child: Tooltip(
+          message: '拖动窗格到其他窗格边缘可重新分屏；拖动分隔条可调整大小',
+          child: MouseRegion(
+            cursor: SystemMouseCursors.grab,
+            child: SizedBox(
+              height: 32,
+              child: _titleContent(text, broadcasting),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _toolbar() => LayoutBuilder(
     builder: (context, constraints) {
       final compact = constraints.maxWidth < 520;
       final broadcasting = widget.broadcastScope != BroadcastScope.off;
-      final targets = widget.broadcastTargets.length;
+      final targets = widget.broadcastTargetCount;
       return Row(
         children: [
           Icon(
@@ -903,18 +993,10 @@ class _TerminalPaneState extends State<TerminalPane> {
             size: 8,
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${ended ? '已断开 · ' : ''}${widget.session.title}'
-              '${broadcasting ? ' · 广播 $targets' : ''}',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: broadcasting
-                    ? const Color(0xffffc66d)
-                    : const Color(0xffa5adba),
-                fontSize: 12,
-              ),
-            ),
+          _paneTitle(
+            '${ended ? '已断开 · ' : ''}${widget.session.title}'
+            '${broadcasting ? ' · 广播 $targets' : ''}',
+            broadcasting,
           ),
           if (!compact && !ended && widget.active)
             _LatencyBadge(connectionId: widget.session.connectionId),
@@ -926,6 +1008,19 @@ class _TerminalPaneState extends State<TerminalPane> {
                 Icons.refresh,
                 color: Color(0xff71cba2),
                 size: 17,
+              ),
+            ),
+          if (widget.onSplitBack != null)
+            IconButton(
+              tooltip: '拆分分屏（移到新标签）',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              onPressed: widget.onSplitBack,
+              icon: const Icon(
+                Icons.close_fullscreen,
+                color: Color(0xffa5adba),
+                size: 16,
               ),
             ),
           if (widget.onBroadcastChanged != null)
@@ -1064,6 +1159,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);
     focus.removeListener(_imeFocusChanged);
+    widget.session.removeInputListener(_inputObserved);
     if (pluginSettings.imeAutoEnglish) {
       unawaited(
         _imeChannel
@@ -1203,14 +1299,8 @@ class _TerminalPaneState extends State<TerminalPane> {
                     padding: const EdgeInsets.all(12),
                     textStyle: TerminalStyle(
                       fontSize: terminalAppearance.fontSize.toDouble(),
-                      fontFamily:
-                          Theme.of(context).platform == TargetPlatform.windows
-                          ? 'Microsoft YaHei'
-                          : 'Menlo',
-                      fontFamilyFallback:
-                          Theme.of(context).platform == TargetPlatform.windows
-                          ? const ['Cascadia Mono', 'Consolas', 'monospace']
-                          : const ['monospace'],
+                      fontFamily: _terminalFontFamily,
+                      fontFamilyFallback: _terminalFontFallback,
                     ),
                     onSecondaryTapDown: (details, _) async {
                       final selected = await showMenu<String>(

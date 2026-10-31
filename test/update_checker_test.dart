@@ -28,6 +28,35 @@ void main() {
     expect(info.assetFor('ios'), isNull);
   });
 
+  test('release JSON exposes downloadable desktop assets', () {
+    final info = parseUpdateRelease({
+      'tag_name': 'v9.9.9',
+      'html_url': 'https://github.com/WuBarlynn/W-term/releases/tag/v9.9.9',
+      'body': 'notes',
+      'assets': [
+        {
+          'name': 'W-Term-9.9.9-macos.dmg',
+          'browser_download_url': 'https://example.com/app.dmg',
+        },
+        {
+          'name': 'W-Term-9.9.9-windows.exe',
+          'browser_download_url': 'https://example.com/app.exe',
+        },
+        {
+          'name': 'SHA256SUMS.txt',
+          'browser_download_url': 'https://example.com/SHA256SUMS.txt',
+        },
+      ],
+    });
+    expect(info, isNotNull);
+    expect(info!.version, 'v9.9.9');
+    expect(info.assetFor('macos')?.name, 'W-Term-9.9.9-macos.dmg');
+    expect(info.assetFor('windows')?.name, 'W-Term-9.9.9-windows.exe');
+    expect(info.assetFor('ios'), isNull);
+    expect(info.checksumAsset?.name, 'SHA256SUMS.txt');
+    expect(parseUpdateRelease({'tag_name': 'v1.0.0'}), isNull);
+  });
+
   test('checksum asset and SHA256SUMS parsing are strict', () {
     const info = UpdateInfo(
       version: 'v1.0.8',

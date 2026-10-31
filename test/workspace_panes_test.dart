@@ -127,6 +127,14 @@ void main() {
     },
   );
 
+  test('pane drag payloads never collide with tab ids', () {
+    final payload = paneDragData('session-1');
+    expect(payload, startsWith('pane:'));
+    expect(paneDragSessionId(payload), 'session-1');
+    expect(paneDragSessionId('tab-1'), isNull);
+    expect(paneDragSessionId('pane:'), '');
+  });
+
   test('replacing a pane keeps the split tree and proportions', () {
     final tree = SplitPane(
       Axis.horizontal,
