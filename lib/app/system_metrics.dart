@@ -83,6 +83,44 @@ class MonitorSample {
   const MonitorSample({required this.at, this.cpuPercent, this.memoryPercent});
 }
 
+class HostMetrics {
+  final double? load1;
+  final int? diskUsedPercent;
+  const HostMetrics({this.load1, this.diskUsedPercent});
+
+  /// Parses `cat /proc/loadavg` or `sysctl -n vm.loadavg` plus `df -P /`.
+  static HostMetrics? parse(String output) {
+    double? load;
+    int? disk;
+    for (final raw in output.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      if (line.startsWith('{') && line.endsWith('}')) {
+        final fields = line
+            .substring(1, line.length - 1)
+            .trim()
+            .split(RegExp(r'\s+'));
+        load ??= _load(fields.first);
+      } else if (RegExp(r'^\d+(\.\d+)?\s+\d+(\.\d+)?\s+\d+(\.\d+)?')
+          .hasMatch(line)) {
+        load ??= _load(line.split(RegExp(r'\s+')).first);
+      }
+      final capacity = RegExp(r'\s(\d{1,3})%\s').firstMatch(line);
+      if (capacity != null) {
+        final value = int.tryParse(capacity.group(1)!);
+        if (value != null && value <= 100) disk ??= value;
+      }
+    }
+    if (load == null && disk == null) return null;
+    return HostMetrics(load1: load, diskUsedPercent: disk);
+  }
+
+  static double? _load(String value) {
+    final parsed = double.tryParse(value);
+    return parsed == null || parsed < 0 || parsed > 100000 ? null : parsed;
+  }
+}
+
 String formatPercent(double? value) =>
     value == null ? '—' : '${value.toStringAsFixed(1)}%';
 

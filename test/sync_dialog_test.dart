@@ -116,10 +116,15 @@ class MemorySync implements SyncStore {
 
   @override
   Future<SyncReview?> syncConflicts() async => null;
+  List<SyncRevision> history = const [];
+  String? restored;
   @override
-  Future<List<SyncRevision>> syncHistory() async => const [];
+  Future<List<SyncRevision>> syncHistory() async => history;
   @override
-  Future<String> restoreSync(String revision) async => '已恢复';
+  Future<String> restoreSync(String revision) async {
+    restored = revision;
+    return '已恢复';
+  }
   @override
   Future<String> resolveSync(String reviewId, List<SyncChoice> choices) async =>
       '同步完成';
@@ -287,6 +292,34 @@ void main() {
           .onPressed,
       isNotNull,
     );
+  });
+  testWidgets('sync history lists revisions and restores selected revision', (
+    tester,
+  ) async {
+    final store = MemorySync()..ready();
+    store.profile = const SyncProfile(
+      configured: true,
+      tokenSaved: true,
+      initialized: true,
+      recoveryConfirmed: true,
+      revision: 'ffffffffffffffffffffffffffffffffffffffff',
+    );
+    store.history = [
+      const SyncRevision(
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '2026-10-31T03:04:00Z',
+        'W Term encrypted sync',
+      ),
+    ];
+    await show(tester, store);
+    await tap(tester, find.text('版本历史'));
+    expect(find.text('同步版本历史'), findsOneWidget);
+    expect(find.textContaining('2026-10-31'), findsOneWidget);
+    await tap(tester, find.text('恢复'));
+    expect(find.text('恢复历史版本'), findsOneWidget);
+    await tap(tester, find.text('恢复此版本'));
+    expect(store.restored, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(find.text('已恢复'), findsOneWidget);
   });
   testWidgets('small phone with keyboard scrolls to recovery and actions', (
     tester,

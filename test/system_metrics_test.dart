@@ -53,6 +53,26 @@ Cached:           200 kB
     expect(ProcSnapshot.parse('cpu nope\nMemTotal: 1 kB'), isNull);
   });
 
+  test('host metrics parse Linux load and disk usage', () {
+    const output = '0.42 0.38 0.35 1/234 5678\n'
+        '/dev/disk1s1 488245288 302794220 183932068 63% /\n';
+    final metrics = HostMetrics.parse(output);
+    expect(metrics, isNotNull);
+    expect(metrics!.load1, 0.42);
+    expect(metrics.diskUsedPercent, 63);
+  });
+
+  test('host metrics parse macOS load average and reject garbage', () {
+    const output = '{ 1.23 1.45 1.67 }\n'
+        'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+        '/dev/disk3s1 971350180 174843032 634721320 22% /\n';
+    final metrics = HostMetrics.parse(output);
+    expect(metrics!.load1, 1.23);
+    expect(metrics.diskUsedPercent, 22);
+    expect(HostMetrics.parse('not metrics'), isNull);
+    expect(HostMetrics.parse('999% /'), isNull);
+  });
+
   test('docker container names are parsed and validated', () {
     const output = 'NAMES\tIMAGE\tSTATUS\n'
         'web-1\tnginx:latest\tUp 2 hours\n'

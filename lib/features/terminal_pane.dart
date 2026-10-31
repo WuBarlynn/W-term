@@ -102,6 +102,8 @@ class _TerminalPaneState extends State<TerminalPane> {
   bool _statusSampling = false;
   ProcSnapshot? _lastProc;
   double? _cpuPercent, _memoryPercent;
+  double? _load1;
+  int? _diskPercent;
   int? _latencyMs;
   int _hoverPathLine = -1;
   int _hoverPathStart = -1;
@@ -456,9 +458,10 @@ class _TerminalPaneState extends State<TerminalPane> {
       final raw = await native.runCommand(
         connectionId: widget.session.connectionId,
         command:
-            "sh -c 'head -1 /proc/stat; grep -E \"^(MemTotal|MemAvailable|MemFree|Buffers|Cached):\" /proc/meminfo'",
+            "sh -c 'head -1 /proc/stat; grep -E \"^(MemTotal|MemAvailable|MemFree|Buffers|Cached):\" /proc/meminfo; cat /proc/loadavg 2>/dev/null || sysctl -n vm.loadavg 2>/dev/null; df -P / 2>/dev/null | tail -1'",
       );
       final snapshot = ProcSnapshot.parse(raw);
+      final host = HostMetrics.parse(raw);
       if (!mounted) return;
       setState(() {
         _latencyMs = watch.elapsedMilliseconds;
@@ -466,6 +469,10 @@ class _TerminalPaneState extends State<TerminalPane> {
           _cpuPercent = cpuUsageBetween(_lastProc, snapshot);
           _memoryPercent = snapshot.memoryUsedPercent;
           _lastProc = snapshot;
+        }
+        if (host != null) {
+          _load1 = host.load1;
+          _diskPercent = host.diskUsedPercent;
         }
       });
     } catch (_) {
@@ -479,25 +486,55 @@ class _TerminalPaneState extends State<TerminalPane> {
     height: 24,
     padding: const EdgeInsets.symmetric(horizontal: 10),
     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: Row(
-      children: [
-        const Icon(Icons.speed, size: 13),
-        const SizedBox(width: 4),
-        Text(
-          _latencyMs == null ? '—' : '$_latencyMs ms',
-          style: const TextStyle(fontSize: 11),
-        ),
-        const SizedBox(width: 14),
-        const Icon(Icons.memory, size: 13),
-        const SizedBox(width: 4),
-        Text('CPU ${formatPercent(_cpuPercent)}', style: const TextStyle(fontSize: 11)),
-        const SizedBox(width: 14),
-        const Icon(Icons.storage, size: 13),
-        const SizedBox(width: 4),
-        Text('内存 ${formatPercent(_memoryPercent)}', style: const TextStyle(fontSize: 11)),
-        const Spacer(),
-        const Text('每 10 秒采样', style: TextStyle(fontSize: 10)),
-      ],
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final showHostMetrics = constraints.maxWidth >= 560;
+        return Row(
+          children: [
+            const Icon(Icons.speed, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              _latencyMs == null ? '—' : '$_latencyMs ms',
+              style: const TextStyle(fontSize: 11),
+            ),
+            const SizedBox(width: 14),
+            const Icon(Icons.memory, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              'CPU ${formatPercent(_cpuPercent)}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            const SizedBox(width: 14),
+            const Icon(Icons.storage, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              '内存 ${formatPercent(_memoryPercent)}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            if (showHostMetrics && _load1 != null) ...[
+              const SizedBox(width: 14),
+              const Icon(Icons.bolt, size: 13),
+              const SizedBox(width: 4),
+              Text(
+                '负载 ${_load1!.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+            if (showHostMetrics && _diskPercent != null) ...[
+              const SizedBox(width: 14),
+              const Icon(Icons.sd_storage, size: 13),
+              const SizedBox(width: 4),
+              Text(
+                '磁盘 $_diskPercent%',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+            const Spacer(),
+            if (!showHostMetrics)
+              const Text('每 10 秒采样', style: TextStyle(fontSize: 10)),
+          ],
+        );
+      },
     ),
   );
 
