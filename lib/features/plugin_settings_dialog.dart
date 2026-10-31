@@ -22,6 +22,8 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool imeAutoEnglish = pluginSettings.imeAutoEnglish;
   late bool windowsHardwareInput = pluginSettings.windowsHardwareInput;
   late bool linkUnderline = pluginSettings.linkUnderline;
+  late bool dragUpload = pluginSettings.dragUpload;
+  late int maxUploadSizeMb = pluginSettings.maxUploadSizeMb;
   bool saving = false;
   String? error;
 
@@ -40,6 +42,8 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         imeAutoEnglishNext: imeAutoEnglish,
         windowsHardwareInputNext: windowsHardwareInput,
         linkUnderlineNext: linkUnderline,
+        dragUploadNext: dragUpload,
+        maxUploadSizeMbNext: maxUploadSizeMb,
       );
       if (notifications) unawaited(systemNotifications.setup());
       if (mounted) Navigator.pop(context);
@@ -94,6 +98,30 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             title: const Text('任务完成通知'),
             subtitle: const Text('长命令输出停止后提示完成；编辑器、分页器、远程会话等交互命令不通知'),
           ),
+          SwitchListTile(
+            value: dragUpload,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => dragUpload = value),
+            title: const Text('拖拽上传'),
+            subtitle: const Text('允许把本地文件/文件夹拖入文件面板上传'),
+          ),
+          DropdownButtonFormField<int>(
+            initialValue: maxUploadSizeMb,
+            decoration: const InputDecoration(labelText: '单文件上传大小上限'),
+            items: const [
+              DropdownMenuItem(value: 0, child: Text('不限制')),
+              DropdownMenuItem(value: 50, child: Text('50 MB')),
+              DropdownMenuItem(value: 100, child: Text('100 MB')),
+              DropdownMenuItem(value: 500, child: Text('500 MB')),
+              DropdownMenuItem(value: 1024, child: Text('1 GB')),
+              DropdownMenuItem(value: 2048, child: Text('2 GB')),
+            ],
+            onChanged: saving
+                ? null
+                : (value) => setState(() => maxUploadSizeMb = value ?? 0),
+          ),
+          const SizedBox(height: 8),
           SwitchListTile(
             value: linkUnderline,
             onChanged: saving

@@ -40,6 +40,11 @@ void main() {
       await store.load();
       expect(store.jsonFormatter, isTrue);
       expect(store.windowsHardwareInput, isFalse);
+      expect(store.dragUpload, isTrue);
+      expect(store.maxUploadSizeMb, 0);
+      expect(uploadTooLarge(101 * 1024 * 1024, 100), isTrue);
+      expect(uploadTooLarge(100 * 1024 * 1024, 100), isFalse);
+      expect(uploadTooLarge(5000, 0), isFalse);
       await store.save(
         json: false,
         ip: true,
@@ -47,6 +52,8 @@ void main() {
         completion: false,
         notifications: false,
         windowsHardwareInputNext: true,
+        dragUploadNext: false,
+        maxUploadSizeMbNext: 500,
       );
       final restored = PluginSettings(file: () async => file);
       await restored.load();
@@ -56,6 +63,8 @@ void main() {
       expect(restored.commandCompletion, isFalse);
       expect(restored.taskNotifications, isFalse);
       expect(restored.windowsHardwareInput, isTrue);
+      expect(restored.dragUpload, isFalse);
+      expect(restored.maxUploadSizeMb, 500);
     } finally {
       await dir.delete(recursive: true);
     }

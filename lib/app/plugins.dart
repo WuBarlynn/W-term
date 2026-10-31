@@ -24,6 +24,8 @@ class PluginSettings extends ChangeNotifier {
   bool imeAutoEnglish = false;
   bool windowsHardwareInput = false;
   bool linkUnderline = true;
+  bool dragUpload = true;
+  int maxUploadSizeMb = 0;
   bool loaded = false;
 
   PluginSettings({Future<File> Function()? file})
@@ -47,6 +49,9 @@ class PluginSettings extends ChangeNotifier {
           imeAutoEnglish = value['imeAutoEnglish'] == true;
           windowsHardwareInput = value['windowsHardwareInput'] == true;
           linkUnderline = value['linkUnderline'] != false;
+          dragUpload = value['dragUpload'] != false;
+          final maxUpload = value['maxUploadSizeMb'];
+          maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
       }
     } catch (_) {
@@ -66,6 +71,8 @@ class PluginSettings extends ChangeNotifier {
     bool? imeAutoEnglishNext,
     bool? windowsHardwareInputNext,
     bool? linkUnderlineNext,
+    bool? dragUploadNext,
+    int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
     ipLookup = ip;
@@ -74,6 +81,8 @@ class PluginSettings extends ChangeNotifier {
     taskNotifications = notifications ?? taskNotifications;
     imeAutoEnglish = imeAutoEnglishNext ?? imeAutoEnglish;
     windowsHardwareInput = windowsHardwareInputNext ?? windowsHardwareInput;
+    dragUpload = dragUploadNext ?? dragUpload;
+    maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
     await file.parent.create(recursive: true);
@@ -89,6 +98,8 @@ class PluginSettings extends ChangeNotifier {
         'imeAutoEnglish': imeAutoEnglish,
         'windowsHardwareInput': windowsHardwareInput,
         'linkUnderline': linkUnderline,
+        'dragUpload': dragUpload,
+        'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,
     );
@@ -97,6 +108,9 @@ class PluginSettings extends ChangeNotifier {
 }
 
 final pluginSettings = PluginSettings();
+
+bool uploadTooLarge(int bytes, int maxMb) =>
+    maxMb > 0 && bytes > maxMb * 1024 * 1024;
 
 class IpLookupResult {
   final String country, region, city, isp, org, timezone;

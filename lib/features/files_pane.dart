@@ -1,3 +1,4 @@
+import '../app/plugins.dart';
 import '../app/font_catalog.dart';
 import '../app/errors.dart';
 import '../app/directory_history.dart';
@@ -605,6 +606,12 @@ class FilesPaneState extends State<FilesPane> {
               FileSystemEntityType.file) {
             throw const FormatException('此入口仅支持文件；文件夹请通过上传菜单选择');
           }
+          final uploadBytes = await File(file.path).length();
+          if (uploadTooLarge(uploadBytes, pluginSettings.maxUploadSizeMb)) {
+            throw FormatException(
+              '文件超过上传上限 ${pluginSettings.maxUploadSizeMb} MB',
+            );
+          }
           temporary = await createAppTemporaryDirectory('wterm-upload-');
           final local = File('${temporary.path}/payload');
           await file.openRead().cast<List<int>>().pipe(local.openWrite());
@@ -1098,7 +1105,8 @@ class FilesPaneState extends State<FilesPane> {
     );
     return DropTarget(
       enable:
-          Platform.isMacOS &&
+          (Platform.isMacOS || Platform.isWindows) &&
+          pluginSettings.dragUpload &&
           widget.dropActive &&
           (ModalRoute.of(context)?.isCurrent ?? true) &&
           !busy &&
