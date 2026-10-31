@@ -55,6 +55,7 @@ void main() {
       'clickTabLocates': true,
       'restoreLayout': false,
       'showStatusBar': false,
+      'rightClickPaste': true,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -68,6 +69,7 @@ void main() {
     expect(store.clickTabLocates, isTrue);
     expect(store.restoreLayout, isFalse);
     expect(store.showStatusBar, isFalse);
+    expect(store.rightClickPaste, isTrue);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 
