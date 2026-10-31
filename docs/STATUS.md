@@ -6,7 +6,7 @@
 
 - 字体：外观对话框新增“导入字体文件”和“从 URL 安装”；支持 TTF/OTF/TTC，大小上限 32 MB，校验字体文件头，忽略控制字符/超长名称；字体复制到应用支持目录并通过 `FontLoader` 注册，重启自动加载；可删除已导入字体。
 - 范围：云同步/云账号/团队协作/Web 端按用户指示暂缓，GitHub 加密同步仍是唯一同步后端。
-- 验证：Flutter 全量 **282 项**通过；三端构建与发布证据见 1.0.26 记录；字体导入未在真实设备选择文件/URL 下载验收。
+- 验证：Flutter 全量 **282 项**通过（`build/flutter-tests-1.0.26.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41164117553](https://github.com/WuBarlynn/W-term/actions/runs/41164117553) 成功。字体导入未在真实设备选择文件/URL 下载验收。
 
 ## 1.0.25 Windows 独立窗口收回（2026-10-31）
 

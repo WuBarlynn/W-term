@@ -460,3 +460,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 主窗口未解锁（Workspace 未注册通道）时安全拒绝并回滚；macOS 原 native 收回路径复用同一载荷与解析逻辑，并补回 hostId 以恢复主机档案。
 - 验证：`build/flutter-tests-1.0.25.log` **280 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.25（78）；Windows CI 41162577816 成功（含 Windows 编译 WindowMethodChannel 路径、启动冒烟、Inno Setup、Rust 测试）。
 - 未执行：真实 Windows 双窗口收回点击、Windows 关闭保活/托盘组合、iPad 多窗口；Windows 收回只验证到编译与启动。Cloud Term 剩余差距以审计文档“1.0.25 仍未完成”为准。
+
+## 18. 1.0.26 字体导入（2026-10-31）
+
+- 三端版本 **1.0.26（79）**；本地产物 `build/release-1.0.26/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.26 。
+- 字体：外观设置新增本地文件导入与 http/https URL 安装；TTF/OTF/TTC、≤32 MB、校验 sfnt 文件头、名称去控制字符/限长；字体复制到应用支持目录并用 `FontLoader` 注册，启动自动加载，可删除。字体列表合并内置、系统枚举与已导入字体。
+- 范围：用户明确 **云同步暂时不用，只用 GitHub 同步**；Cloud Term 云账号、团队协作、Gist/S3、Web 端从当前交付目标移除，仅保留 GitHub 私有仓库加密同步、本机备份与恢复。审计文档已加范围调整说明。
+- 验证：`build/flutter-tests-1.0.26.log` **282 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.26（79）；Windows CI 41164117553 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
+- 未执行：真实设备文件选择、URL 字体下载与渲染、字体授权/损坏文件样本；字体导入只覆盖单元/组件测试。
