@@ -595,6 +595,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 新增 `lib/app/zmodem_mux.dart` 串行化 mux；`terminal_session` 已切换。
 - 验证：`test/zmodem_interop_test.dart` 使用真实 lrzsz 0.13.1 双向 80 KB 通过；无 lrzsz 环境自动跳过。Flutter 全量 **320 项**通过。
 - 仍待实机验收终端工具栏交互、取消与大文件行为。
+- 验证：macOS DMG、iOS IPA 完成；Windows CI [41224736001](https://github.com/WuBarlynn/W-term/actions/runs/41224736001) 成功。发布包位于 `build/release-1.0.52/`。
 
 ## 44. 1.0.51 Office 系统应用原排版（2026-10-31）
 

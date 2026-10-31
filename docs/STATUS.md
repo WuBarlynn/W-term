@@ -7,7 +7,7 @@
 - 本地修补 `zmodem 0.0.6`：接收端按 ZCRCW/ZCRCQ 回 ZACK，并处理 ACK 后的 ZDATA 头，修复 1024 字节后停滞与协议帧混入。
 - 新增串行化 `WTermZModemMux`：发送端按块刷新，替代 xterm 原 mux 的整文件缓冲。
 - 真实 lrzsz 0.13.1 双向 80 KB 二进制文件集成测试通过；测试在无 lrzsz 的环境自动跳过。
-- 验证：Flutter 全量 **320 项**通过（含真实 lrzsz 双向集成测试），`flutter analyze` 无问题；三端构建状态见下方记录。
+- 验证：Flutter 全量 **320 项**通过（含真实 lrzsz 双向集成测试），`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41224736001](https://github.com/WuBarlynn/W-term/actions/runs/41224736001) 成功。终端工具栏内的 ZMODEM 交互仍待实机验收。
 
 ## 1.0.51 Office 系统应用原排版（2026-10-31）
 
