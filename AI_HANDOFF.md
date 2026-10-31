@@ -484,3 +484,10 @@ UI、实际桥接、测试、文档与双端构建。
 - 限制：队列仍归当前 FilesPane/标签所有，换标签或关闭窗格会停止后续项；无百分比进度、无失败重试、无跨标签统一队列。
 - 验证：`build/flutter-tests-1.0.28.log` **285 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.28（81）；Windows CI 41167515357 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
 - 未执行：真实远端批量下载与并发浏览、目录递归队列、取消时机、Windows 安装升级。
+
+## 21. 1.0.29 精确命令完成通知（2026-10-31）
+
+- 三端版本 **1.0.29（82）**；本地产物 `build/release-1.0.29/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.29 。
+- 通知：`TerminalSession` 解析 OSC 133;D（携带退出码），`TaskMonitor.commandFinished` 立即完成任务；通知正文显示退出码。终端菜单新增“命令完成通知钩子”，可选 bash/zsh/fish 注入 OSC 133;D；空闲启发式保留为回退。同时补上缺失的“目录上报（文件跟随）”菜单入口。
+- 验证：`build/flutter-tests-1.0.29.log` **288 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.29（82）；Windows CI 41169000225 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
+- 未执行：真实 bash/zsh/fish 远端钩子、已有 shell 集成的退出码、通知点击定位；钩子需用户在终端菜单手动安装且只作用于当前会话。
