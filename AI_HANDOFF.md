@@ -499,3 +499,12 @@ UI、实际桥接、测试、文档与双端构建。
 - Windows 更新：下载并 SHA256 校验后，先启动独立 PowerShell 助手（等待 2 秒），应用随后退出；助手用 `/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS` 安装。安装器 `[Run]` 移除 `skipifsilent`，静默安装完成后自动启动新版。解决应用未退出导致文件锁定/安装器静默失败的问题。
 - 验证：`build/flutter-tests-1.0.30.log` **288 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.30（83）；Windows CI 41170799293 成功（移除 IME 代码后构建/启动冒烟/Inno Setup/Rust 测试）。
 - 未执行：Windows 实体机打字（含中文 IME）复测、自动更新从旧版安装到新版并自动启动的端到端验证；这两项需用户在真实 Windows 环境确认。
+
+## 23. 1.0.31 PDF 内嵌预览与 Windows 静默安装 CI（2026-10-31）
+
+- 三端版本 **1.0.31（84）**；本地产物 `build/release-1.0.31/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.31 。
+- PDF：SFTP 选中 `.pdf` 时通过 `native.downloadFile` 下载到临时目录，用 pdfrx/PDFium 内嵌渲染，限制 100 MB，关闭后删除临时文件；文本/Markdown/图片预览保留。iOS IPA 因此增至约 52 MB。
+- Windows 安装 CI：新增 `scripts/test-windows-installer.ps1`，在 GitHub Windows runner 上实际静默安装到临时目录、等待 wterm.exe、杀掉安装器自动启动的进程并静默卸载。Windows CI 41173520983 通过该步骤。
+- 注意：1.0.30 已回退阻断输入的 Windows IME 原生切换，并将更新改为“退出后独立 PowerShell 安装器 + VERYSILENT + 安装后启动”；1.0.31 沿用。自动更新从旧版本到新版本的完整链路与 Windows 实体机输入仍需用户复测。
+- 验证：`build/flutter-tests-1.0.31.log` **289 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.31（84）；Windows CI 41173520983 成功（pdfrx Windows 构建、启动冒烟、Inno Setup、静默安装/卸载冒烟、Rust 测试）。
+- 未执行：真实 PDF 文件在 macOS/iOS/Windows 的渲染与滚动、超 100 MB 拒绝、Windows 输入与自动更新端到端点击。

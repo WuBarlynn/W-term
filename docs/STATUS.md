@@ -7,7 +7,7 @@
 - 文件：SFTP 选中 PDF 时下载到临时文件并用 pdfrx/PDFium 内嵌渲染，限制 100 MB，关闭预览后删除临时文件；Markdown/文本/图片预览保留。
 - Windows 安装：CI 新增 `scripts/test-windows-installer.ps1`，实际静默安装到临时目录、校验 wterm.exe 并卸载，覆盖 Inno Setup 静默安装路径。
 - 沿用 1.0.30 的 Windows 输入回退与退出后独立安装器流程。
-- 验证：Flutter 全量 **289 项**通过；三端构建与发布证据见 1.0.31 记录；PDF 真机渲染与 Windows 输入/自动安装仍需实体机复测。
+- 验证：Flutter 全量 **289 项**通过（`build/flutter-tests-1.0.31.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41173520983](https://github.com/WuBarlynn/W-term/actions/runs/41173520983) 成功，并首次通过静默安装冒烟（安装到临时目录、校验 wterm.exe、卸载）。PDF 真机渲染与 Windows 输入/自动更新仍需实体机复测。
 
 ## 1.0.30 Windows 输入与自动更新热修复（2026-10-31）
 
