@@ -594,6 +594,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 主机收藏显示在顶部收藏栏，Cmd/Ctrl+Shift+数字键优先连接收藏，未命中时回退标签切换。
 - 终端 `findPathAt` 识别绝对/相对路径，Cmd/Ctrl+点击复用预览流程；路径含空格仍需选中后预览。
 - 同步设置新增 `ai` 环境与 API Key，Rust 校验可选字段；Keychain 读取失败时省略该组，不阻塞其余设置。
+- 验证：Flutter **315 项**、`flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41205690331](https://github.com/WuBarlynn/W-term/actions/runs/41205690331) 成功。发布包位于 `build/release-1.0.44/`。
 - 剩余引导差异：快捷键自定义、分享图片模板/行号/水印、工作区密度与收藏栏开关尚未实现。
 
 ## 36. 1.0.43 在线字体与跨标签上传队列（2026-10-31）

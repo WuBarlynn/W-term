@@ -9,7 +9,7 @@
 - 终端输出中的绝对/相对路径支持 Cmd/Ctrl+点击预览；文本、图片、PDF、媒体与 Office 按既有预览流程处理，相对路径依赖 OSC 7 当前目录。
 - GitHub 设置同步新增 AI 助手环境与 API Token；AI 环境随加密快照参与冲突审阅，读取 Keychain 失败时其余设置仍可同步。
 - 修复设置同步写出在途保存竞态，并提高设置快照上限到 4 MiB。
-- 验证：Flutter 全量 **315 项**通过，`flutter analyze` 无问题；Rust 同步设置测试通过；三端构建与实机验收状态见下方记录。
+- 验证：Flutter 全量 **315 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41205690331](https://github.com/WuBarlynn/W-term/actions/runs/41205690331) 成功（构建、启动冒烟、静默安装卸载、Rust 测试）。新手引导、收藏快捷键、路径预览与 AI 设置双向同步仍需实机验收。
 
 ## 1.0.43 在线字体与跨标签上传队列（2026-10-31）
 
