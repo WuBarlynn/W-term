@@ -491,3 +491,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 通知：`TerminalSession` 解析 OSC 133;D（携带退出码），`TaskMonitor.commandFinished` 立即完成任务；通知正文显示退出码。终端菜单新增“命令完成通知钩子”，可选 bash/zsh/fish 注入 OSC 133;D；空闲启发式保留为回退。同时补上缺失的“目录上报（文件跟随）”菜单入口。
 - 验证：`build/flutter-tests-1.0.29.log` **288 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.29（82）；Windows CI 41169000225 成功（构建/启动冒烟/Inno Setup/Rust 测试）。
 - 未执行：真实 bash/zsh/fish 远端钩子、已有 shell 集成的退出码、通知点击定位；钩子需用户在终端菜单手动安装且只作用于当前会话。
+
+## 22. 1.0.30 Windows 输入与自动更新热修复（2026-10-31）
+
+- 三端版本 **1.0.30（83）**；本地产物 `build/release-1.0.30/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.30 。
+- Windows 输入：回退 1.0.27 的 `ImmSetConversionStatus` 原生自动切换；该实现会阻断 Flutter Windows 文本输入。移除 `dev.wterm/biometrics` Windows IME 通道、`SetAsciiInput` 与 `imm32` 链接；Dart 仅在 macOS 调用输入法自动切换。Windows 恢复 Flutter 默认输入法行为。
+- Windows 更新：下载并 SHA256 校验后，先启动独立 PowerShell 助手（等待 2 秒），应用随后退出；助手用 `/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS` 安装。安装器 `[Run]` 移除 `skipifsilent`，静默安装完成后自动启动新版。解决应用未退出导致文件锁定/安装器静默失败的问题。
+- 验证：`build/flutter-tests-1.0.30.log` **288 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.30（83）；Windows CI 41170799293 成功（移除 IME 代码后构建/启动冒烟/Inno Setup/Rust 测试）。
+- 未执行：Windows 实体机打字（含中文 IME）复测、自动更新从旧版安装到新版并自动启动的端到端验证；这两项需用户在真实 Windows 环境确认。

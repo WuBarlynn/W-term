@@ -6,7 +6,7 @@
 
 - 输入：回退 1.0.27 的 Windows IME 原生切换（该实现会阻断 Flutter Windows 文本输入），Windows 重新使用 Flutter 默认输入法行为；macOS 输入法自动切换保留。
 - 更新：Windows 下载并校验后不再由应用直接启动安装器；先拉起独立 PowerShell 助手，应用退出 2 秒后由助手静默安装，安装器 `[Run]` 在静默安装完成后启动新版本。安装参数改为 `/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS`。
-- 验证：Flutter 全量 **288 项**通过；三端构建与发布证据见 1.0.30 记录；Windows 输入与更新安装未在真实 Windows 桌面点击验收。
+- 验证：Flutter 全量 **288 项**通过（`build/flutter-tests-1.0.30.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41170799293](https://github.com/WuBarlynn/W-term/actions/runs/41170799293) 成功（移除 IME 原生代码后构建、启动冒烟、Inno Setup、Rust 测试）。Windows 输入与自动安装仍未在真实 Windows 桌面点击验收。
 
 ## 1.0.29 精确命令完成通知（2026-10-31）
 
