@@ -1,4 +1,6 @@
 import 'font_catalog.dart';
+import 'imported_fonts.dart';
+import 'onboarding.dart';
 import 'interactive_auth.dart';
 import 'connection_route.dart';
 import 'forward_store.dart';
@@ -16,6 +18,7 @@ import 'proxy_store.dart';
 import '../features/proxy_dialog.dart';
 import '../features/plugin_settings_dialog.dart';
 import '../features/settings_dialog.dart';
+import '../features/onboarding_dialog.dart';
 import '../features/terminal_appearance_dialog.dart';
 import '../features/auth_challenge_dialog.dart';
 import '../features/forwarding_dialog.dart';
@@ -111,6 +114,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   final sessions = <_Session>[];
   final commandHistory = CommandHistory();
   final tabs = <WorkspaceTab>[];
+  List<HostProfile> _favoriteHosts = [];
   int selected = -1, attempt = 0;
   BroadcastScope broadcastScope = BroadcastScope.off;
   bool connecting = false, preparing = false;
@@ -125,6 +129,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(commandHistory.load());
+    unawaited(_loadFavorites());
     if (hostStore is VaultMaintenance) {
       unawaited(autoBackup.ensureRecent(hostStore as VaultMaintenance));
     }
@@ -138,6 +143,23 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
     }
     _restartAutoSync();
+    if (hostStore is FirstRunHost && !onboarding.completed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || onboarding.completed) return;
+        final fonts = {...commonTerminalFonts, ...importedFonts.names}.toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => OnboardingDialog(
+            appearance: terminalAppearance,
+            plugins: pluginSettings,
+            store: onboarding,
+            fontChoices: fonts,
+          ),
+        );
+      });
+    }
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
     pendingDeepLink.addListener(_deepLinkReceived);
@@ -1716,12 +1738,35 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _loadFavorites() async {
+    try {
+      final hosts = await hostStore.read();
+      if (!mounted) return;
+      final favorites = hosts.where((host) => host.favorite).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      if (favorites.length == _favoriteHosts.length &&
+          favorites.every((host) => _favoriteHosts.any((h) => h.id == host.id))) {
+        return;
+      }
+      setState(() => _favoriteHosts = favorites);
+    } catch (_) {
+      // Favorites are a shortcut; the host list still reports its own errors.
+    }
+  }
+
   void _handleShortcut(String action, int? index) {
     if (!mounted) return;
     if (action == 'new') {
       unawaited(connect());
     } else if (action == 'close-tab') {
       if (_activeTabIndex >= 0) unawaited(closeTab(tabs[selected]));
+    } else if (action == 'favorite' && index != null) {
+      if (index >= 0 && index < _favoriteHosts.length) {
+        unawaited(connect(_favoriteHosts[index]));
+      } else if (index >= 0 && index < tabs.length) {
+        setState(() => selected = index);
+        _scheduleLayoutSave();
+      }
     } else if (action == 'tab' && index != null) {
       if (index >= 0 && index < tabs.length) {
         setState(() => selected = index);
@@ -2758,6 +2803,29 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     );
   }
 
+  Widget _favoritesBar() => SizedBox(
+    key: const ValueKey('favorites-bar'),
+    height: 34,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      itemCount: _favoriteHosts.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 6),
+      itemBuilder: (context, index) {
+        final host = _favoriteHosts[index];
+        final shortcut = index < 9
+            ? (Platform.isMacOS ? '⌘${index + 1}' : 'Ctrl+Shift+${index + 1}')
+            : '';
+        return ActionChip(
+          avatar: const Icon(Icons.star, size: 14),
+          tooltip: shortcut.isEmpty ? host.host : '$shortcut · ${host.host}',
+          label: Text(host.name, style: const TextStyle(fontSize: 12)),
+          onPressed: connecting ? null : () => connect(host),
+        );
+      },
+    ),
+  );
+
   Widget _collapsedSidebar() => Container(
     width: 48,
     decoration: BoxDecoration(
@@ -2868,6 +2936,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                     )
                   : HostsPage(
                       key: hostPanelKey,
+                      onChanged: () => unawaited(_loadFavorites()),
                       store: hostStore,
                       embedded: true,
                       onConnect: (profile) {
@@ -3242,6 +3311,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           if (!focusMode) ...[
+                            if (_favoriteHosts.isNotEmpty) ...[
+                              _favoritesBar(),
+                              const Divider(height: 1),
+                            ],
                             sessionBar(wide),
                             const Divider(height: 1),
                           ],

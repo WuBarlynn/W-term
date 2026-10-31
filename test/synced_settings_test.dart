@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wterm/app/ai_assistant.dart';
 import 'package:wterm/app/keyword_highlights.dart';
 import 'package:wterm/app/pinned_commands.dart';
 import 'package:wterm/app/plugins.dart';
+import 'package:wterm/app/synced_settings.dart';
 import 'package:wterm/app/terminal_appearance.dart';
 
 void main() {
@@ -109,5 +111,33 @@ void main() {
     await saving;
     expect(exported['palette'], 'nord');
     expect(exported['fontSize'], 16);
+  });
+
+  test('AI profiles round-trip with API keys in the settings payload', () {
+    const settings = AiSettings(
+      baseUrl: 'https://api.example.test/v1',
+      model: 'test-model',
+      apiKey: 'sk-fixture',
+      permission: AiPermission.readOnly,
+    );
+    final decoded = SyncedAiCodec.decode(
+      SyncedAiCodec.encode(
+        const AiProfileSet(
+          profiles: [
+            AiProfile(id: 'work', name: 'Work', settings: settings),
+            AiProfile(id: 'home', name: 'Home', settings: AiSettings()),
+          ],
+          activeId: 'home',
+        ),
+      ),
+    );
+    expect(decoded, isNotNull);
+    expect(decoded!.activeId, 'home');
+    expect(decoded.profiles, hasLength(2));
+    expect(decoded.profiles.first.settings.apiKey, 'sk-fixture');
+    expect(decoded.profiles.first.settings.model, 'test-model');
+    expect(decoded.profiles.first.settings.permission, AiPermission.readOnly);
+    expect(SyncedAiCodec.decode({'profiles': []}), isNull);
+    expect(SyncedAiCodec.decode(null), isNull);
   });
 }

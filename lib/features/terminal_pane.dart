@@ -429,6 +429,13 @@ class _TerminalPaneState extends State<TerminalPane> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
       }
+      if (pluginSettings.filePreview && !widget.session.isLocal) {
+        final candidate = findPathAt(text, x);
+        final path = candidate == null
+            ? null
+            : resolveRemotePath(candidate, widget.session.currentDirectory);
+        if (path != null) await previewRemotePath(path);
+      }
     } catch (_) {
       // Coordinate lookup is best-effort; normal selection must keep working.
     }
@@ -457,6 +464,10 @@ class _TerminalPaneState extends State<TerminalPane> {
           .showSnackBar(const SnackBar(content: Text('请选中绝对路径，或等待终端上报当前目录')));
       return;
     }
+    await previewRemotePath(path);
+  }
+
+  Future<void> previewRemotePath(String path) async {
     try {
       if (isSystemPreviewPath(path)) {
         final extension = path.contains('.')
@@ -1605,7 +1616,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                                           ];
                                           final index = digits.indexOf(key);
                                           if (index >= 0) {
-                                            widget.onShortcut!('tab', index);
+                                            widget.onShortcut!('favorite', index);
                                             return KeyEventResult.handled;
                                           }
                                         }

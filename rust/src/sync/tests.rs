@@ -435,7 +435,11 @@ fn sync_settings_roundtrip_and_merge() {
         "appearance": {"palette": "nord", "fontSize": 15},
         "plugins": {"linkUnderline": true},
         "pinned": {"version": 1, "entries": []},
-        "highlights": {"enabled": false, "keywords": [], "colorArgb": 4294958438u32}
+        "highlights": {"enabled": false, "keywords": [], "colorArgb": 4294958438u32},
+        "ai": {
+            "activeId": "work",
+            "profiles": [{"id": "work", "name": "Work", "settings": {"baseUrl": "https://api.example.test/v1", "model": "fixture", "apiKey": "sk-fixture", "systemPrompt": "test", "contextLines": 20, "timeoutSeconds": 30, "permission": "readOnly"}}]
+        }
     });
     put_record(&a, "settings", &settings.to_string()).unwrap();
     let local = capture(&a, &base, DEVICE_A).unwrap();

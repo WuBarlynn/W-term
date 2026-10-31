@@ -388,7 +388,7 @@ pub(super) fn apply_in_transaction(tx: &Connection, plan: &MergePlan) -> Result<
 }
 
 pub(crate) fn validate_settings(json: &str) -> Result<()> {
-    ensure!(json.len() <= 256 * 1024, "同步设置超过 256 KiB");
+    ensure!(json.len() <= 4 * 1024 * 1024, "同步设置超过 4 MiB");
     let value: Value =
         serde_json::from_str(json).map_err(|_| anyhow::anyhow!("同步设置格式无效"))?;
     let object = value.as_object().context("同步设置格式无效")?;
@@ -402,6 +402,10 @@ pub(crate) fn validate_settings(json: &str) -> Result<()> {
             "同步设置缺少必要字段"
         );
     }
+    ensure!(
+        object.get("ai").is_none_or(Value::is_object),
+        "同步设置中的 AI 配置无效"
+    );
     ensure!(object.len() <= 8, "同步设置字段过多");
     Ok(())
 }

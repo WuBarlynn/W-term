@@ -19,12 +19,14 @@ class HostsPage extends StatefulWidget {
   final bool embedded;
   final ValueChanged<HostProfile>? onConnect;
   final ValueChanged<List<HostProfile>>? onBatchConnect;
+  final VoidCallback? onChanged;
   const HostsPage({
     super.key,
     required this.store,
     this.embedded = false,
     this.onConnect,
     this.onBatchConnect,
+    this.onChanged,
   });
   @override
   State<HostsPage> createState() => HostsPageState();
@@ -61,6 +63,7 @@ class HostsPageState extends State<HostsPage> {
           hosts = result;
           folders = savedFolders;
         });
+        widget.onChanged?.call();
       }
     } catch (e) {
       if (mounted) setState(() => error = '无法读取主机配置：${userFacingError(e)}');

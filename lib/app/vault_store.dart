@@ -10,6 +10,7 @@ import 'quick_unlock.dart';
 import 'identity_store.dart';
 import 'snippet_store.dart';
 import 'sync_store.dart';
+import 'onboarding.dart';
 import 'proxy_store.dart';
 import '../src/rust/api/client.dart' show ServerIdentity;
 import '../src/rust/api/forward.dart' as forward_native;
@@ -58,6 +59,7 @@ class NativeVaultSession
         SnippetStore,
         SyncStore,
         SyncedSettingsHost,
+        FirstRunHost,
         ConnectionProxyStore,
         ForwardRuleStore {
   final String _token;

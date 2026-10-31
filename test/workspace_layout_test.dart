@@ -236,4 +236,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('API Server'), findsOneWidget);
   });
+
+  testWidgets('favorite hosts appear in the top favorites bar', (tester) async {
+    tester.view.physicalSize = const Size(1000, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = KeychainHostStore();
+    await store.write([
+      HostProfile(
+        id: 'fav',
+        name: 'Prod Web',
+        host: 'example.com',
+        username: 'alice',
+        favorite: true,
+      ),
+      HostProfile(
+        id: 'plain',
+        name: 'Staging',
+        host: 'staging.example.com',
+        username: 'alice',
+      ),
+    ]);
+    await tester.pumpWidget(MaterialApp(home: Workspace(hostStore: store)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('favorites-bar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('favorites-bar')),
+        matching: find.text('Prod Web'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('favorites-bar')),
+        matching: find.text('Staging'),
+      ),
+      findsNothing,
+    );
+  });
 }
