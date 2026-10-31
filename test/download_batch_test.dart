@@ -37,4 +37,19 @@ void main() {
     batch.finish();
     expect(batch.count(DownloadState.cancelled), 2);
   });
+  queueTests();
+}
+
+void queueTests() {
+  test('application download queue exposes the active batch', () {
+    final queue = DownloadQueue();
+    final batch = DownloadBatch('/tmp/q', [DownloadItem('a', '/a')]);
+    expect(queue.running, isFalse);
+    queue.begin(batch);
+    expect(queue.batch, same(batch));
+    expect(queue.running, isTrue);
+    queue.finish();
+    expect(queue.running, isFalse);
+    expect(queue.batch, same(batch));
+  });
 }

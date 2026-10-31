@@ -57,8 +57,6 @@ class FilesPaneState extends State<FilesPane> {
   UploadBatch? uploadBatch;
   FolderAccess? folderAccess;
   DownloadTask? downloadTask;
-  DownloadBatch? downloadBatch;
-  bool downloadRunning = false;
   native.RemoteEntry? downloadEntry;
   List<XFile> uploadSources = const [];
   final history = DirectoryHistory();
@@ -77,7 +75,6 @@ class FilesPaneState extends State<FilesPane> {
   @override
   void dispose() {
     uploadBatch?.cancelRemaining();
-    downloadBatch?.cancelRemaining();
     folderAccess?.release().catchError((Object _) {});
     path.dispose();
     search.dispose();
@@ -235,20 +232,20 @@ class FilesPaneState extends State<FilesPane> {
       }
       return;
     }
-    if (downloadRunning) {
+    if (downloadQueue.running) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已有下载队列正在运行，请等待或取消剩余任务')));
       return;
     }
     final directory = await getDirectoryPath();
     if (directory == null || !mounted) return;
+    if (downloadQueue.running) return;
     final batch = DownloadBatch(directory, [
       for (final entry in items)
         DownloadItem(entry.name, entry.path, isDirectory: entry.isDirectory),
     ]);
+    downloadQueue.begin(batch);
     setState(() {
-      downloadBatch = batch;
-      downloadRunning = true;
       selecting = false;
       selected.clear();
       error = null;
@@ -262,10 +259,6 @@ class FilesPaneState extends State<FilesPane> {
     List<native.RemoteEntry> items,
   ) async {
     for (var index = 0; index < items.length; index++) {
-      if (!mounted) {
-        batch.finish();
-        return;
-      }
       if (batch.cancelRequested) break;
       if (!batch.start(index)) continue;
       final entry = items[index];
@@ -292,8 +285,8 @@ class FilesPaneState extends State<FilesPane> {
       }
     }
     batch.finish();
+    downloadQueue.finish();
     if (!mounted) return;
-    setState(() => downloadRunning = false);
     final completed = batch.count(DownloadState.completed);
     final failed = batch.count(DownloadState.failed);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -497,7 +490,7 @@ class FilesPaneState extends State<FilesPane> {
   }
 
   Future<void> showDownloadTasks() async {
-    final batch = downloadBatch;
+    final batch = downloadQueue.batch;
     if (batch == null) return;
     await showDialog<void>(
       context: context,
@@ -1163,47 +1156,54 @@ class FilesPaneState extends State<FilesPane> {
                         size: 19,
                       ),
                     ),
-                    if (uploadBatch != null ||
-                        downloadBatch != null ||
-                        downloadTask != null)
-                      PopupMenuButton<String>(
-                        tooltip: '传输任务',
-                        icon: Icon(
-                          downloadRunning
-                              ? Icons.downloading
-                              : Icons.playlist_add_check,
-                          size: 19,
-                          color: downloadRunning
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
-                        ),
-                        onSelected: (value) {
-                          if (value == 'upload') {
-                            showUploadTasks();
-                          } else if (value == 'download-batch') {
-                            showDownloadTasks();
-                          } else {
-                            showDownloadTask();
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          if (uploadBatch != null)
-                            const PopupMenuItem(
-                              value: 'upload',
-                              child: Text('上传任务'),
-                            ),
-                          if (downloadBatch != null)
-                            const PopupMenuItem(
-                              value: 'download-batch',
-                              child: Text('下载队列'),
-                            ),
-                          if (downloadTask != null)
-                            const PopupMenuItem(
-                              value: 'download',
-                              child: Text('最近下载'),
-                            ),
-                        ],
-                      ),
+                    ListenableBuilder(
+                      listenable: downloadQueue,
+                      builder: (context, _) {
+                        if (uploadBatch == null &&
+                            downloadQueue.batch == null &&
+                            downloadTask == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return PopupMenuButton<String>(
+                          tooltip: '传输任务',
+                          icon: Icon(
+                            downloadQueue.running
+                                ? Icons.downloading
+                                : Icons.playlist_add_check,
+                            size: 19,
+                            color: downloadQueue.running
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'upload') {
+                              showUploadTasks();
+                            } else if (value == 'download-batch') {
+                              showDownloadTasks();
+                            } else {
+                              showDownloadTask();
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            if (uploadBatch != null)
+                              const PopupMenuItem(
+                                value: 'upload',
+                                child: Text('上传任务'),
+                              ),
+                            if (downloadQueue.batch != null)
+                              const PopupMenuItem(
+                                value: 'download-batch',
+                                child: Text('下载队列'),
+                              ),
+                            if (downloadTask != null)
+                              const PopupMenuItem(
+                                value: 'download',
+                                child: Text('最近下载'),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                     PopupMenuButton<String>(
                       tooltip: '上传',
                       enabled: !busy && listing != null,

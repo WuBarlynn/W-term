@@ -85,3 +85,24 @@ String downloadStateLabel(DownloadState state) => switch (state) {
   DownloadState.failed => '失败',
   DownloadState.cancelled => '已取消',
 };
+
+/// Application-wide download queue. The batch keeps running when its
+/// originating file pane is disposed (tab switch or pane close) so another tab
+/// can observe progress and cancel remaining items.
+class DownloadQueue extends ChangeNotifier {
+  DownloadBatch? batch;
+  bool running = false;
+
+  void begin(DownloadBatch next) {
+    batch = next;
+    running = true;
+    notifyListeners();
+  }
+
+  void finish() {
+    running = false;
+    notifyListeners();
+  }
+}
+
+final downloadQueue = DownloadQueue();
