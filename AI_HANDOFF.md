@@ -428,3 +428,12 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.21（74）**；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.21 ；本地产物 `build/release-1.0.21/`。
 - 验证：Flutter 267 项、Windows CI 41149755797、macOS 自签名严格校验、DMG、iOS IPA。截图/真机交互未验收。
 - 未完成项以 [CLOUDTERM_FEATURE_AUDIT.md](docs/CLOUDTERM_FEATURE_AUDIT.md) 的“1.0.21 仍未完成”为准；不得把当前构建称为 Cloud Term 全功能等价或最终 V1.0。下一步优先：真机/Windows 交互验收、iPad/Windows 多窗口收回、Gist/S3 与团队/云服务立项评估。
+
+## 14. 1.0.22 分屏/广播/更新/字体（2026-10-31）
+
+- 三端版本 **1.0.22（75）**；本地产物 `build/release-1.0.22/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.22 。
+- 分屏：每个窗格标题可拖到其他窗格边缘/标签，窗格内部可重排；分隔条按像素自由拖动、双击恢复均分；标签菜单新增“拆分所有窗格为标签”，无需断开连接。修复了窗格重建后广播失效的问题：输入广播移到 `TerminalSession`，目标在按键时动态解析；终端协议回复不再被广播到其他会话。
+- 更新：仅 macOS/Windows 桌面端显示“检查更新（GitHub）”；启动 6 秒后自动查询 GitHub Release，解析 DMG/EXE 资产，SHA256 校验后 macOS 打开 DMG、Windows 静默安装并重启；iOS 不显示入口。
+- 字体：内置 JetBrains Mono（常规/粗体）与 Noto Sans SC，界面/终端/CJK 字体改为可搜索选择并枚举 macOS/iOS/Windows 系统字体；Windows 界面默认微软雅黑 UI，终端默认 Cascadia Mono，CJK 回退优先微软雅黑。
+- 验证：`build/flutter-tests-1.0.22-final.log` **275 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + 严格签名校验、DMG；iOS Runner.app/IPA 版本 1.0.22（75）；Windows CI **41157390012** 成功（Release 构建、启动冒烟、Inno Setup、Rust cargo 测试），安装包 1.0.22（75）。
+- 未执行/限制：分屏拖拽/分隔条、广播多真实 SSH 会话、Touch ID/Face ID、Windows 安装升级与 GitHub 更新下载均未在真机/真实网络点击验收；仅完成代码、单元/组件测试与构建级验证。Cloud Term 剩余差距仍以 `docs/CLOUDTERM_FEATURE_AUDIT.md` 的“1.0.22 仍未完成”为准，不得宣称全功能等价或最终 V1.0。
