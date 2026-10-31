@@ -6,7 +6,7 @@
 
 - 收回：Windows 独立窗口通过 `desktop_multi_window` 单向通道把会话交还主窗口；主窗口校验 payload、恢复当前工作区标签并聚焦，Rust 连接不中断、不重连。收回失败会在原窗口重新接回并提示。
 - 同窗口多引擎共用 Rust 连接状态；主窗口未解锁或未注册通道时安全拒绝并回滚。
-- 验证：Flutter 全量 **280 项**通过；三端构建与发布证据见 1.0.25 记录；Windows 收回交互未在真实 Windows 桌面点击验收。
+- 验证：Flutter 全量 **280 项**通过（`build/flutter-tests-1.0.25.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41162577816](https://github.com/WuBarlynn/W-term/actions/runs/41162577816) 成功（构建/启动冒烟/安装包/Rust 测试）。Windows 收回交互未在真实 Windows 桌面点击验收。
 
 ## 1.0.24 按主机标签绑定固定命令（2026-10-31）
 

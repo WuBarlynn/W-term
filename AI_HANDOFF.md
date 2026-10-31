@@ -452,3 +452,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 固定命令：`PinnedCommand` 增加 `tag` 字段；在带标签的主机中固定选中命令时可选择全局、仅当前主机或某个主机标签；`forHost(hostId, tags:)` 按当前主机标签动态显示，标签固定不会出现在没有该标签的主机；持久化与去重包含 tag。
 - 验证：`build/flutter-tests-1.0.24.log` **278 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.24（77）；Windows CI 41160793313 成功（构建/启动冒烟/Inno Setup/Rust 测试），安装包 1.0.24（77）。
 - 未执行：标签绑定在真实多主机/真机点击验证；片段仍不能按标签过滤，右侧 Dock 未实现。Cloud Term 剩余差距以审计文档“1.0.24 仍未完成”为准。
+
+## 17. 1.0.25 Windows 独立窗口收回（2026-10-31）
+
+- 三端版本 **1.0.25（78）**；本地产物 `build/release-1.0.25/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.25 。
+- 收回：新增 `SessionHandoffPayload` 统一载荷；Windows 独立窗口在“收回主窗口”时先 `detachForHandoff`，再通过 `WindowMethodChannel('dev.wterm/window-recall', unidirectional)` 把连接 ID/快照/hostId 交还主引擎；主工作区注册处理器，恢复标签并聚焦主窗口，Rust 连接不重连。失败时原窗口重新 attach 并提示。
+- 主窗口未解锁（Workspace 未注册通道）时安全拒绝并回滚；macOS 原 native 收回路径复用同一载荷与解析逻辑，并补回 hostId 以恢复主机档案。
+- 验证：`build/flutter-tests-1.0.25.log` **280 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.25（78）；Windows CI 41162577816 成功（含 Windows 编译 WindowMethodChannel 路径、启动冒烟、Inno Setup、Rust 测试）。
+- 未执行：真实 Windows 双窗口收回点击、Windows 关闭保活/托盘组合、iPad 多窗口；Windows 收回只验证到编译与启动。Cloud Term 剩余差距以审计文档“1.0.25 仍未完成”为准。
