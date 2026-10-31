@@ -6,7 +6,7 @@
 
 - Windows：终端搜索、命令历史、系统监控、远程文本编辑、AI/片段/文件预览等硬编码 `Menlo`/`monospace` 区域增加 `monoFontFallback`，Windows 优先 Cascadia Mono，避免回退到微软雅黑造成列错位。
 - 链接下划线绘制增加渲染对象获取异常保护，布局切换帧直接跳过。
-- 验证：Flutter 全量 **301 项**通过；三端构建与发布证据见 1.0.39 记录；Windows 实机等宽显示未验收。
+- 验证：Flutter 全量 **301 项**通过（`build/flutter-tests-1.0.39.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41186496288](https://github.com/WuBarlynn/W-term/actions/runs/41186496288) 成功（构建/启动冒烟/静默安装卸载/Rust 测试）。Windows 实机等宽显示未验收。
 
 ## 1.0.38 Office 文本预览（2026-10-31）
 

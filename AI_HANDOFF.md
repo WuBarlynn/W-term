@@ -564,3 +564,11 @@ UI、实际桥接、测试、文档与双端构建。
 - 旧版 .doc/.xls/.ppt 仍走系统打开；临时文件在关闭预览后删除。
 - 验证：`build/flutter-tests-1.0.38.log` **301 项** Flutter 测试通过（含自建 ZIP 的 docx/xlsx/pptx 解析测试），`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.38（91）；Windows CI 41185043886 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
 - 未执行：真实 Office 文件（复杂表格、合并单元格、多工作表、加密文档）与三端真机渲染；Windows 实体机输入/自动更新仍待复测。
+
+## 31. 1.0.39 Windows 等宽字体回退与链接下划线加固（2026-10-31）
+
+- 三端版本 **1.0.39（92）**；本地产物 `build/release-1.0.39/`；发布 https://github.com/WuBarlynn/W-term/releases/tag/v1.0.39 。
+- 字体：新增 `monoFontFallback`（Cascadia Mono → SF Mono → Menlo → Consolas → monospace），应用到终端搜索、命令历史、系统监控、远程文本编辑、AI/片段/文件预览等仍硬编码 Menlo/monospace 的区域；Windows 不再回退到比例字体造成列错位。UI/终端主字体设置保持原样。
+- 链接下划线：获取 TerminalView 渲染对象时增加异常保护，布局切换帧直接跳过，避免新覆盖层在极早帧抛错。
+- 验证：`build/flutter-tests-1.0.39.log` **301 项** Flutter 测试通过，`flutter analyze` 无问题；macOS 自签名 Release + DMG；iOS IPA 1.0.39（92）；Windows CI 41186496288 成功（构建/启动冒烟/Inno Setup/静默安装卸载/Rust 测试）。
+- 未执行：Windows 实体机等宽字体/终端显示、链接下划线像素位置；Windows 输入与自动更新仍待用户复测。
