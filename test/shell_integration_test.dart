@@ -10,4 +10,18 @@ void main() {
     expect(shellDirectoryIntegrationCommand.contains('\x00'), isFalse);
     expect(shellDirectoryIntegrationCommand.length, lessThan(16384));
   });
+
+  test('fish directory integration uses a prompt event', () {
+    expect(fishDirectoryIntegrationCommand, contains('--on-event fish_prompt'));
+    expect(fishDirectoryIntegrationCommand, contains(r'\033]7;file://'));
+    expect(
+      shellDirectoryIntegrationCommandFor('fish'),
+      fishDirectoryIntegrationCommand,
+    );
+    expect(
+      shellDirectoryIntegrationCommandFor('bash'),
+      shellDirectoryIntegrationCommand,
+    );
+    expect(fishDirectoryIntegrationCommand.contains('\n'), isFalse);
+  });
 }

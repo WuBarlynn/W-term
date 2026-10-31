@@ -21,6 +21,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app/temporary_directory.dart';
 
@@ -772,23 +774,10 @@ class FilesPaneState extends State<FilesPane> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(entry.name),
-          content: SizedBox(
-            width: 600,
-            child: SingleChildScrollView(
-              child: SelectableText(
-                text,
-                style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('关闭'),
-            ),
-          ],
+        builder: (_) => _FilePreviewDialog(
+          title: entry.name,
+          text: text,
+          markdown: isMarkdownPreviewName(entry.name),
         ),
       );
     } catch (e) {
@@ -1332,4 +1321,98 @@ String formatSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KiB';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
+}
+
+bool isMarkdownPreviewName(String name) {
+  final lower = name.toLowerCase();
+  return lower.endsWith('.md') ||
+      lower.endsWith('.markdown') ||
+      lower.endsWith('.mdown');
+}
+
+class _FilePreviewDialog extends StatefulWidget {
+  final String title;
+  final String text;
+  final bool markdown;
+  const _FilePreviewDialog({
+    required this.title,
+    required this.text,
+    required this.markdown,
+  });
+  @override
+  State<_FilePreviewDialog> createState() => _FilePreviewDialogState();
+}
+
+class _FilePreviewDialogState extends State<_FilePreviewDialog> {
+  late bool preview = widget.markdown;
+
+  Future<void> _openLink(String? href) async {
+    final uri = href == null ? null : Uri.tryParse(href);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Row(
+        children: [
+          Expanded(child: Text(widget.title, overflow: TextOverflow.ellipsis)),
+          if (widget.markdown)
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: true, label: Text('预览')),
+                ButtonSegment(value: false, label: Text('源码')),
+              ],
+              selected: {preview},
+              onSelectionChanged: (value) =>
+                  setState(() => preview = value.first),
+            ),
+        ],
+      ),
+      content: SizedBox(
+        width: 640,
+        height: 520,
+        child: preview
+            ? Markdown(
+                data: widget.text,
+                selectable: true,
+                padding: const EdgeInsets.all(4),
+                styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                  codeblockDecoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: theme.colorScheme.primary,
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                ),
+                onTapLink: (_, href, _) => _openLink(href),
+              )
+            : SingleChildScrollView(
+                child: SelectableText(
+                  widget.text,
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 12,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('关闭'),
+        ),
+      ],
+    );
+  }
 }

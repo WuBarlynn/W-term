@@ -880,28 +880,32 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   Future<void> shellIntegration() async {
-    final ok = await showDialog<bool>(
+    final shell = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('启用目录上报'),
         content: const Text(
           '将向当前 shell 注入 OSC 7 提示符钩子，让文件面板跟随终端目录。'
-          '仅支持 bash/zsh，且只对当前会话生效；不会修改 .bashrc/.zshrc。',
+          '只对当前会话生效，不会修改 shell 启动文件。请选择远程 shell 类型。',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'fish'),
+            child: const Text('fish'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('启用'),
+            onPressed: () => Navigator.pop(context, 'posix'),
+            child: const Text('bash / zsh'),
           ),
         ],
       ),
     );
-    if (ok != true) return;
-    _sendInput('$shellDirectoryIntegrationCommand\n');
+    if (shell == null) return;
+    _sendInput('${shellDirectoryIntegrationCommandFor(shell)}\n');
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已发送目录上报设置；文件面板可开启跟随')));

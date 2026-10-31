@@ -48,7 +48,7 @@ class _WTermTerminal extends Terminal {
 /// any widget. Views can attach, move and detach without reconnecting.
 class TerminalSession extends ChangeNotifier {
   final String connectionId, host, username, hostId;
-  final _WTermTerminal terminal = _WTermTerminal(maxLines: 5000);
+  final Terminal terminal = _WTermTerminal(maxLines: 5000);
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
   final VoidCallback? onActivity;
@@ -299,7 +299,7 @@ class TerminalSession extends ChangeNotifier {
   /// independent of panes, which means splitting, moving or closing a pane can
   /// never disable broadcast.
   void _handleTerminalInput(String text) {
-    if (terminal.userInput) {
+    if ((terminal as _WTermTerminal).userInput) {
       sendInput(text);
     } else {
       send(text, record: false);
