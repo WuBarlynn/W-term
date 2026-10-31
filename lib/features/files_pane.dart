@@ -870,6 +870,7 @@ class FilesPaneState extends State<FilesPane> {
           title: '${entry.name}（文本预览）',
           text: 'Office 文本/表格预览，复杂排版、图片和公式不会保留。\n\n$text',
           markdown: false,
+          openPath: local,
         ),
       );
     } catch (e) {
@@ -1499,10 +1500,12 @@ class _FilePreviewDialog extends StatefulWidget {
   final String title;
   final String text;
   final bool markdown;
+  final String? openPath;
   const _FilePreviewDialog({
     required this.title,
     required this.text,
     required this.markdown,
+    this.openPath,
   });
   @override
   State<_FilePreviewDialog> createState() => _FilePreviewDialogState();
@@ -1574,6 +1577,16 @@ class _FilePreviewDialogState extends State<_FilePreviewDialog> {
               ),
       ),
       actions: [
+        if (widget.openPath != null &&
+            (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
+          TextButton.icon(
+            onPressed: () => Process.run(
+              Platform.isWindows ? 'explorer' : 'open',
+              [widget.openPath!],
+            ),
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: const Text('用系统应用打开'),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('关闭'),
