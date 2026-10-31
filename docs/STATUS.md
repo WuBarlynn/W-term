@@ -6,7 +6,7 @@
 
 - Windows 终端主字体 Cascadia Mono 缺失时，回退顺序改为 JetBrains Mono（内置）→ Consolas → Noto Sans SC → 微软雅黑，避免比例字体造成列错位；界面字体默认仍为微软雅黑。
 - 等宽回退链同时加入 JetBrains Mono。
-- 验证：Flutter 全量 **301 项**通过；三端构建与发布证据见 1.0.41 记录；Windows 实机字体未验收。
+- 验证：Flutter 全量 **301 项**通过（`build/flutter-tests-1.0.41.log`）；macOS 自签名 Release/DMG、iOS IPA 完成；Windows CI [41190183254](https://github.com/WuBarlynn/W-term/actions/runs/41190183254) 成功（构建/启动冒烟/静默安装卸载/Rust 测试）。Windows 实机字体未验收。
 
 ## 1.0.40 上传选项（2026-10-31）
 
