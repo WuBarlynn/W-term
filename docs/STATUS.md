@@ -8,7 +8,7 @@
 - 恢复历史版本时以所选版本内容创建新的同步提交，不改写远端提交历史、不强制推送。
 - 恢复要求当前无待处理批次、本机无未同步修改、远端分支未更新，并需在确认窗口批准。
 - 恢复后各记录版本号递增，后续普通同步与冲突处理继续沿用同一基线。
-- 验证：Flutter 全量 **322 项**、`flutter analyze` 无问题；Rust **121 项**普通测试（含新增历史恢复与既有 19 项忽略 fixture 测试）通过。
+- 验证：Flutter 全量 **322 项**、`flutter analyze` 无问题；Rust **121 项**普通测试（含新增历史恢复与既有 19 项忽略 fixture 测试）通过；macOS Apple Silicon 与 Intel 自签名 DMG、iOS IPA 完成；Windows CI [41246060530](https://github.com/WuBarlynn/W-term/actions/runs/41246060530) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.60 终端行高（2026-10-31）
 
