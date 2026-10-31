@@ -25,6 +25,10 @@ class PluginSettings extends ChangeNotifier {
   bool windowsHardwareInput = Platform.isWindows;
   bool linkUnderline = true;
   bool dragUpload = true;
+  bool compactTabs = false;
+  bool showFavoritesBar = true;
+  bool clickTabLocates = false;
+  bool restoreLayout = true;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -53,6 +57,10 @@ class PluginSettings extends ChangeNotifier {
               : Platform.isWindows;
           linkUnderline = value['linkUnderline'] != false;
           dragUpload = value['dragUpload'] != false;
+          compactTabs = value['compactTabs'] == true;
+          showFavoritesBar = value['showFavoritesBar'] != false;
+          clickTabLocates = value['clickTabLocates'] == true;
+          restoreLayout = value['restoreLayout'] != false;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -75,6 +83,10 @@ class PluginSettings extends ChangeNotifier {
     'windowsHardwareInput': windowsHardwareInput,
     'linkUnderline': linkUnderline,
     'dragUpload': dragUpload,
+    'compactTabs': compactTabs,
+    'showFavoritesBar': showFavoritesBar,
+    'clickTabLocates': clickTabLocates,
+    'restoreLayout': restoreLayout,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -95,6 +107,10 @@ class PluginSettings extends ChangeNotifier {
           : windowsHardwareInput,
       linkUnderlineNext: data['linkUnderline'] != false,
       dragUploadNext: data['dragUpload'] != false,
+      compactTabsNext: data['compactTabs'] == true,
+      showFavoritesBarNext: data['showFavoritesBar'] != false,
+      clickTabLocatesNext: data['clickTabLocates'] == true,
+      restoreLayoutNext: data['restoreLayout'] != false,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -111,6 +127,10 @@ class PluginSettings extends ChangeNotifier {
     bool? windowsHardwareInputNext,
     bool? linkUnderlineNext,
     bool? dragUploadNext,
+    bool? compactTabsNext,
+    bool? showFavoritesBarNext,
+    bool? clickTabLocatesNext,
+    bool? restoreLayoutNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -122,6 +142,10 @@ class PluginSettings extends ChangeNotifier {
     windowsHardwareInput = windowsHardwareInputNext ?? windowsHardwareInput;
     linkUnderline = linkUnderlineNext ?? linkUnderline;
     dragUpload = dragUploadNext ?? dragUpload;
+    compactTabs = compactTabsNext ?? compactTabs;
+    showFavoritesBar = showFavoritesBarNext ?? showFavoritesBar;
+    clickTabLocates = clickTabLocatesNext ?? clickTabLocates;
+    restoreLayout = restoreLayoutNext ?? restoreLayout;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -139,6 +163,10 @@ class PluginSettings extends ChangeNotifier {
         'windowsHardwareInput': windowsHardwareInput,
         'linkUnderline': linkUnderline,
         'dragUpload': dragUpload,
+        'compactTabs': compactTabs,
+        'showFavoritesBar': showFavoritesBar,
+        'clickTabLocates': clickTabLocates,
+        'restoreLayout': restoreLayout,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

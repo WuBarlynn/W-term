@@ -19,6 +19,7 @@ import '../features/proxy_dialog.dart';
 import '../features/plugin_settings_dialog.dart';
 import '../features/settings_dialog.dart';
 import '../features/onboarding_dialog.dart';
+import '../features/workspace_settings_dialog.dart';
 import '../features/terminal_appearance_dialog.dart';
 import '../features/auth_challenge_dialog.dart';
 import '../features/forwarding_dialog.dart';
@@ -1668,6 +1669,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     if (_restoredLayout) return;
     _restoredLayout = true;
     try {
+      if (!pluginSettings.restoreLayout) return;
       if (tabs.isNotEmpty || sessions.isNotEmpty) return;
       final file = await _layoutFile();
       if (!await file.exists()) return;
@@ -2682,6 +2684,18 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       ],
     ),
     SettingsSection(
+      title: '工作区',
+      icon: Icons.dashboard_customize_outlined,
+      entries: [
+        SettingsEntry(
+          action: 'workspace',
+          title: '工作区偏好',
+          subtitle: '标签密度、收藏栏、启动恢复与标签定位',
+          icon: Icons.dashboard_customize_outlined,
+        ),
+      ],
+    ),
+    SettingsSection(
       title: '连接与文件',
       icon: Icons.link,
       entries: [
@@ -2795,6 +2809,12 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
               context: context,
               builder: (_) => const PluginSettingsDialog(),
             );
+          } else if (action == 'workspace') {
+            await showDialog<void>(
+              context: context,
+              builder: (_) => const WorkspaceSettingsDialog(),
+            );
+            if (mounted) setState(() {});
           } else {
             await sidebarAction(action, false);
           }
@@ -3015,6 +3035,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           borderRadius: BorderRadius.circular(6),
           onTap: () {
             setState(() => selected = index);
+            if (pluginSettings.clickTabLocates && active?.hostId.isNotEmpty == true) {
+              hostPanelKey.currentState?.locateHost(active!.hostId);
+            }
             _scheduleLayoutSave();
           },
           onDoubleTap: () => _renameTab(tab),
@@ -3148,7 +3171,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
 
   Widget sessionBar(bool wide) => SizedBox(
     key: const ValueKey('session-bar'),
-    height: wide ? 36 : 44,
+    height: pluginSettings.compactTabs ? (wide ? 30 : 38) : (wide ? 36 : 44),
     child: Row(
       children: [
         if (!wide)
@@ -3311,7 +3334,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           if (!focusMode) ...[
-                            if (_favoriteHosts.isNotEmpty) ...[
+                            if (_favoriteHosts.isNotEmpty && pluginSettings.showFavoritesBar) ...[
                               _favoritesBar(),
                               const Divider(height: 1),
                             ],

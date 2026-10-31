@@ -50,6 +50,10 @@ void main() {
       'linkUnderline': false,
       'dragUpload': false,
       'maxUploadSizeMb': 64,
+      'compactTabs': true,
+      'showFavoritesBar': false,
+      'clickTabLocates': true,
+      'restoreLayout': false,
     });
     expect(store.jsonFormatter, isFalse);
     expect(store.commandCompletion, isFalse);
@@ -58,6 +62,10 @@ void main() {
     expect(store.linkUnderline, isFalse);
     expect(store.dragUpload, isFalse);
     expect(store.maxUploadSizeMb, 64);
+    expect(store.compactTabs, isTrue);
+    expect(store.showFavoritesBar, isFalse);
+    expect(store.clickTabLocates, isTrue);
+    expect(store.restoreLayout, isFalse);
     expect(store.toJson()['maxUploadSizeMb'], 64);
   });
 

@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+
+import '../app/errors.dart';
+import '../app/plugins.dart';
+
+class WorkspaceSettingsDialog extends StatefulWidget {
+  const WorkspaceSettingsDialog({super.key});
+
+  @override
+  State<WorkspaceSettingsDialog> createState() =>
+      _WorkspaceSettingsDialogState();
+}
+
+class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
+  late bool compactTabs = pluginSettings.compactTabs;
+  late bool showFavoritesBar = pluginSettings.showFavoritesBar;
+  late bool clickTabLocates = pluginSettings.clickTabLocates;
+  late bool restoreLayout = pluginSettings.restoreLayout;
+  bool saving = false;
+  String error = '';
+
+  Future<void> save() async {
+    setState(() {
+      saving = true;
+      error = '';
+    });
+    try {
+      await pluginSettings.save(
+        json: pluginSettings.jsonFormatter,
+        ip: pluginSettings.ipLookup,
+        preview: pluginSettings.filePreview,
+        completion: pluginSettings.commandCompletion,
+        notifications: pluginSettings.taskNotifications,
+        compactTabsNext: compactTabs,
+        showFavoritesBarNext: showFavoritesBar,
+        clickTabLocatesNext: clickTabLocates,
+        restoreLayoutNext: restoreLayout,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: const Text('工作区偏好'),
+    content: SizedBox(
+      width: 480,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: compactTabs,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => compactTabs = value),
+            title: const Text('紧凑标签栏'),
+            subtitle: const Text('降低标签高度，为终端留出更多空间。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showFavoritesBar,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => showFavoritesBar = value),
+            title: const Text('显示收藏栏'),
+            subtitle: const Text('在终端顶部显示收藏主机与数字快捷键。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: clickTabLocates,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => clickTabLocates = value),
+            title: const Text('点击标签定位连接'),
+            subtitle: const Text('切换标签时在主机列表中选择对应主机。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: restoreLayout,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => restoreLayout = value),
+            title: const Text('启动恢复上次布局'),
+            subtitle: const Text('下次启动以未连接窗格恢复标签、分屏与目录。'),
+          ),
+          if (error.isNotEmpty)
+            Text(
+              error,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: saving ? null : () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: saving ? null : save,
+        child: saving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('保存'),
+      ),
+    ],
+  );
+}

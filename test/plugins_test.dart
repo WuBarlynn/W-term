@@ -41,6 +41,10 @@ void main() {
       expect(store.jsonFormatter, isTrue);
       expect(store.windowsHardwareInput, isFalse);
       expect(store.dragUpload, isTrue);
+      expect(store.compactTabs, isFalse);
+      expect(store.showFavoritesBar, isTrue);
+      expect(store.clickTabLocates, isFalse);
+      expect(store.restoreLayout, isTrue);
       expect(store.maxUploadSizeMb, 0);
       expect(uploadTooLarge(101 * 1024 * 1024, 100), isTrue);
       expect(uploadTooLarge(100 * 1024 * 1024, 100), isFalse);
@@ -53,6 +57,10 @@ void main() {
         notifications: false,
         windowsHardwareInputNext: true,
         dragUploadNext: false,
+        compactTabsNext: true,
+        showFavoritesBarNext: false,
+        clickTabLocatesNext: true,
+        restoreLayoutNext: false,
         maxUploadSizeMbNext: 500,
       );
       final restored = PluginSettings(file: () async => file);
@@ -64,6 +72,10 @@ void main() {
       expect(restored.taskNotifications, isFalse);
       expect(restored.windowsHardwareInput, isTrue);
       expect(restored.dragUpload, isFalse);
+      expect(restored.compactTabs, isTrue);
+      expect(restored.showFavoritesBar, isFalse);
+      expect(restored.clickTabLocates, isTrue);
+      expect(restored.restoreLayout, isFalse);
       expect(restored.maxUploadSizeMb, 500);
     } finally {
       await dir.delete(recursive: true);
