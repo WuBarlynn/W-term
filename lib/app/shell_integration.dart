@@ -28,3 +28,7 @@ String shellCommandFinishedIntegrationCommandFor(String shell) =>
       'fish' => fishCommandFinishedIntegrationCommand,
       _ => bashCommandFinishedIntegrationCommand,
     };
+
+/// Portable across bash/zsh/fish: ask the current shell to report itself via
+/// OSC 9, which the terminal session parses without displaying anything.
+const shellProbeCommand = r'''printf '\033]9;shell;%s\007' "$SHELL"''';

@@ -90,6 +90,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   static const _imeChannel = MethodChannel('dev.wterm/biometrics');
   List<CommandCompletion> _completions = const [];
   String _completionSignature = '';
+  String? _pendingShellAction;
+  String? _lastReportedShell;
+  Timer? _shellProbeTimer;
   @override
   void initState() {
     super.initState();
@@ -103,6 +106,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.addInputListener(_inputObserved);
     widget.session.terminal.addListener(_markLinksDirty);
     _wasActive = widget.active;
+    _lastReportedShell = widget.session.reportedShell;
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _focus();
@@ -121,6 +125,9 @@ class _TerminalPaneState extends State<TerminalPane> {
       widget.session.addListener(sessionChanged);
       widget.session.addInputListener(_inputObserved);
       widget.session.terminal.addListener(_markLinksDirty);
+      _lastReportedShell = widget.session.reportedShell;
+      _shellProbeTimer?.cancel();
+      _pendingShellAction = null;
     }
     if (widget.active && !_wasActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
@@ -283,7 +290,67 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   void sessionChanged() {
+    final reported = widget.session.reportedShell;
+    if (reported != null && reported != _lastReportedShell) {
+      _lastReportedShell = reported;
+      _applyReportedShell();
+    }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _autoShellIntegration(String action) async {
+    if (widget.session.isLocal) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('本地终端不需要注入远程 shell 钩子')));
+      }
+      return;
+    }
+    _pendingShellAction = action;
+    _lastReportedShell = null;
+    _shellProbeTimer?.cancel();
+    _shellProbeTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || _pendingShellAction == null) return;
+      _pendingShellAction = null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('未能自动识别 shell，请重新打开菜单手动选择 bash/zsh/fish')),
+      );
+    });
+    widget.session.send('$shellProbeCommand\n');
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('正在检测当前 shell…')));
+    }
+  }
+
+  void _applyReportedShell() {
+    final action = _pendingShellAction;
+    final shell = widget.session.reportedShell;
+    if (action == null || shell == null) return;
+    _pendingShellAction = null;
+    _shellProbeTimer?.cancel();
+    if (shell != 'bash' && shell != 'zsh' && shell != 'fish') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('检测到 $shell，请重新打开菜单手动选择支持的 shell')),
+        );
+      }
+      return;
+    }
+    final command = action == 'directory'
+        ? shellDirectoryIntegrationCommandFor(shell)
+        : shellCommandFinishedIntegrationCommandFor(shell);
+    widget.session.send('$command\n');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '检测到 $shell，已发送${action == 'directory' ? '目录上报' : '命令完成通知'}钩子',
+          ),
+        ),
+      );
+    }
   }
 
   void appearanceChanged() {
@@ -974,6 +1041,10 @@ class _TerminalPaneState extends State<TerminalPane> {
             child: const Text('取消'),
           ),
           TextButton(
+            onPressed: () => Navigator.pop(context, 'auto'),
+            child: const Text('自动检测'),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(context, 'fish'),
             child: const Text('fish'),
           ),
@@ -985,6 +1056,10 @@ class _TerminalPaneState extends State<TerminalPane> {
       ),
     );
     if (shell == null) return;
+    if (shell == 'auto') {
+      await _autoShellIntegration('directory');
+      return;
+    }
     _sendInput('${shellDirectoryIntegrationCommandFor(shell)}\n');
     if (mounted) {
       ScaffoldMessenger.of(context)
@@ -1007,6 +1082,10 @@ class _TerminalPaneState extends State<TerminalPane> {
             child: const Text('取消'),
           ),
           TextButton(
+            onPressed: () => Navigator.pop(context, 'auto'),
+            child: const Text('自动检测'),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(context, 'fish'),
             child: const Text('fish'),
           ),
@@ -1022,6 +1101,10 @@ class _TerminalPaneState extends State<TerminalPane> {
       ),
     );
     if (shell == null) return;
+    if (shell == 'auto') {
+      await _autoShellIntegration('notify');
+      return;
+    }
     _sendInput('${shellCommandFinishedIntegrationCommandFor(shell)}\n');
     if (mounted) {
       ScaffoldMessenger.of(
@@ -1289,6 +1372,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     pinnedCommands.removeListener(sessionChanged);
     _copyTimer?.cancel();
     _highlightTimer?.cancel();
+    _shellProbeTimer?.cancel();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);

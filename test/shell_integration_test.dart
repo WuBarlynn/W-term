@@ -40,4 +40,10 @@ void main() {
       bashCommandFinishedIntegrationCommand,
     );
   });
+
+  test('shell probe reports the login shell through OSC 9', () {
+    expect(shellProbeCommand, contains(r'\033]9;shell;%s\007'));
+    expect(shellProbeCommand, contains(r'"$SHELL"'));
+    expect(shellProbeCommand.contains('\n'), isFalse);
+  });
 }

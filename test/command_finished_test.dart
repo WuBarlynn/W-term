@@ -16,6 +16,8 @@ void main() {
     expect(exits, [7, 0]);
     session.terminal.write('\x1b]7;file://host/tmp/dir\x07');
     expect(session.currentDirectory, '/tmp/dir');
+    session.terminal.write('\x1b]9;shell;/usr/bin/fish\x07');
+    expect(session.reportedShell, 'fish');
   });
 
   test('exact completion uses the finish marker and carries exit code', () {

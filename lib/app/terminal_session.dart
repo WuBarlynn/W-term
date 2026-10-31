@@ -79,6 +79,7 @@ class TerminalSession extends ChangeNotifier {
   String? _error;
   int? _lastColumns, _lastRows;
   String? currentDirectory;
+  String? reportedShell;
   static int _offlineSequence = 0;
 
   TerminalSession({
@@ -173,6 +174,14 @@ class TerminalSession extends ChangeNotifier {
   bool get isLocal => _local;
 
   void _handlePrivateOsc(String code, List<String> args) {
+    if (code == '9' && args.length >= 2 && args.first == 'shell') {
+      final path = args[1].trim();
+      if (path.isNotEmpty) {
+        reportedShell = path.split(RegExp(r'[/\\]')).last;
+        notifyListeners();
+      }
+      return;
+    }
     if (code == '133') {
       if (args.isNotEmpty && args.first == 'D') {
         final exitCode = args.length > 1 ? int.tryParse(args[1]) : null;
