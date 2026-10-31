@@ -251,18 +251,21 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   List<String> get _terminalFontFallback {
     final cjk = terminalAppearance.cjkFont.trim();
+    final windows = Theme.of(context).platform == TargetPlatform.windows;
     return [
       if (cjk.isNotEmpty) cjk,
-      'Noto Sans SC',
-      if (Theme.of(context).platform == TargetPlatform.windows) ...[
+      if (windows) ...[
         'Microsoft YaHei UI',
         'Microsoft YaHei',
+        'Noto Sans SC',
         'Consolas',
       ] else if (Theme.of(context).platform == TargetPlatform.macOS ||
           Theme.of(context).platform == TargetPlatform.iOS) ...[
         'PingFang SC',
+        'Noto Sans SC',
         'Menlo',
-      ],
+      ] else
+        'Noto Sans SC',
       'monospace',
     ];
   }

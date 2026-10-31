@@ -10,11 +10,45 @@ import '../src/rust/api/client.dart' as native;
 import 'command_history.dart';
 import 'errors.dart';
 
+/// Marks user-originated terminal input so broadcast never forwards protocol
+/// replies (device attributes, cursor reports, mouse reports) to other hosts.
+class _WTermTerminal extends Terminal {
+  _WTermTerminal({super.maxLines});
+  bool userInput = false;
+
+  T _mark<T>(T Function() action) {
+    userInput = true;
+    try {
+      return action();
+    } finally {
+      userInput = false;
+    }
+  }
+
+  @override
+  bool keyInput(
+    TerminalKey key, {
+    bool shift = false,
+    bool alt = false,
+    bool ctrl = false,
+  }) => _mark(() => super.keyInput(key, shift: shift, alt: alt, ctrl: ctrl));
+
+  @override
+  bool charInput(int charCode, {bool alt = false, bool ctrl = false}) =>
+      _mark(() => super.charInput(charCode, alt: alt, ctrl: ctrl));
+
+  @override
+  void textInput(String text) => _mark(() => super.textInput(text));
+
+  @override
+  void paste(String text) => _mark(() => super.paste(text));
+}
+
 /// Owns the terminal model, SSH output and session lifetime independently of
 /// any widget. Views can attach, move and detach without reconnecting.
 class TerminalSession extends ChangeNotifier {
   final String connectionId, host, username, hostId;
-  final Terminal terminal = Terminal(maxLines: 5000);
+  final _WTermTerminal terminal = _WTermTerminal(maxLines: 5000);
   final VoidCallback onEnded;
   final void Function(String command)? onCommand;
   final VoidCallback? onActivity;
@@ -37,6 +71,7 @@ class TerminalSession extends ChangeNotifier {
   StreamSubscription<String>? _localOutput;
   final bool _offline;
   final List<void Function(String text)> _inputListeners = [];
+
   /// Resolves the broadcast targets at input time so pane moves, tab changes
   /// and disconnects are always reflected without rebinding the terminal.
   List<TerminalSession> Function()? broadcastTargets;
@@ -263,12 +298,19 @@ class TerminalSession extends ChangeNotifier {
   /// the session so broadcast targets receive the same bytes. The routing is
   /// independent of panes, which means splitting, moving or closing a pane can
   /// never disable broadcast.
-  void _handleTerminalInput(String text) => sendInput(text);
+  void _handleTerminalInput(String text) {
+    if (terminal.userInput) {
+      sendInput(text);
+    } else {
+      send(text, record: false);
+    }
+  }
 
   void sendInput(String text, {bool record = true}) {
     if (_ended || _closed || text.isEmpty) return;
     send(text, record: record);
-    for (final target in broadcastTargets?.call() ?? const <TerminalSession>[]) {
+    for (final target
+        in broadcastTargets?.call() ?? const <TerminalSession>[]) {
       if (identical(target, this)) continue;
       target.send(text, record: false);
     }

@@ -238,8 +238,11 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                         : terminalFont.text.trim(),
                     fontFamilyFallback: [
                       if (cjkFont.text.trim().isNotEmpty) cjkFont.text.trim(),
+                      if (Theme.of(context).platform == TargetPlatform.windows)
+                        'Microsoft YaHei UI'
+                      else
+                        'PingFang SC',
                       'Noto Sans SC',
-                      'Microsoft YaHei',
                       'monospace',
                     ],
                   ),
