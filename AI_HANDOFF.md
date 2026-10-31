@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.49（102）**。
 - 快捷键新增 search/files/snippets/history/settings/local-terminal/clear/zoom-in/zoom-out/zoom-reset；终端内搜索、片段、清空、字号本地处理，其余回调 Workspace。
 - 字号缩放调用 `TerminalAppearance.save` 并写入外观文件。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **318 项**与 `flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41216908197](https://github.com/WuBarlynn/W-term/actions/runs/41216908197) 成功。发布包位于 `build/release-1.0.49/`。
 
 ## 41. 1.0.48 快捷键设置与完整文本导出（2026-10-31）
 

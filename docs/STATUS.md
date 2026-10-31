@@ -7,7 +7,7 @@
 - 快捷键页新增终端内搜索、打开/关闭文件传输、片段栏、命令历史、设置、本地终端、清空终端与字号放大/缩小/重置。
 - 终端内快捷键优先匹配用户录制绑定；收藏数字键保持固定。
 - 所有绑定继续随 GitHub 加密设置同步。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **318 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41216908197](https://github.com/WuBarlynn/W-term/actions/runs/41216908197) 成功。扩展快捷键仍待实机验收。
 
 ## 1.0.48 快捷键设置与完整文本导出（2026-10-31）
 
