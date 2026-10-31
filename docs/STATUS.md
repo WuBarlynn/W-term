@@ -7,7 +7,7 @@
 - 设置新增“工作区偏好”：紧凑标签栏、显示/隐藏收藏栏、点击标签定位连接、启动恢复上次布局。
 - 这些偏好写入插件设置文件，并随 GitHub 加密设置同步参与冲突审阅。
 - 收藏栏开关关闭后仍保留数字快捷键；点击标签定位仅在对应主机存在时执行。
-- 验证：Flutter 全量测试与 `flutter analyze` 通过；三端构建状态见下方记录。
+- 验证：Flutter 全量 **315 项**通过，`flutter analyze` 无问题；macOS 自签名 Release/DMG 与 iOS IPA 完成；Windows CI [41207268718](https://github.com/WuBarlynn/W-term/actions/runs/41207268718) 成功。工作区偏好的实机布局表现仍待验收。
 
 ## 1.0.44 新手引导、收藏栏与路径预览（2026-10-31）
 

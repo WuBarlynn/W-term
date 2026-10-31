@@ -592,7 +592,7 @@ UI、实际桥接、测试、文档与双端构建。
 - 三端版本 **1.0.45（98）**。
 - 新增 `WorkspaceSettingsDialog` 与插件设置字段 `compactTabs`、`showFavoritesBar`、`clickTabLocates`、`restoreLayout`；均随设置同步。
 - 紧凑标签高度：桌面 30、手机 38；收藏栏隐藏不取消数字快捷键；启动恢复可关闭。
-- 验证：Flutter 测试与 `flutter analyze` 通过；三端构建状态待发布记录补充。
+- 验证：Flutter **315 项**、`flutter analyze` 通过；macOS DMG、iOS IPA 完成；Windows CI [41207268718](https://github.com/WuBarlynn/W-term/actions/runs/41207268718) 成功。发布包位于 `build/release-1.0.45/`。
 
 ## 37. 1.0.44 新手引导、收藏栏、路径预览与 AI 设置同步（2026-10-31）
 
