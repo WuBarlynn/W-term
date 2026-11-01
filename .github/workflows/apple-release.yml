@@ -50,7 +50,7 @@ jobs:
             -passout pass:"$password"
           security import cert.p12 -k "$keychain" -P "$password" \
             -T /usr/bin/codesign
-          security add-trusted-cert -r trustRoot -k "$keychain" cert.pem
+          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain cert.pem
           security set-key-partition-list -S apple-tool:,apple: -s \
             -k "$password" "$keychain"
           security default-keychain -s "$keychain"
