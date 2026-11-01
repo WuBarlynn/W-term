@@ -167,7 +167,7 @@ class _VaultSettingsState extends State<VaultSettings> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('切换应用不会锁定保险库；完全退出后重新启动需要解锁。可在解锁页启用 Touch ID / Face ID。'),
+            const Text('切换应用不会锁定保险库；完全退出后重新启动需要解锁。可在解锁页启用 Touch ID / Face ID / Windows Hello。'),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('启动时自动解锁'),
