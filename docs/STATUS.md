@@ -9,7 +9,7 @@
 - 自定义皮肤支持实时预览、编辑、删除；取消编辑恢复原状态。背景图随 GitHub 加密设置同步，单图 ≤2 MiB、总数 ≤8 款、总背景 ≤6 MiB。
 - 手动切换界面明暗或终端配色会自动退出皮肤，恢复无背景状态。
 - 新手引导的皮肤列表包含已创建的自定义皮肤。
-- 验证：Flutter 全量 **334 项**与 `flutter analyze` 通过；三端 GitHub Actions 构建待执行。
+- 验证：Flutter 全量 **334 项**与 `flutter analyze` 通过；Windows CI [41282851695](https://github.com/WuBarlynn/W-term/actions/runs/41282851695) 与 Apple release CI [41282854884](https://github.com/WuBarlynn/W-term/actions/runs/41282854884) 成功，产物包含 `-arm64.dmg`、`-intel.dmg`、IPA、Windows 安装包与便携包。
 
 ## 1.0.71 Windows Hello、文件夹图标与发布命名（2026-10-31）
 
