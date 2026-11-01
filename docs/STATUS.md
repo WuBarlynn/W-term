@@ -6,7 +6,7 @@
 
 - 桌面托盘 / 菜单栏新增“连接”子菜单，列出最近 20 台保存主机，点击直接打开连接。
 - 托盘菜单新增本地终端、设置与 GitHub 同步入口；主机列表每分钟刷新。
-- 验证：`flutter analyze` 与 Flutter 全量测试通过。
+- 验证：`flutter analyze` 与 Flutter 全量 **329 项**通过；macOS 双架构 DMG、iOS IPA 完成；Windows CI [41263459806](https://github.com/WuBarlynn/W-term/actions/runs/41263459806) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.69 光标闪烁（2026-10-31）
 
