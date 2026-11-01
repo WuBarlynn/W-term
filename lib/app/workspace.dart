@@ -43,6 +43,7 @@ import 'auto_backup.dart';
 import 'system_notifications.dart';
 import 'sync_automation.dart';
 import 'deep_links.dart';
+import 'window_bridge.dart';
 import 'desktop_tray.dart';
 import '../features/hosts_page.dart';
 
@@ -2737,6 +2738,13 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         widget.onLock?.call();
       case 'focus':
         if (mounted) setState(() => focusMode = !focusMode);
+      case 'new-window':
+        final opened = await WindowBridge.openNewWindow();
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('当前设备不支持新建窗口')),
+          );
+        }
     }
   }
 
@@ -2789,6 +2797,15 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
           subtitle: '标签密度、收藏栏、启动恢复与标签定位',
           icon: Icons.dashboard_customize_outlined,
         ),
+        if (Theme.of(context).platform == TargetPlatform.iOS &&
+            MediaQuery.sizeOf(context).shortestSide >= 600)
+          SettingsEntry(
+            action: 'new-window',
+            title: '新建窗口',
+            subtitle: '在独立窗口中打开另一个工作区',
+            icon: Icons.open_in_new,
+            closeOnAction: true,
+          ),
       ],
     ),
     SettingsSection(

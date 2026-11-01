@@ -7,6 +7,8 @@ import UniformTypeIdentifiers
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var folderPicker: WTermFolderPicker?
   private var clipboardChannel: FlutterMethodChannel?
+  private static var sharedVaultToken: String?
+  private static var vaultWindowCount = 0
 
   override func application(
     _ application: UIApplication,
@@ -48,6 +50,57 @@ import UniformTypeIdentifiers
           return
         }
         result(UIFont.familyNames.sorted())
+      }
+    }
+
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WTermWindows") {
+      let channel = FlutterMethodChannel(name: "dev.wterm/windows", binaryMessenger: registrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "sharedVaultToken":
+          result(AppDelegate.sharedVaultToken)
+        case "retainVault":
+          guard let args = call.arguments as? [String: Any],
+                let token = args["token"] as? String,
+                !token.isEmpty,
+                token.count <= 128 else {
+            result(FlutterError(code: "vault_token", message: "保险库令牌无效", details: nil))
+            return
+          }
+          AppDelegate.sharedVaultToken = token
+          AppDelegate.vaultWindowCount += 1
+          result(nil)
+        case "releaseVault":
+          if AppDelegate.vaultWindowCount > 0 {
+            AppDelegate.vaultWindowCount -= 1
+          }
+          if AppDelegate.vaultWindowCount == 0 {
+            AppDelegate.sharedVaultToken = nil
+            result(true)
+          } else {
+            result(false)
+          }
+        case "clearVault":
+          AppDelegate.sharedVaultToken = nil
+          AppDelegate.vaultWindowCount = 0
+          result(nil)
+        case "newWindow":
+          let options = UIScene.ActivationRequestOptions()
+          if let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) {
+            options.requestingScene = scene
+          }
+          UIApplication.shared.requestSceneSessionActivation(
+            nil,
+            userActivity: nil,
+            options: options,
+            errorHandler: { _ in }
+          )
+          result(true)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
       }
     }
 

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wterm/app/host_store.dart';
 import 'package:wterm/app/quick_unlock.dart';
 import 'package:wterm/app/vault_store.dart';
+import 'package:wterm/app/workspace.dart';
 import 'package:wterm/features/vault_gate.dart';
 
 class FakeVault implements VaultSession {
@@ -45,10 +46,13 @@ class FakeVault implements VaultSession {
 class FakeService implements VaultService {
   bool hasVault = false, fail = false;
   final vault = FakeVault();
+  VaultSession? shared;
   Completer<VaultSession>? pending;
   final modes = <bool>[];
   @override
   Future<bool> exists() async => hasVault;
+  @override
+  Future<VaultSession?> openShared() async => shared;
   @override
   Future<VaultSession> open(String password, {required bool create}) async {
     modes.add(create);
@@ -115,6 +119,25 @@ void main() {
     }
     await tester.tap(find.text(create ? '创建并导入' : '解锁'));
   }
+
+  testWidgets('shared vault opens another window without a password', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final service = FakeService()
+      ..hasVault = true
+      ..shared = FakeVault();
+    await tester.pumpWidget(
+      MaterialApp(home: VaultGate(service: service)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Workspace), findsOneWidget);
+    expect(find.text('解锁'), findsNothing);
+    expect(service.modes, isEmpty);
+  });
 
   testWidgets(
     'creation imports legacy records once, locking clears workspace and passwords',

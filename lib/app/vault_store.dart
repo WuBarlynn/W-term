@@ -12,6 +12,7 @@ import 'snippet_store.dart';
 import 'sync_store.dart';
 import 'onboarding.dart';
 import 'proxy_store.dart';
+import 'window_bridge.dart';
 import '../src/rust/api/client.dart' show ServerIdentity;
 import '../src/rust/api/forward.dart' as forward_native;
 import '../src/rust/api/proxy.dart' as proxy_native;
@@ -20,6 +21,7 @@ import '../src/rust/api/sync.dart' as sync_native;
 abstract interface class VaultService {
   Future<bool> exists();
   Future<VaultSession> open(String password, {required bool create});
+  Future<VaultSession?> openShared();
 }
 
 abstract interface class VaultSession implements HostStore, FolderStore {
@@ -44,7 +46,22 @@ class NativeVaultService implements VaultService {
       password: password,
       create: create,
     );
+    await WindowBridge.retainVault(result.token);
     return NativeVaultSession(result.token, result.legacyImported);
+  }
+
+  @override
+  Future<VaultSession?> openShared() async {
+    final token = await WindowBridge.sharedVaultToken();
+    if (token == null) return null;
+    try {
+      await native.vaultRead(token: token, kind: 'hosts');
+    } catch (_) {
+      await WindowBridge.clearVault();
+      return null;
+    }
+    await WindowBridge.retainVault(token);
+    return NativeVaultSession(token, true);
   }
 }
 
@@ -582,5 +599,8 @@ class NativeVaultSession
   Future<void> deleteSnippet(String id) =>
       native.vaultDeleteSnippet(token: _token, id: id);
   @override
-  Future<void> lock() => native.vaultLock(token: _token);
+  Future<void> lock() async {
+    await WindowBridge.clearVault();
+    await native.vaultLock(token: _token);
+  }
 }

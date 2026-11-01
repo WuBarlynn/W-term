@@ -7,6 +7,7 @@ import '../app/app_version_label.dart';
 import '../app/quick_unlock.dart';
 import '../app/host_store.dart';
 import '../app/vault_store.dart';
+import '../app/window_bridge.dart';
 import '../app/workspace.dart';
 
 // Installed above the Navigator so route dialogs are covered as well.
@@ -62,6 +63,7 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
       confirmation = TextEditingController();
   VaultSession? session, openingSession;
   bool loading = true, exists = true, busy = false, hidden = false;
+  bool _retained = false;
   int generation = 0;
   Future<void>? pendingUnlock;
   String? error;
@@ -77,7 +79,20 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     generation++;
     final current = session ?? openingSession;
-    if (current != null) unawaited(current.lock().catchError((Object _) {}));
+    if (current != null) {
+      if (_retained) {
+        unawaited(
+          WindowBridge.releaseVault()
+              .then((shouldLock) async {
+                if (shouldLock) await current.lock();
+              })
+              .catchError((Object _) {}),
+        );
+      } else {
+        unawaited(current.lock().catchError((Object _) {}));
+      }
+    }
+    _retained = false;
     vaultPrivacy.value = false;
     password.clear();
     confirmation.clear();
@@ -89,6 +104,28 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
   Future<void> inspect() async {
     try {
       final found = await service.exists();
+      if (found && mounted) {
+        VaultSession? shared;
+        try {
+          shared = await service.openShared();
+        } catch (_) {
+          shared = null;
+        }
+        if (shared != null) {
+          if (!mounted) {
+            await shared.lock();
+            return;
+          }
+          _retained = true;
+          setState(() {
+            session = shared;
+            loading = false;
+            exists = true;
+            error = null;
+          });
+          return;
+        }
+      }
       final type = await quick.availableType();
       var enabled = false;
       try {
@@ -165,6 +202,7 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
       secret = biometric ? await quick.read() : password.text;
       if (!mounted || current != generation) return;
       opened = await service.open(secret, create: !exists);
+      _retained = true;
       openingSession = opened;
       password.clear();
       confirmation.clear();
@@ -265,6 +303,7 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
     }
     try {
       await previous?.lock();
+      _retained = false;
       await pendingUnlock;
       pendingUnlock = null;
       final found = await service.exists();
