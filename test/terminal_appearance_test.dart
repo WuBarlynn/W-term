@@ -134,6 +134,32 @@ void main() {
     restored.dispose();
   });
 
+  test('synced custom skins activate without dropping the background', () async {
+    final settings = TerminalAppearance(file: () async => file);
+    await settings.applySynced({
+      'palette': 'dark',
+      'fontSize': 13,
+      'skin': 'custom:remote',
+      'uiTheme': 'dark',
+      'customSkins': [
+        {
+          'id': 'remote',
+          'name': '远端皮肤',
+          'palette': 'auto',
+          'dark': true,
+          'seed': 0xff36c9a8,
+          'base': 0xff10231f,
+          'overlay': 0.2,
+          'background': 'AQID',
+        },
+      ],
+    });
+    expect(settings.skin, 'custom:remote');
+    expect(settings.activeSkinName, '远端皮肤');
+    expect(settings.activeSkinBackground, [1, 2, 3]);
+    settings.dispose();
+  });
+
   test('damaged or out of range preferences fall back to defaults', () async {
     for (final content in [
       '{broken',

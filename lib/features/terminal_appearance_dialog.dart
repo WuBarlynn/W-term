@@ -92,6 +92,18 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
     }
   }
 
+  String get _activeSkinLabel {
+    if (skin.startsWith('custom:')) {
+      final id = skin.substring(7);
+      return customSkins
+              .where((item) => item.id == id)
+              .firstOrNull
+              ?.name ??
+          '自定义皮肤';
+    }
+    return skin == 'none' ? '无皮肤' : (builtInSkins[skin]?.name ?? '无皮肤');
+  }
+
   Future<void> openSkinGallery() async {
     final result = await showDialog<SkinGalleryResult>(
       context: context,
@@ -327,7 +339,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
               OutlinedButton.icon(
                 onPressed: busy ? null : openSkinGallery,
                 icon: const Icon(Icons.dashboard_customize_outlined),
-                label: Text('皮肤库 · ${skin == 'none' ? '无皮肤' : skin}'),
+                label: Text('皮肤库 · $_activeSkinLabel'),
               ),
               const SizedBox(height: 8),
               const Align(
@@ -360,6 +372,36 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                               palette = entry.value.palette;
                               uiTheme = entry.value.dark ? 'dark' : 'light';
                             }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '主题预设',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final preset in const [
+                    ('深色', 'dark', 'dark'),
+                    ('浅色', 'light', 'light'),
+                    ('浅色界面 + 深色终端', 'dark', 'light'),
+                  ])
+                    OutlinedButton(
+                      onPressed: busy
+                          ? null
+                          : () => setState(() {
+                              palette = preset.$2;
+                              uiTheme = preset.$3;
+                              skin = 'none';
+                            }),
+                      child: Text(preset.$1),
                     ),
                 ],
               ),
