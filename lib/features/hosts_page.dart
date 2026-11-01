@@ -671,6 +671,95 @@ class HostsPageState extends State<HostsPage> {
     ),
   );
 
+  bool _canMoveFolder(String source, String target) {
+    if (source.isEmpty || target.isEmpty || source == target) return false;
+    return !source.startsWith('$target/');
+  }
+
+  Future<void> moveFolder(String source, String target) async {
+    final store = widget.store;
+    if (store is! FolderTreeStore || store is! FolderStore) return;
+    if (!_canMoveFolder(source, target) || saving) return;
+    final leaf = source.split('/').last;
+    final destination = '$target/$leaf';
+    if (folders.contains(destination)) {
+      setState(() => error = '目标文件夹已存在「$leaf」');
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final nextFolders = [
+        for (final value in folders)
+          value == source || value.startsWith('$source/')
+              ? '$destination${value.substring(source.length)}'
+              : value,
+      ];
+      final nextHosts = [
+        for (final host in hosts)
+          host.group == source || host.group.startsWith('$source/')
+              ? HostProfile.fromJson({...host.toJson(), 'group': '$destination${host.group.substring(source.length)}'})
+              : host,
+      ];
+      await (store as FolderStore).writeFolders(nextFolders);
+      await store.write(nextHosts);
+      unawaited(
+        folderIcons.renamePrefix(source, destination).catchError((Object _) {}),
+      );
+      final nextCollapsed = collapsed
+          .map(
+            (value) => value == source || value.startsWith('$source/')
+                ? '$destination${value.substring(source.length)}'
+                : value,
+          )
+          .toSet();
+      collapsed
+        ..clear()
+        ..addAll(nextCollapsed);
+      await load();
+    } catch (e) {
+      if (mounted) setState(() => error = userFacingError(e));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Widget folderDragRow(String path, Widget tile) {
+    if (path.isEmpty) return tile;
+    final draggable = Draggable<String>(
+      data: 'folder:$path',
+      feedback: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(path.split('/').last, style: const TextStyle(fontSize: 12)),
+        ),
+      ),
+      child: tile,
+    );
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.startsWith('folder:') &&
+          _canMoveFolder(details.data.substring(7), path),
+      onAcceptWithDetails: (details) {
+        final source = details.data.substring(7);
+        unawaited(moveFolder(source, path));
+      },
+      builder: (context, candidates, rejected) => DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: candidates.isNotEmpty
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: draggable,
+      ),
+    );
+  }
+
   List<Widget> tree(List<HostProfile> visible, bool ready) {
     final paths = <String>{};
     for (final path in {...folders, ...hosts.map((h) => h.group)}) {
@@ -693,7 +782,9 @@ class HostsPageState extends State<HostsPage> {
       if (filtered && matches.isEmpty) return;
       final open = !collapsed.contains(path) || filtered;
       widgets.add(
-        ListTile(
+        folderDragRow(
+          path,
+          ListTile(
           dense: true,
           visualDensity: VisualDensity.compact,
           contentPadding: EdgeInsets.only(left: 8 + depth * 12.0, right: 0),
@@ -755,6 +846,7 @@ class HostsPageState extends State<HostsPage> {
           onTap: () => setState(() {
             if (!collapsed.remove(path)) collapsed.add(path);
           }),
+        ),
         ),
       );
       if (!open) return;

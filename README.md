@@ -2,7 +2,7 @@
 
 W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持 macOS、iOS / iPadOS 与 Windows。界面使用 Flutter，连接、认证、终端流、传输与本地保险库由 Rust 核心处理。
 
-当前版本：**1.0.73 (126)**。
+当前版本：**1.0.74 (127)**。
 
 ## 功能
 
@@ -14,7 +14,7 @@ W Term 是一个基于 Flutter + Rust 的跨平台 SSH / SFTP 工作区，支持
 - 多级跳板路由，逐跳指纹、MFA、取消与整链清理。
 - 命名 HTTP CONNECT / SOCKS5 代理，支持继承、指定与直连。
 - 本地 `-L`、远程 `-R`、动态 SOCKS5 `-D` 端口转发与设备本地规则。
-- 主机文件夹（支持与 Cloud Term 一致的内置/在线图标）、标签、收藏、搜索、备注、启动命令与环境变量（连接时静默 SSH env 请求，失败回退 shell 导出）。
+- 主机文件夹（支持拖拽移动、与 Cloud Term 一致的内置/在线图标）、标签、收藏、搜索、备注、启动命令与环境变量（连接时静默 SSH env 请求，失败回退 shell 导出）。
 - CSV/TSV、PuTTY、SecureCRT、MobaXterm、Xshell、Excel 主机导入。
 
 ### 终端与工作区
