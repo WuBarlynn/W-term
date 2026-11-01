@@ -73,6 +73,28 @@ Cached:           200 kB
     expect(HostMetrics.parse('999% /'), isNull);
   });
 
+  test('network counters parse interfaces and compute rates', () {
+    const before = '''
+lo: 999 0 0 0 0 0 0 0 999 0 0 0 0 0 0 0
+eth0: 1000 1 0 0 0 0 0 0 200 1 0 0 0 0 0 0
+''';
+    const after = '''
+lo: 1999 0 0 0 0 0 0 0 1999 0 0 0 0 0 0 0
+eth0: 3048 2 0 0 0 0 0 0 1224 2 0 0 0 0 0 0
+''';
+    final first = NetworkCounters.parse(before);
+    final second = NetworkCounters.parse(after);
+    expect(first.interfaces.keys, ['eth0']);
+    final rates = second.ratesSince(
+      first,
+      const Duration(milliseconds: 1000),
+    );
+    expect(rates, contains('eth0'));
+    expect(rates, contains('2.0 KB/s'));
+    expect(rates, contains('1.0 KB/s'));
+    expect(NetworkCounters.parse('garbage'), isA<NetworkCounters>());
+  });
+
   test('docker container names are parsed and validated', () {
     const output = 'NAMES\tIMAGE\tSTATUS\n'
         'web-1\tnginx:latest\tUp 2 hours\n'

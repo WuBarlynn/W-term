@@ -347,6 +347,29 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
     }
   }
 
+  Future<String> _networkRates() async {
+    try {
+      const command = "sh -c 'cat /proc/net/dev 2>/dev/null'";
+      final first = NetworkCounters.parse(
+        await native.runCommand(
+          connectionId: widget.connectionId,
+          command: command,
+        ),
+      );
+      final watch = Stopwatch()..start();
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final second = NetworkCounters.parse(
+        await native.runCommand(
+          connectionId: widget.connectionId,
+          command: command,
+        ),
+      );
+      return second.ratesSince(first, watch.elapsed);
+    } catch (_) {
+      return '';
+    }
+  }
+
   Future<void> _load() async {
     final current = index;
     setState(() {
@@ -391,7 +414,14 @@ class _SystemMonitorDialogState extends State<SystemMonitorDialog> {
         connectionId: widget.connectionId,
         command: command,
       );
-      if (mounted) setState(() => output[current] = result);
+      var displayed = result;
+      if (current == 0) {
+        final network = await _networkRates();
+        if (network.isNotEmpty) {
+          displayed = '$result\n\n网卡流量（约 1 秒采样）\n$network';
+        }
+      }
+      if (mounted) setState(() => output[current] = displayed);
     } catch (e) {
       if (mounted) setState(() => error = userFacingError(e));
     } finally {

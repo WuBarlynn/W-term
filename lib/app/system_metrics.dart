@@ -83,11 +83,65 @@ class MonitorSample {
   const MonitorSample({required this.at, this.cpuPercent, this.memoryPercent});
 }
 
+class NetworkCounters {
+  final Map<String, (int rx, int tx)> interfaces;
+  const NetworkCounters(this.interfaces);
+
+  /// Parses Linux `/proc/net/dev`; loopback and malformed lines are ignored.
+  static NetworkCounters parse(String output) {
+    final values = <String, (int, int)>{};
+    for (final raw in output.split('\n')) {
+      final line = raw.trim();
+      final separator = line.indexOf(':');
+      if (separator <= 0) continue;
+      final name = line.substring(0, separator).trim();
+      if (name.isEmpty || name == 'lo') continue;
+      final fields = line
+          .substring(separator + 1)
+          .trim()
+          .split(RegExp(r'\s+'));
+      if (fields.length < 9) continue;
+      final rx = int.tryParse(fields[0]);
+      final tx = int.tryParse(fields[8]);
+      if (rx == null || tx == null || rx < 0 || tx < 0) continue;
+      values[name] = (rx, tx);
+    }
+    return NetworkCounters(values);
+  }
+
+  /// Returns one line per interface with positive deltas.
+  String ratesSince(NetworkCounters previous, Duration elapsed) {
+    final millis = elapsed.inMilliseconds.clamp(200, 60000);
+    final lines = <String>[];
+    for (final entry in interfaces.entries) {
+      final before = previous.interfaces[entry.key];
+      if (before == null) continue;
+      final rx = entry.value.$1 - before.$1;
+      final tx = entry.value.$2 - before.$2;
+      if (rx < 0 || tx < 0 || (rx == 0 && tx == 0)) continue;
+      lines.add(
+        '${entry.key}  ↓ ${_rate(rx, millis)}  ↑ ${_rate(tx, millis)}',
+      );
+    }
+    return lines.join('\n');
+  }
+
+  static String _rate(int bytes, int millis) {
+    final perSecond = bytes * 1000 / millis;
+    if (perSecond >= 1024 * 1024) {
+      return '${(perSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    }
+    if (perSecond >= 1024) {
+      return '${(perSecond / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${perSecond.toStringAsFixed(0)} B/s';
+  }
+}
+
 class HostMetrics {
   final double? load1;
   final int? diskUsedPercent;
   const HostMetrics({this.load1, this.diskUsedPercent});
-
   /// Parses `cat /proc/loadavg` or `sysctl -n vm.loadavg` plus `df -P /`.
   static HostMetrics? parse(String output) {
     double? load;
