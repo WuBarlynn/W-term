@@ -18,6 +18,7 @@ import 'plugin_settings_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -90,6 +91,10 @@ class _TerminalPaneState extends State<TerminalPane> {
   bool _wasActive = false;
   Timer? _copyTimer;
   String? _autoCopied;
+  Timer? _selectionMenuTimer;
+  OverlayEntry? _selectionMenuOverlay;
+  String _dismissedSelectionMenu = '';
+  bool _contextMenuOpen = false;
   final _inputTracker = TerminalInputTracker();
   Timer? _highlightTimer;
   static const _imeChannel = MethodChannel('dev.wterm/biometrics');
@@ -120,6 +125,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.addListener(sessionChanged);
     pinnedCommands.addListener(sessionChanged);
     controller.addListener(_selectionForCopy);
+    controller.addListener(_selectionForMenu);
     pluginSettings.addListener(_pluginSettingsChanged);
     keywordHighlights.addListener(_highlightSettingsChanged);
     focus.addListener(_imeFocusChanged);
@@ -173,6 +179,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (widget.active && !_wasActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus());
     }
+    if (!widget.active) _removeSelectionMenu();
     _wasActive = widget.active;
   }
 
@@ -212,6 +219,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   void _pluginSettingsChanged() {
+    if (!pluginSettings.selectionMenu) _removeSelectionMenu();
     if (!pluginSettings.commandCompletion) _refreshCompletions();
     if (pluginSettings.showMachineInfo &&
         _machineInfo.isEmpty &&
@@ -394,6 +402,151 @@ class _TerminalPaneState extends State<TerminalPane> {
         // A selection can be released together with its buffer range.
       }
     });
+  }
+
+  String _selectionSignature(BufferRange selection) =>
+      '${selection.begin.x},${selection.begin.y}-'
+      '${selection.end.x},${selection.end.y}';
+
+  void _selectionForMenu() {
+    _selectionMenuTimer?.cancel();
+    final selection = controller.selection;
+    if (selection == null) {
+      _dismissedSelectionMenu = '';
+      _removeSelectionMenu();
+      return;
+    }
+    if (!pluginSettings.selectionMenu ||
+        !widget.active ||
+        ended ||
+        _contextMenuOpen) {
+      _removeSelectionMenu();
+      return;
+    }
+    final signature = _selectionSignature(selection);
+    if (signature == _dismissedSelectionMenu) {
+      _removeSelectionMenu();
+      return;
+    }
+    _selectionMenuTimer = Timer(const Duration(milliseconds: 450), () {
+      final current = controller.selection;
+      if (!mounted || !widget.active || !pluginSettings.selectionMenu) return;
+      if (current == null || _selectionSignature(current) != signature) return;
+      _showSelectionMenu(current);
+    });
+  }
+
+  void _showSelectionMenu(BufferRange selection) {
+    final render = _terminalViewKey.currentState?.renderTerminal;
+    final text = widget.session.terminal.buffer.getText(selection).trim();
+    if (!mounted || render == null) return;
+    if (text.isEmpty) return;
+    _removeSelectionMenu();
+    final anchor = render.localToGlobal(render.getOffset(selection.end));
+    final media = MediaQuery.sizeOf(context);
+    final canPin = pluginSettings.selectionPin;
+    final canSnippet = widget.snippets != null && pluginSettings.selectionSnippet;
+    final canShare = pluginSettings.selectionShare;
+    final canJson = pluginSettings.jsonFormatter && isJsonText(text);
+    final canIp = pluginSettings.ipLookup && isIpv4(text);
+    final count =
+        1 +
+        (canPin ? 1 : 0) +
+        (canSnippet ? 1 : 0) +
+        (canShare ? 1 : 0) +
+        (canJson ? 1 : 0) +
+        (canIp ? 1 : 0);
+    final width = 8.0 + count * 40.0;
+    final left = anchor.dx
+        .clamp(8.0, math.max(8.0, media.width - width - 8.0))
+        .toDouble();
+    final above = anchor.dy - 52;
+    final top = above >= 8
+        ? above
+        : math.min(anchor.dy + 24, math.max(8.0, media.height - 56.0));
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _selectionMenuOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        left: left,
+        top: top,
+        child: TapRegion(
+          onTapOutside: (_) => _dismissSelectionMenu(),
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _selectionMenuButton(Icons.copy, '复制', copy),
+                if (canPin)
+                  _selectionMenuButton(
+                    Icons.push_pin_outlined,
+                    '固定选中命令',
+                    pinSelection,
+                  ),
+                if (canSnippet)
+                  _selectionMenuButton(
+                    Icons.bookmark_add_outlined,
+                    '存为命令片段',
+                    saveSelectionAsSnippet,
+                  ),
+                if (canShare)
+                  _selectionMenuButton(
+                    Icons.ios_share,
+                    '分享为图片',
+                    shareImage,
+                  ),
+                if (canJson)
+                  _selectionMenuButton(
+                    Icons.data_object,
+                    '格式化选中 JSON',
+                    formatJson,
+                  ),
+                if (canIp)
+                  _selectionMenuButton(
+                    Icons.public,
+                    '查询选中 IP 归属',
+                    lookupSelectedIp,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_selectionMenuOverlay!);
+  }
+
+  Widget _selectionMenuButton(
+    IconData icon,
+    String tooltip,
+    Future<void> Function() action,
+  ) => IconButton(
+    tooltip: tooltip,
+    icon: Icon(icon, size: 18),
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+    onPressed: () async {
+      _dismissSelectionMenu();
+      await action();
+    },
+  );
+
+  void _dismissSelectionMenu() {
+    final selection = controller.selection;
+    if (selection != null) {
+      _dismissedSelectionMenu = _selectionSignature(selection);
+    }
+    _removeSelectionMenu();
+  }
+
+  void _removeSelectionMenu() {
+    _selectionMenuTimer?.cancel();
+    _selectionMenuOverlay?.remove();
+    _selectionMenuOverlay = null;
   }
 
   bool get ended => widget.session.ended;
@@ -1694,6 +1847,8 @@ class _TerminalPaneState extends State<TerminalPane> {
     widget.session.removeListener(sessionChanged);
     pinnedCommands.removeListener(sessionChanged);
     _copyTimer?.cancel();
+    _selectionMenuTimer?.cancel();
+    _selectionMenuOverlay?.remove();
     _highlightTimer?.cancel();
     _shellProbeTimer?.cancel();
     _statusTimer?.cancel();
@@ -1701,6 +1856,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _cursorTimer?.cancel();
     compose.dispose();
     controller.removeListener(_selectionForCopy);
+    controller.removeListener(_selectionForMenu);
     pluginSettings.removeListener(_pluginSettingsChanged);
     keywordHighlights.removeListener(_highlightSettingsChanged);
     focus.removeListener(_imeFocusChanged);
@@ -1997,6 +2153,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                                       fontFamilyFallback: _terminalFontFallback,
                                     ),
                                     onSecondaryTapDown: (details, _) async {
+                                      _dismissSelectionMenu();
                                       if (pluginSettings.rightClickPaste) {
                                         await paste();
                                         return;
@@ -2014,6 +2171,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                                       final canLookupIp =
                                           pluginSettings.ipLookup &&
                                           isIpv4(selectedTerminalText);
+                                      _contextMenuOpen = true;
                                       final selected = await showMenu<String>(
                                         context: context,
                                         position: RelativeRect.fromLTRB(
@@ -2087,6 +2245,7 @@ class _TerminalPaneState extends State<TerminalPane> {
                                           ),
                                         ],
                                       );
+                                      _contextMenuOpen = false;
                                       if (selected == 'copy') {
                                         await copy();
                                       } else if (selected == 'copy-all') {

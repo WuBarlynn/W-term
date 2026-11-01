@@ -4,6 +4,7 @@ import 'package:wterm/app/pinned_commands.dart';
 import 'package:wterm/app/plugins.dart';
 import 'package:wterm/app/terminal_session.dart';
 import 'package:wterm/features/terminal_pane.dart';
+import 'package:xterm/xterm.dart';
 
 class _RoutingSession extends TerminalSession {
   _RoutingSession()
@@ -12,6 +13,11 @@ class _RoutingSession extends TerminalSession {
 
   @override
   void sendInput(String text, {bool record = true}) => inputs.add(text);
+}
+
+class _LiveSession extends _RoutingSession {
+  @override
+  bool get ended => false;
 }
 
 void main() {
@@ -54,6 +60,72 @@ void main() {
     );
     await tester.pump();
     expect(find.byTooltip('dockcmd'), findsOneWidget);
+  });
+
+  testWidgets('selecting terminal text opens the selection actions menu', (
+    tester,
+  ) async {
+    final previous = (
+      pluginSettings.selectionMenu,
+      pluginSettings.jsonFormatter,
+      pluginSettings.ipLookup,
+      pluginSettings.selectionPin,
+      pluginSettings.selectionSnippet,
+      pluginSettings.selectionShare,
+    );
+    pluginSettings
+      ..selectionMenu = true
+      ..jsonFormatter = true
+      ..ipLookup = true
+      ..selectionPin = false
+      ..selectionSnippet = false
+      ..selectionShare = false;
+    addTearDown(() {
+      pluginSettings
+        ..selectionMenu = previous.$1
+        ..jsonFormatter = previous.$2
+        ..ipLookup = previous.$3
+        ..selectionPin = previous.$4
+        ..selectionSnippet = previous.$5
+        ..selectionShare = previous.$6;
+    });
+    final session = _LiveSession();
+    session.terminal.write('{"a":1} 1.2.3.4\r\n');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalPane(session: session, active: true, onActivate: () {}),
+        ),
+      ),
+    );
+    await tester.pump();
+    final view = find.byType(TerminalView);
+    expect(view, findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    final controller = tester.widget<TerminalView>(view).controller!;
+    final buffer = session.terminal.buffer;
+    var line = -1;
+    for (var index = 0; index < buffer.lines.length; index++) {
+      if (buffer.lines[index].getText().contains('1.2.3.4')) {
+        line = index;
+        break;
+      }
+    }
+    expect(line, greaterThanOrEqualTo(0));
+    controller.setSelection(
+      buffer.createAnchorFromOffset(CellOffset(0, line)),
+      buffer.createAnchorFromOffset(CellOffset(8, line)),
+    );
+    expect(buffer.getText(controller.selection!).trim(), '{"a":1}');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    expect(find.byTooltip('复制'), findsOneWidget);
+    expect(find.byTooltip('格式化选中 JSON'), findsOneWidget);
+    expect(find.byTooltip('查询选中 IP 归属'), findsNothing);
+    expect(find.byTooltip('固定选中命令'), findsNothing);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('link underlines render over terminal output', (tester) async {

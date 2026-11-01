@@ -54,6 +54,7 @@ class PluginSettings extends ChangeNotifier {
   bool selectionPin = true;
   bool selectionSnippet = true;
   bool selectionShare = true;
+  bool selectionMenu = true;
   int maxUploadSizeMb = 0;
   bool loaded = false;
 
@@ -98,6 +99,7 @@ class PluginSettings extends ChangeNotifier {
           selectionPin = value['selectionPin'] != false;
           selectionSnippet = value['selectionSnippet'] != false;
           selectionShare = value['selectionShare'] != false;
+          selectionMenu = value['selectionMenu'] != false;
           final maxUpload = value['maxUploadSizeMb'];
           maxUploadSizeMb = maxUpload is int ? maxUpload.clamp(0, 10240) : 0;
         }
@@ -133,6 +135,7 @@ class PluginSettings extends ChangeNotifier {
     'selectionPin': selectionPin,
     'selectionSnippet': selectionSnippet,
     'selectionShare': selectionShare,
+    'selectionMenu': selectionMenu,
     'maxUploadSizeMb': maxUploadSizeMb,
   };
 
@@ -169,6 +172,7 @@ class PluginSettings extends ChangeNotifier {
       selectionPinNext: data['selectionPin'] != false,
       selectionSnippetNext: data['selectionSnippet'] != false,
       selectionShareNext: data['selectionShare'] != false,
+      selectionMenuNext: data['selectionMenu'] != false,
       maxUploadSizeMbNext: maxUpload is int
           ? maxUpload.clamp(0, 10240)
           : maxUploadSizeMb,
@@ -198,6 +202,7 @@ class PluginSettings extends ChangeNotifier {
     bool? selectionPinNext,
     bool? selectionSnippetNext,
     bool? selectionShareNext,
+    bool? selectionMenuNext,
     int? maxUploadSizeMbNext,
   }) async {
     jsonFormatter = json;
@@ -224,6 +229,7 @@ class PluginSettings extends ChangeNotifier {
     selectionPin = selectionPinNext ?? selectionPin;
     selectionSnippet = selectionSnippetNext ?? selectionSnippet;
     selectionShare = selectionShareNext ?? selectionShare;
+    selectionMenu = selectionMenuNext ?? selectionMenu;
     maxUploadSizeMb = (maxUploadSizeMbNext ?? maxUploadSizeMb).clamp(0, 10240);
     notifyListeners();
     final file = await _file();
@@ -254,6 +260,7 @@ class PluginSettings extends ChangeNotifier {
         'selectionPin': selectionPin,
         'selectionSnippet': selectionSnippet,
         'selectionShare': selectionShare,
+        'selectionMenu': selectionMenu,
         'maxUploadSizeMb': maxUploadSizeMb,
       }),
       flush: true,

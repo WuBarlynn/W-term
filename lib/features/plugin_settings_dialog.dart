@@ -27,6 +27,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
   late bool selectionPin = pluginSettings.selectionPin;
   late bool selectionSnippet = pluginSettings.selectionSnippet;
   late bool selectionShare = pluginSettings.selectionShare;
+  late bool selectionMenu = pluginSettings.selectionMenu;
   late int maxUploadSizeMb = pluginSettings.maxUploadSizeMb;
   bool saving = false;
   String? error;
@@ -51,6 +52,7 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
         selectionPinNext: selectionPin,
         selectionSnippetNext: selectionSnippet,
         selectionShareNext: selectionShare,
+        selectionMenuNext: selectionMenu,
         maxUploadSizeMbNext: maxUploadSizeMb,
       );
       if (notifications) unawaited(systemNotifications.setup());
@@ -148,6 +150,14 @@ class _PluginSettingsDialogState extends State<PluginSettingsDialog> {
             onChanged: saving
                 ? null
                 : (value) => setState(() => maxUploadSizeMb = value ?? 0),
+          ),
+          SwitchListTile(
+            value: selectionMenu,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => selectionMenu = value),
+            title: const Text('划词快捷菜单'),
+            subtitle: const Text('选中终端文本后显示复制、固定、片段、分享与 IP/JSON 入口'),
           ),
           SwitchListTile(
             value: selectionPin,
