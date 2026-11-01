@@ -68,6 +68,7 @@ void main() {
       nextCustomColors: colors,
       nextCopyOnSelect: true,
       nextCursorStyle: 'verticalBar',
+      nextCursorBlink: true,
       nextLineHeight: 1.6,
       nextFontWeight: 'semibold',
       nextBottomPadding: 24,
@@ -82,6 +83,7 @@ void main() {
     expect(restored.palette, 'custom');
     expect(restored.copyOnSelect, isTrue);
     expect(restored.cursorStyle, 'verticalBar');
+    expect(restored.cursorBlink, isTrue);
     expect(restored.lineHeight, 1.6);
     expect(restored.fontWeight, 'semibold');
     expect(restored.terminalFontWeight, FontWeight.w600);

@@ -151,6 +151,7 @@ class TerminalAppearance extends ChangeNotifier {
   String fontWeight = 'normal';
   bool copyOnSelect = false;
   String cursorStyle = 'block';
+  bool cursorBlink = false;
   int bottomPadding = 0;
   int scrollback = 5000;
   bool uiToneFollowsTerminal = false;
@@ -408,6 +409,7 @@ class TerminalAppearance extends ChangeNotifier {
         fontSize = storedSize;
       }
       copyOnSelect = value['copyOnSelect'] == true;
+      cursorBlink = value['cursorBlink'] == true;
       uiToneFollowsTerminal = value['uiToneFollowsTerminal'] == true;
       final storedCursor = value['cursorStyle'];
       if (storedCursor is String &&
@@ -454,6 +456,7 @@ class TerminalAppearance extends ChangeNotifier {
     'customColors': customColors,
     'copyOnSelect': copyOnSelect,
     'cursorStyle': cursorStyle,
+    'cursorBlink': cursorBlink,
     'bottomPadding': bottomPadding,
     'scrollback': scrollback,
     'uiToneFollowsTerminal': uiToneFollowsTerminal,
@@ -512,6 +515,7 @@ class TerminalAppearance extends ChangeNotifier {
       nextCursorStyle: data['cursorStyle'] is String
           ? data['cursorStyle'] as String
           : cursorStyle,
+      nextCursorBlink: data['cursorBlink'] == true,
       nextLineHeight: data['lineHeight'] is num
           ? (data['lineHeight'] as num).toDouble()
           : lineHeight,
@@ -540,6 +544,7 @@ class TerminalAppearance extends ChangeNotifier {
     Map<String, int>? nextCustomColors,
     bool? nextCopyOnSelect,
     String? nextCursorStyle,
+    bool? nextCursorBlink,
     double? nextLineHeight,
     String? nextFontWeight,
     int? nextBottomPadding,
@@ -588,6 +593,7 @@ class TerminalAppearance extends ChangeNotifier {
           'customColors': nextColors,
           'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
           'cursorStyle': nextCursor,
+          'cursorBlink': nextCursorBlink ?? cursorBlink,
           'lineHeight': nextLine,
           'fontWeight': nextWeight,
           'bottomPadding': nextPadding,
@@ -608,6 +614,7 @@ class TerminalAppearance extends ChangeNotifier {
       customColors = Map.unmodifiable(nextColors);
       copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
       cursorStyle = nextCursor;
+      cursorBlink = nextCursorBlink ?? cursorBlink;
       lineHeight = nextLine;
       fontWeight = nextWeight;
       bottomPadding = nextPadding;

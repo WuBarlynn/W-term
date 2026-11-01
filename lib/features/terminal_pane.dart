@@ -104,6 +104,8 @@ class _TerminalPaneState extends State<TerminalPane> {
   final _connectedAt = DateTime.now();
   String _machineInfo = '';
   Timer? _infoTimer;
+  Timer? _cursorTimer;
+  bool _cursorVisible = true;
   double? _cpuPercent, _memoryPercent;
   double? _load1;
   int? _diskPercent;
@@ -123,6 +125,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     focus.addListener(_imeFocusChanged);
     widget.session.addInputListener(_inputObserved);
     widget.session.terminal.addListener(_markLinksDirty);
+    _updateCursorBlink();
     _wasActive = widget.active;
     _lastReportedShell = widget.session.reportedShell;
     if (!widget.session.isLocal) {
@@ -194,6 +197,18 @@ class _TerminalPaneState extends State<TerminalPane> {
       _completions = next;
       _completionSignature = signature;
     });
+  }
+
+  void _updateCursorBlink() {
+    _cursorTimer?.cancel();
+    _cursorTimer = null;
+    if (terminalAppearance.cursorBlink) {
+      _cursorTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted) setState(() => _cursorVisible = !_cursorVisible);
+      });
+    } else {
+      _cursorVisible = true;
+    }
   }
 
   void _pluginSettingsChanged() {
@@ -475,6 +490,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 
   void appearanceChanged() {
+    _updateCursorBlink();
     if (mounted) setState(() {});
   }
 
@@ -1679,6 +1695,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _shellProbeTimer?.cancel();
     _statusTimer?.cancel();
     _infoTimer?.cancel();
+    _cursorTimer?.cancel();
     compose.dispose();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
@@ -1964,6 +1981,9 @@ class _TerminalPaneState extends State<TerminalPane> {
                                         Theme.of(context).platform ==
                                             TargetPlatform.windows &&
                                         pluginSettings.windowsHardwareInput,
+                                    cursorVisible:
+                                        _cursorVisible ||
+                                        !terminalAppearance.cursorBlink,
                                     textStyle: TerminalStyle(
                                       fontSize: terminalAppearance.fontSize
                                           .toDouble(),

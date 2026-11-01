@@ -32,6 +32,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     required FocusNode focusNode,
     required TerminalCursorType cursorType,
     required bool alwaysShowCursor,
+    bool cursorVisible = true,
     EditableRectCallback? onEditableRect,
     String? composingText,
   })  : _terminal = terminal,
@@ -42,6 +43,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         _focusNode = focusNode,
         _cursorType = cursorType,
         _alwaysShowCursor = alwaysShowCursor,
+        _cursorVisible = cursorVisible,
         _onEditableRect = onEditableRect,
         _composingText = composingText,
         _painter = TerminalPainter(
@@ -130,6 +132,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   set alwaysShowCursor(bool value) {
     if (value == _alwaysShowCursor) return;
     _alwaysShowCursor = value;
+    markNeedsPaint();
+  }
+
+  bool _cursorVisible = true;
+  set cursorVisible(bool value) {
+    if (value == _cursorVisible) return;
+    _cursorVisible = value;
     markNeedsPaint();
   }
 
@@ -365,7 +374,8 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   }
 
   bool get _shouldShowCursor {
-    return _terminal.cursorVisibleMode || _alwaysShowCursor || _isComposingText;
+    return _cursorVisible &&
+        (_terminal.cursorVisibleMode || _alwaysShowCursor || _isComposingText);
   }
 
   double get _viewportHeight {

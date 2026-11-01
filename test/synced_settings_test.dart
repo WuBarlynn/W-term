@@ -24,6 +24,7 @@ void main() {
       'terminalFont': 'Menlo',
       'skin': 'aurora',
       'copyOnSelect': true,
+      'cursorBlink': true,
     });
     expect(store.palette, 'nord');
     expect(store.fontSize, 15);
@@ -33,6 +34,7 @@ void main() {
     expect(store.terminalFont, 'Menlo');
     expect(store.skin, 'aurora');
     expect(store.copyOnSelect, isTrue);
+    expect(store.cursorBlink, isTrue);
     expect(store.toJson()['palette'], 'nord');
     expect(File('${dir.path}/appearance.json').existsSync(), isTrue);
   });

@@ -27,6 +27,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String skin = widget.store.skin;
   late bool copyOnSelect = widget.store.copyOnSelect;
   late String cursorStyle = widget.store.cursorStyle;
+  late bool cursorBlink = widget.store.cursorBlink;
   late int bottomPadding = widget.store.bottomPadding;
   late int scrollback = widget.store.scrollback;
   late bool uiToneFollowsTerminal = widget.store.uiToneFollowsTerminal;
@@ -260,6 +261,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextCustomColors: customColors,
         nextCopyOnSelect: copyOnSelect,
         nextCursorStyle: cursorStyle,
+        nextCursorBlink: cursorBlink,
         nextLineHeight: lineHeight,
         nextFontWeight: fontWeight,
         nextBottomPadding: bottomPadding,
@@ -485,6 +487,15 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                     ? null
                     : (value) =>
                           setState(() => fontWeight = value ?? 'normal'),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('光标闪烁'),
+                subtitle: const Text('聚焦终端时每 0.5 秒切换光标显示'),
+                value: cursorBlink,
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => cursorBlink = value),
               ),
               DropdownButtonFormField<String>(
                 initialValue: cursorStyle,
