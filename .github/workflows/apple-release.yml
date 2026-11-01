@@ -50,10 +50,12 @@ jobs:
             -passout pass:"$password"
           security import cert.p12 -k "$keychain" -P "$password" \
             -T /usr/bin/codesign
+          security add-trusted-cert -r trustRoot -k "$keychain" cert.pem
           security set-key-partition-list -S apple-tool:,apple: -s \
             -k "$password" "$keychain"
           security default-keychain -s "$keychain"
           security list-keychains -d user -s "$keychain" login.keychain
+          security unlock-keychain -p "$password" "$keychain"
           security find-identity -v -p codesigning
       - name: Build Apple Silicon app
         run: bash scripts/build-macos-signed.sh
