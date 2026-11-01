@@ -60,8 +60,7 @@ class _ShortcutSettingsDialogState extends State<ShortcutSettingsDialog> {
                       '未设置',
                 ),
                 leading: Switch(
-                  value:
-                      shortcutSettings.bindings[action.id]?.enabled ?? false,
+                  value: shortcutSettings.bindings[action.id]?.enabled ?? false,
                   onChanged: saving
                       ? null
                       : (value) async {
@@ -93,14 +92,55 @@ class _ShortcutSettingsDialogState extends State<ShortcutSettingsDialog> {
             if (shortcutSettings.apple)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('其他终端内快捷键（搜索、粘贴、标签数字）保持固定。', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  '其他终端内快捷键（搜索、粘贴、标签数字）保持固定。',
+                  style: TextStyle(fontSize: 11),
+                ),
               )
             else
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('Windows 默认使用 Ctrl+Shift；其他终端内快捷键保持固定。', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  'Windows 默认使用 Ctrl+Shift；其他终端内快捷键保持固定。',
+                  style: TextStyle(fontSize: 11),
+                ),
               ),
             const SizedBox(height: 10),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              title: const Text(
+                'GNU Readline 快捷键速查',
+                style: TextStyle(fontSize: 13),
+              ),
+              subtitle: const Text(
+                'shell 自带的行编辑能力，不占用上方可录制快捷键。',
+                style: TextStyle(fontSize: 11),
+              ),
+              children: [
+                for (final (keys, action) in const [
+                  ('Ctrl+A / Ctrl+E', '行首 / 行尾'),
+                  ('Ctrl+B / Ctrl+F', '左移 / 右移一个字符'),
+                  ('Alt+B / Alt+F', '左移 / 右移一个单词'),
+                  ('Ctrl+U / Ctrl+K', '删除到行首 / 行尾'),
+                  ('Ctrl+W', '删除前一个单词'),
+                  ('Ctrl+Y', '粘贴最近删除内容'),
+                  ('Ctrl+R', '反向搜索历史'),
+                  ('Ctrl+L', '清屏'),
+                  ('Ctrl+C / Ctrl+D', '中断 / 结束输入'),
+                  ('Ctrl+P / Ctrl+N', '上一条 / 下一条历史'),
+                ])
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(keys),
+                    trailing: Text(
+                      action,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(

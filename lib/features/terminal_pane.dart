@@ -1272,9 +1272,11 @@ class _TerminalPaneState extends State<TerminalPane> {
       return;
     }
     final raw = widget.session.terminal.buffer.getText(selection);
-    String formatted;
+    String formatted, minified;
     try {
-      formatted = const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
+      final decoded = jsonDecode(raw);
+      formatted = const JsonEncoder.withIndent('  ').convert(decoded);
+      minified = jsonEncode(decoded);
     } on FormatException {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('选中的内容不是有效 JSON')));
@@ -1303,6 +1305,17 @@ class _TerminalPaneState extends State<TerminalPane> {
           TextButton(
             onPressed: () => Clipboard.setData(ClipboardData(text: formatted)),
             child: const Text('复制'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: minified));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已复制压缩后的 JSON')),
+                );
+              }
+            },
+            child: const Text('复制压缩'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
