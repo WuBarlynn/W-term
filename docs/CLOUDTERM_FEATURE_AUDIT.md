@@ -79,7 +79,7 @@
 - [~] GitHub Release 检查；SHA256SUMS 校验；Windows 静默安装/重启；macOS 下载并打开 DMG；iOS 无自动安装
 - [ ] Web 端
 - [x] macOS Apple Silicon 与 Intel 双架构 DMG；Windows 仍为 x64
-- [~] 桌面托盘/菜单栏、`wterm://connect` 深链接、固定全局快捷键、本地 Shell（桌面 PTY）已实现；输入法自动切换仍缺
+- [x] 桌面托盘/菜单栏（保存连接子菜单、本地终端、设置、GitHub 同步）、`wterm://connect` 深链接、固定全局快捷键、本地 Shell（桌面 PTY）；输入法自动切换在 macOS 实现，Windows 使用硬件键盘兼容模式
 
 ## 同步、账号与协作
 

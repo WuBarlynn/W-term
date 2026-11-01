@@ -4,11 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'host_store.dart';
+
 /// Requests a new connection after the tray menu asks the workspace to focus.
 final trayConnectRequests = ValueNotifier<int>(0);
+final trayHostConnectRequests = ValueNotifier<String>('');
+final trayLocalTerminalRequests = ValueNotifier<int>(0);
+final traySettingsRequests = ValueNotifier<int>(0);
+final traySyncRequests = ValueNotifier<int>(0);
 
 class DesktopTray with TrayListener {
   bool _ready = false;
+  List<HostProfile> _hosts = const [];
 
   bool get _supported =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
@@ -24,11 +31,57 @@ class DesktopTray with TrayListener {
         isTemplate: false,
       );
       await trayManager.setToolTip('W Term');
+      trayManager.addListener(this);
+      _ready = true;
+      await _rebuildMenu();
+    } catch (_) {
+      // Tray support is optional; macOS may hide icons without permission.
+    }
+  }
+
+  Future<void> updateHosts(List<HostProfile> hosts) async {
+    _hosts = hosts.take(20).toList();
+    if (!_ready) return;
+    await _rebuildMenu();
+  }
+
+  Future<void> _rebuildMenu() async {
+    if (!_ready) return;
+    final hosts = _hosts;
+    try {
       await trayManager.setContextMenu(
         Menu(
           items: [
             MenuItem(key: 'show', label: '显示 W Term', onClick: _clicked),
             MenuItem(key: 'new', label: '新建连接', onClick: _clicked),
+            MenuItem.submenu(
+              label: '连接',
+              submenu: Menu(
+                items: hosts.isEmpty
+                    ? [
+                        MenuItem(
+                          key: 'no-hosts',
+                          label: '暂无保存的连接',
+                          disabled: true,
+                        ),
+                      ]
+                    : [
+                        for (final host in hosts)
+                          MenuItem(
+                            key: 'host:${host.id}',
+                            label: host.name,
+                            onClick: _clicked,
+                          ),
+                      ],
+              ),
+            ),
+            MenuItem(
+              key: 'local-terminal',
+              label: '本地终端',
+              onClick: _clicked,
+            ),
+            MenuItem(key: 'settings', label: '设置', onClick: _clicked),
+            MenuItem(key: 'sync', label: 'GitHub 同步', onClick: _clicked),
             if (Platform.isMacOS || Platform.isWindows)
               MenuItem(
                 key: 'shortcut',
@@ -42,10 +95,8 @@ class DesktopTray with TrayListener {
           ],
         ),
       );
-      trayManager.addListener(this);
-      _ready = true;
     } catch (_) {
-      // Tray support is optional; macOS may hide icons without permission.
+      // Tray menus are optional.
     }
   }
 
@@ -59,12 +110,27 @@ class DesktopTray with TrayListener {
   }
 
   void _clicked(MenuItem item) {
+    final key = item.key ?? '';
+    if (key.startsWith('host:')) {
+      showWindow();
+      trayHostConnectRequests.value = key.substring(5);
+      return;
+    }
     switch (item.key) {
       case 'show':
         showWindow();
       case 'new':
         showWindow();
         trayConnectRequests.value++;
+      case 'local-terminal':
+        showWindow();
+        trayLocalTerminalRequests.value++;
+      case 'settings':
+        showWindow();
+        traySettingsRequests.value++;
+      case 'sync':
+        showWindow();
+        traySyncRequests.value++;
       case 'quit':
         quit();
     }

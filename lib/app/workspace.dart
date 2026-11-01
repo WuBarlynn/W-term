@@ -179,6 +179,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     shortcutSettings.addListener(_shortcutsChanged);
     taskMonitor.addListener(_taskCompleted);
     trayConnectRequests.addListener(_trayConnectRequested);
+    trayHostConnectRequests.addListener(_trayHostRequested);
+    trayLocalTerminalRequests.addListener(_trayLocalTerminalRequested);
+    traySettingsRequests.addListener(_traySettingsRequested);
+    traySyncRequests.addListener(_traySyncRequested);
     pendingDeepLink.addListener(_deepLinkReceived);
     const MethodChannel('dev.wterm/biometrics')
         .setMethodCallHandler(_handleNativeMethod);
@@ -191,6 +195,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       );
     }
     unawaited(_restoreLayout());
+    unawaited(_refreshTrayHosts());
+    _trayHostTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(_refreshTrayHosts()),
+    );
     if (supportsDesktopUpdates) {
       _updateTimer = Timer(const Duration(seconds: 6), _autoCheckUpdates);
     }
@@ -203,6 +212,11 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
     taskMonitor.removeListener(_taskCompleted);
     taskMonitor.cancelAll();
     trayConnectRequests.removeListener(_trayConnectRequested);
+    trayHostConnectRequests.removeListener(_trayHostRequested);
+    trayLocalTerminalRequests.removeListener(_trayLocalTerminalRequested);
+    traySettingsRequests.removeListener(_traySettingsRequested);
+    traySyncRequests.removeListener(_traySyncRequested);
+    _trayHostTimer?.cancel();
     pendingDeepLink.removeListener(_deepLinkReceived);
     const MethodChannel('dev.wterm/biometrics').setMethodCallHandler(null);
     if (Platform.isWindows) {
@@ -967,6 +981,42 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   void _trayConnectRequested() {
     if (!mounted || connecting) return;
     unawaited(connect());
+  }
+
+  Timer? _trayHostTimer;
+
+  Future<void> _refreshTrayHosts() async {
+    try {
+      final hosts = await hostStore.read();
+      await desktopTray.updateHosts(hosts);
+    } catch (_) {
+      // The tray is optional and must not affect the workspace.
+    }
+  }
+
+  void _trayHostRequested() {
+    final id = trayHostConnectRequests.value;
+    if (!mounted || connecting || id.isEmpty) return;
+    unawaited(_connectTrayHost(id));
+  }
+
+  Future<void> _connectTrayHost(String id) async {
+    try {
+      final host = (await hostStore.read()).where((h) => h.id == id).firstOrNull;
+      if (host != null && mounted) await connect(host);
+    } catch (_) {}
+  }
+
+  void _trayLocalTerminalRequested() {
+    if (mounted) unawaited(openLocalTerminal());
+  }
+
+  void _traySettingsRequested() {
+    if (mounted) unawaited(_openSettings(false));
+  }
+
+  void _traySyncRequested() {
+    if (mounted) unawaited(sidebarAction('sync', false));
   }
 
   Future<bool> _handleNativeMethod(MethodCall call) async {
