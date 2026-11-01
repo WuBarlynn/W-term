@@ -6,14 +6,14 @@
 
 - JSON 格式化弹窗新增“复制压缩”，直接复制单行压缩结果，同时保留原有的缩进复制。
 - 快捷键页新增 GNU Readline 速查：光标移动、删除、历史搜索、清屏与中断键位；该参考不占用可录制快捷键。
-- 验证：Flutter 全量 **342 项**与 `flutter analyze` 通过。
+- 验证：Flutter 全量 **342 项**与 `flutter analyze` 通过；Windows tag build [41297056956](https://github.com/WuBarlynn/W-term/actions/runs/41297056956) 与 Apple release [41297056931](https://github.com/WuBarlynn/W-term/actions/runs/41297056931) 生成三端产物。
 
 ## 1.0.78 划词菜单与 IP 增强（2026-11-01）
 
 - 选中终端文本后自动显示划词快捷菜单：复制、固定、存为片段、分享为图片；JSON/IP 入口按选区动态出现，触屏设备不再依赖右键。
 - 整个菜单可在插件设置关闭，固定/片段/分享按钮仍可分别裁剪；菜单定位自动避开屏幕边缘，失焦、切换标签、打开右键菜单或连接断开时自动收起，同一选区关闭后不会反复弹出。
 - IP 归属查询新增 ASN 与经纬度；局域网、回环、链路本地与运营商级 NAT 地址本地判定，不发送到第三方接口。
-- 验证：Flutter 全量 **342 项**与 `flutter analyze` 通过。
+- 验证：Flutter 全量 **342 项**与 `flutter analyze` 通过；Windows tag build [41296766063](https://github.com/WuBarlynn/W-term/actions/runs/41296766063) 与 Apple release [41296766006](https://github.com/WuBarlynn/W-term/actions/runs/41296766006) 生成三端产物。
 
 ## 1.0.77 传输恢复与选区识别（2026-11-01）
 
