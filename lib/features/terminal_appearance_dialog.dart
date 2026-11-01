@@ -9,6 +9,7 @@ import '../app/imported_fonts.dart';
 import '../app/terminal_appearance.dart';
 import '../app/errors.dart';
 import 'font_market_dialog.dart';
+import 'skin_gallery_dialog.dart';
 
 class TerminalAppearanceDialog extends StatefulWidget {
   final TerminalAppearance store;
@@ -25,6 +26,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
   late String fontWeight = widget.store.fontWeight;
   late String uiTheme = widget.store.uiTheme;
   late String skin = widget.store.skin;
+  late List<CustomSkin> customSkins = [...widget.store.customSkins];
   late bool copyOnSelect = widget.store.copyOnSelect;
   late String cursorStyle = widget.store.cursorStyle;
   late bool cursorBlink = widget.store.cursorBlink;
@@ -85,8 +87,38 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
       setState(() {
         customColors = result;
         palette = 'custom';
+        skin = 'none';
       });
     }
+  }
+
+  Future<void> openSkinGallery() async {
+    final result = await showDialog<SkinGalleryResult>(
+      context: context,
+      builder: (_) => SkinGalleryDialog(store: widget.store),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      customSkins = [...result.customSkins];
+      skin = result.skin;
+      final custom = result.skin.startsWith('custom:')
+          ? customSkins
+                .where((item) => item.id == result.skin.substring(7))
+                .firstOrNull
+          : null;
+      if (custom != null) {
+        palette = custom.palette == 'auto'
+            ? (custom.dark ? 'dark' : 'light')
+            : custom.palette;
+        uiTheme = custom.dark ? 'dark' : 'light';
+      } else {
+        final builtin = builtInSkins[result.skin];
+        if (builtin != null) {
+          palette = builtin.palette;
+          uiTheme = builtin.dark ? 'dark' : 'light';
+        }
+      }
+    });
   }
 
   bool busy = false;
@@ -258,6 +290,7 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
         nextTerminalFont: terminalFont.text.trim(),
         nextCjkFont: cjkFont.text.trim(),
         nextSkin: skin,
+        nextCustomSkins: customSkins,
         nextCustomColors: customColors,
         nextCopyOnSelect: copyOnSelect,
         nextCursorStyle: cursorStyle,
@@ -291,6 +324,12 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              OutlinedButton.icon(
+                onPressed: busy ? null : openSkinGallery,
+                icon: const Icon(Icons.dashboard_customize_outlined),
+                label: Text('皮肤库 · ${skin == 'none' ? '无皮肤' : skin}'),
+              ),
+              const SizedBox(height: 8),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -337,7 +376,10 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 ],
                 onChanged: busy
                     ? null
-                    : (value) => setState(() => palette = value ?? 'dark'),
+                    : (value) => setState(() {
+                        palette = value ?? 'dark';
+                        skin = 'none';
+                      }),
               ),
               const SizedBox(height: 4),
               Align(
@@ -359,7 +401,10 @@ class _TerminalAppearanceDialogState extends State<TerminalAppearanceDialog> {
                 ],
                 onChanged: busy
                     ? null
-                    : (value) => setState(() => uiTheme = value ?? 'system'),
+                    : (value) => setState(() {
+                        uiTheme = value ?? 'system';
+                        skin = 'none';
+                      }),
               ),
               const SizedBox(height: 12),
               _FontField(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,6 +98,38 @@ void main() {
       settings.save('custom', 15, nextCustomColors: const {'background': -1}),
       throwsArgumentError,
     );
+    settings.dispose();
+    restored.dispose();
+  });
+
+  test('custom skins persist with background and become the active skin', () async {
+    final settings = TerminalAppearance(file: () async => file);
+    final skin = CustomSkin(
+      id: 'custom-test',
+      name: '测试皮肤',
+      palette: 'auto',
+      dark: true,
+      seed: 0xff36c9a8,
+      base: 0xff10231f,
+      overlay: 0.3,
+      background: Uint8List.fromList([1, 2, 3, 4]),
+    );
+    await settings.save(
+      'dark',
+      13,
+      nextSkin: 'custom:custom-test',
+      nextCustomSkins: [skin],
+      nextUiTheme: 'dark',
+    );
+    expect(settings.hasSkin, isTrue);
+    expect(settings.activeSkinName, '测试皮肤');
+    expect(settings.activeSkinBackground, [1, 2, 3, 4]);
+    expect(settings.activeTheme.background.a, lessThan(1));
+    final restored = TerminalAppearance(file: () async => file);
+    await restored.load();
+    expect(restored.skin, 'custom:custom-test');
+    expect(restored.customSkins.single.name, '测试皮肤');
+    expect(restored.activeSkinOverlay, 0.3);
     settings.dispose();
     restored.dispose();
   });

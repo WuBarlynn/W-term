@@ -54,6 +54,7 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
         nextUiTheme: uiTheme,
         nextTerminalFont: terminalFont,
         nextSkin: skin,
+        nextCustomSkins: widget.appearance.customSkins,
         nextCopyOnSelect: copyOnSelect,
       );
       await widget.plugins.save(
@@ -142,7 +143,10 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
           ButtonSegment(value: 'light', label: Text('浅色')),
         ],
         selected: {uiTheme},
-        onSelectionChanged: (value) => setState(() => uiTheme = value.first),
+        onSelectionChanged: (value) => setState(() {
+          uiTheme = value.first;
+          skin = 'none';
+        }),
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -152,6 +156,11 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
           const DropdownMenuItem(value: 'none', child: Text('不使用皮肤')),
           for (final entry in builtInSkins.entries)
             DropdownMenuItem(value: entry.key, child: Text(entry.value.name)),
+          for (final item in widget.appearance.customSkins)
+            DropdownMenuItem(
+              value: 'custom:${item.id}',
+              child: Text(item.name),
+            ),
         ],
         onChanged: (value) => setState(() => skin = value ?? 'none'),
       ),
@@ -164,7 +173,10 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
             ChoiceChip(
               label: Text(entry.value),
               selected: palette == entry.key,
-              onSelected: (_) => setState(() => palette = entry.key),
+              onSelected: (_) => setState(() {
+                palette = entry.key;
+                skin = 'none';
+              }),
             ),
         ],
       ),

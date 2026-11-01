@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,6 +21,90 @@ class SkinDefinition {
     required this.top,
     required this.bottom,
   });
+}
+
+
+class CustomSkin {
+  static const maxBackgroundBytes = 2 * 1024 * 1024;
+  final String id, name, palette;
+  final bool dark;
+  final int seed, base;
+  final double overlay;
+  final Uint8List? background;
+
+  const CustomSkin({
+    required this.id,
+    required this.name,
+    required this.palette,
+    required this.dark,
+    required this.seed,
+    required this.base,
+    required this.overlay,
+    this.background,
+  });
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'palette': palette,
+    'dark': dark,
+    'seed': seed,
+    'base': base,
+    'overlay': overlay,
+    if (background != null) 'background': base64Encode(background!),
+  };
+
+  static CustomSkin? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['id'];
+    final name = raw['name'];
+    final palette = raw['palette'];
+    final dark = raw['dark'];
+    final seed = raw['seed'];
+    final base = raw['base'];
+    final overlay = raw['overlay'];
+    if (id is! String ||
+        !RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(id) ||
+        name is! String ||
+        name.trim().isEmpty ||
+        name.trim().length > 64 ||
+        !{ 'auto', ...TerminalAppearance.names.keys }.contains(palette) ||
+        dark is! bool ||
+        seed is! int ||
+        base is! int ||
+        seed < 0 ||
+        seed > 0xffffffff ||
+        base < 0 ||
+        base > 0xffffffff ||
+        overlay is! num ||
+        overlay < 0 ||
+        overlay > 0.6) {
+      return null;
+    }
+    Uint8List? background;
+    final encoded = raw['background'];
+    if (encoded != null) {
+      if (encoded is! String || encoded.length > maxBackgroundBytes * 2) {
+        return null;
+      }
+      try {
+        background = base64Decode(encoded);
+      } catch (_) {
+        return null;
+      }
+      if (background.length > maxBackgroundBytes) return null;
+    }
+    return CustomSkin(
+      id: id,
+      name: name.trim(),
+      palette: palette as String,
+      dark: dark,
+      seed: seed,
+      base: base,
+      overlay: overlay.toDouble(),
+      background: background,
+    );
+  }
 }
 
 const builtInSkins = <String, SkinDefinition>{
@@ -145,6 +230,7 @@ class TerminalAppearance extends ChangeNotifier {
   String palette = 'dark';
   String uiTheme = 'system';
   String skin = 'none';
+  List<CustomSkin> customSkins = const [];
   String uiFont = '', terminalFont = '', cjkFont = '';
   int fontSize = 13;
   double lineHeight = 1.2;
@@ -221,8 +307,90 @@ class TerminalAppearance extends ChangeNotifier {
     );
   }
 
-  TerminalTheme get activeTheme =>
-      palette == 'custom' ? customTheme(customColors) : themeFor(palette);
+  CustomSkin? get activeCustomSkin {
+    if (!skin.startsWith('custom:')) return null;
+    final id = skin.substring(7);
+    for (final item in customSkins) {
+      if (item.id == id) return item;
+    }
+    return null;
+  }
+
+  SkinDefinition? get activeBuiltInSkin => builtInSkins[skin];
+  bool get hasSkin => activeBuiltInSkin != null || activeCustomSkin != null;
+  bool get activeSkinDark =>
+      activeCustomSkin?.dark ?? activeBuiltInSkin?.dark ?? false;
+  int get activeSkinSeed =>
+      activeCustomSkin?.seed ?? activeBuiltInSkin?.seed ?? 0xff167768;
+  int get activeSkinTop =>
+      activeCustomSkin?.base ?? activeBuiltInSkin?.top ?? 0xff101820;
+  int get activeSkinBottom =>
+      activeCustomSkin?.base ?? activeBuiltInSkin?.bottom ?? 0xff101820;
+  double get activeSkinOverlay => activeCustomSkin?.overlay ?? 0.18;
+  Uint8List? get activeSkinBackground => activeCustomSkin?.background;
+  String get activeSkinName =>
+      activeCustomSkin?.name ?? activeBuiltInSkin?.name ?? '无皮肤';
+
+  TerminalTheme get activeTheme {
+    final custom = activeCustomSkin;
+    TerminalTheme base;
+    if (custom != null) {
+      if (custom.palette == 'auto') {
+        base = _autoGlassTheme(custom);
+      } else if (custom.palette == 'custom') {
+        base = customTheme(customColors);
+      } else {
+        base = themeFor(custom.palette);
+      }
+    } else if (activeBuiltInSkin != null) {
+      base = themeFor(activeBuiltInSkin!.palette);
+    } else {
+      base = palette == 'custom' ? customTheme(customColors) : themeFor(palette);
+    }
+    if (!hasSkin) return base;
+    return _copyTerminalTheme(
+      base,
+      background: base.background.withValues(alpha: 0.78),
+    );
+  }
+
+  TerminalTheme _autoGlassTheme(CustomSkin custom) {
+    final base = themeFor(custom.dark ? 'dark' : 'light');
+    return _copyTerminalTheme(
+      base,
+      background: Color(custom.base).withValues(alpha: 0.78),
+    );
+  }
+
+  TerminalTheme _copyTerminalTheme(
+    TerminalTheme source, {
+    Color? foreground,
+    Color? background,
+  }) => TerminalTheme(
+    cursor: source.cursor,
+    selection: source.selection,
+    foreground: foreground ?? source.foreground,
+    background: background ?? source.background,
+    black: source.black,
+    red: source.red,
+    green: source.green,
+    yellow: source.yellow,
+    blue: source.blue,
+    magenta: source.magenta,
+    cyan: source.cyan,
+    white: source.white,
+    brightBlack: source.brightBlack,
+    brightRed: source.brightRed,
+    brightGreen: source.brightGreen,
+    brightYellow: source.brightYellow,
+    brightBlue: source.brightBlue,
+    brightMagenta: source.brightMagenta,
+    brightCyan: source.brightCyan,
+    brightWhite: source.brightWhite,
+    searchHitBackground: source.searchHitBackground,
+    searchHitBackgroundCurrent: source.searchHitBackgroundCurrent,
+    searchHitForeground: source.searchHitForeground,
+  );
 
   static TerminalTheme themeFor(String palette) {
     if (palette == 'black') return TerminalThemes.whiteOnBlack;
@@ -372,9 +540,24 @@ class TerminalAppearance extends ChangeNotifier {
       final storedSize = value['fontSize'];
       final storedTheme = value['uiTheme'];
       final storedUiFont = value['uiFont'];
+      final storedCustomSkins = value['customSkins'];
+      if (storedCustomSkins is List) {
+        final parsed = <CustomSkin>[];
+        final ids = <String>{};
+        for (final raw in storedCustomSkins.take(8)) {
+          final item = CustomSkin.fromJson(raw);
+          if (item != null && ids.add(item.id)) parsed.add(item);
+        }
+        customSkins = List.unmodifiable(parsed);
+      }
       final storedSkin = value['skin'];
       if (storedSkin is String &&
-          (storedSkin == 'none' || builtInSkins.containsKey(storedSkin))) {
+          (storedSkin == 'none' ||
+              builtInSkins.containsKey(storedSkin) ||
+              (storedSkin.startsWith('custom:') &&
+                  customSkins.any(
+                    (item) => item.id == storedSkin.substring(7),
+                  )))) {
         skin = storedSkin;
       }
       final storedTerminalFont = value['terminalFont'];
@@ -453,6 +636,7 @@ class TerminalAppearance extends ChangeNotifier {
     'terminalFont': terminalFont,
     'cjkFont': cjkFont,
     'skin': skin,
+    'customSkins': customSkins.map((item) => item.toJson()).toList(),
     'customColors': customColors,
     'copyOnSelect': copyOnSelect,
     'cursorStyle': cursorStyle,
@@ -479,7 +663,25 @@ class TerminalAppearance extends ChangeNotifier {
       return;
     }
     final nextTheme = data['uiTheme'];
+    final rawCustomSkins = data['customSkins'];
+    final parsedCustomSkins = <CustomSkin>[];
+    if (rawCustomSkins is List) {
+      final ids = <String>{};
+      for (final raw in rawCustomSkins.take(8)) {
+        final item = CustomSkin.fromJson(raw);
+        if (item != null && ids.add(item.id)) parsedCustomSkins.add(item);
+      }
+    }
     final nextSkin = data['skin'];
+    final nextSkinValue = nextSkin is String &&
+            (nextSkin == 'none' ||
+                builtInSkins.containsKey(nextSkin) ||
+                (nextSkin.startsWith('custom:') &&
+                    parsedCustomSkins.any(
+                      (item) => item.id == nextSkin.substring(7),
+                    )))
+        ? nextSkin
+        : skin;
     final rawColors = data['customColors'];
     final colors = <String, int>{};
     if (rawColors is Map) {
@@ -506,10 +708,10 @@ class TerminalAppearance extends ChangeNotifier {
           ? data['terminalFont'] as String
           : terminalFont,
       nextCjkFont: data['cjkFont'] is String ? data['cjkFont'] as String : cjkFont,
-      nextSkin: nextSkin is String &&
-              (nextSkin == 'none' || builtInSkins.containsKey(nextSkin))
-          ? nextSkin
-          : skin,
+      nextSkin: nextSkinValue,
+      nextCustomSkins: rawCustomSkins is List
+          ? parsedCustomSkins
+          : customSkins,
       nextCustomColors: rawColors is Map ? colors : customColors,
       nextCopyOnSelect: data['copyOnSelect'] == true,
       nextCursorStyle: data['cursorStyle'] is String
@@ -541,6 +743,7 @@ class TerminalAppearance extends ChangeNotifier {
     String? nextTerminalFont,
     String? nextCjkFont,
     String? nextSkin,
+    List<CustomSkin>? nextCustomSkins,
     Map<String, int>? nextCustomColors,
     bool? nextCopyOnSelect,
     String? nextCursorStyle,
@@ -558,6 +761,7 @@ class TerminalAppearance extends ChangeNotifier {
     final nextPadding = (nextBottomPadding ?? bottomPadding).clamp(0, 64);
     final nextScroll = (nextScrollback ?? scrollback).clamp(1000, 100000);
     final nextColors = nextCustomColors ?? customColors;
+    final nextCustom = nextCustomSkins ?? customSkins;
     final validColors =
         nextColors.isEmpty ||
         nextColors.entries.every(
@@ -566,6 +770,11 @@ class TerminalAppearance extends ChangeNotifier {
               entry.value >= 0 &&
               entry.value <= 0xffffffff,
         );
+    final validSkin = nextSkin == null ||
+        nextSkin == 'none' ||
+        builtInSkins.containsKey(nextSkin) ||
+        (nextSkin.startsWith('custom:') &&
+            nextCustom.any((item) => item.id == nextSkin.substring(7)));
     if (!names.containsKey(nextPalette) ||
         nextSize < 10 ||
         nextSize > 28 ||
@@ -574,7 +783,14 @@ class TerminalAppearance extends ChangeNotifier {
         !fontWeights.containsKey(nextWeight) ||
         !{'system', 'dark', 'light'}.contains(nextMode) ||
         !{'block', 'underline', 'verticalBar'}.contains(nextCursor) ||
-        !validColors) {
+        !validColors ||
+        !validSkin ||
+        nextCustom.length > 8 ||
+        nextCustom.fold<int>(
+              0,
+              (total, item) => total + (item.background?.length ?? 0),
+            ) >
+            6 * 1024 * 1024) {
       return Future.error(ArgumentError('无效的终端外观设置'));
     }
     final operation = _pending.catchError((Object _) {}).then((_) async {
@@ -590,6 +806,7 @@ class TerminalAppearance extends ChangeNotifier {
           'terminalFont': nextTerminalFont ?? terminalFont,
           'cjkFont': nextCjkFont ?? cjkFont,
           'skin': nextSkin ?? skin,
+          'customSkins': nextCustom.map((item) => item.toJson()).toList(),
           'customColors': nextColors,
           'copyOnSelect': nextCopyOnSelect ?? copyOnSelect,
           'cursorStyle': nextCursor,
@@ -611,6 +828,7 @@ class TerminalAppearance extends ChangeNotifier {
       terminalFont = nextTerminalFont ?? terminalFont;
       cjkFont = nextCjkFont ?? cjkFont;
       skin = nextSkin ?? skin;
+      customSkins = List.unmodifiable(nextCustom);
       customColors = Map.unmodifiable(nextColors);
       copyOnSelect = nextCopyOnSelect ?? copyOnSelect;
       cursorStyle = nextCursor;

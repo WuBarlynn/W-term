@@ -10,6 +10,7 @@ import 'src/rust/frb_generated.dart';
 import 'features/detached_terminal.dart';
 import 'features/vault_gate.dart';
 import 'app/deep_links.dart';
+import 'app/skin_backdrop.dart';
 import 'app/system_notifications.dart';
 import 'app/desktop_tray.dart';
 import 'app/terminal_appearance.dart';
@@ -105,16 +106,36 @@ class WTermApp extends StatelessWidget {
   final Widget? home;
   const WTermApp({super.key, this.home});
   ThemeData theme(Brightness brightness) {
-    final skin = builtInSkins[terminalAppearance.skin];
+    final hasSkin = terminalAppearance.hasSkin;
     final configuredFont = terminalAppearance.uiFont.trim();
     final follow = terminalAppearance.uiToneFollowsTerminal;
     final terminalTheme = terminalAppearance.activeTheme;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: follow
+    var scheme = ColorScheme.fromSeed(
+      seedColor: hasSkin
+          ? Color(terminalAppearance.activeSkinSeed)
+          : follow
           ? terminalTheme.blue
-          : Color(skin?.seed ?? 0xff167768),
+          : const Color(0xff167768),
       brightness: brightness,
     );
+    if (hasSkin) {
+      scheme = scheme.copyWith(
+        surface: scheme.surface.withValues(alpha: 0.78),
+        surfaceContainerLowest: scheme.surfaceContainerLowest.withValues(
+          alpha: 0.70,
+        ),
+        surfaceContainerLow: scheme.surfaceContainerLow.withValues(
+          alpha: 0.74,
+        ),
+        surfaceContainer: scheme.surfaceContainer.withValues(alpha: 0.78),
+        surfaceContainerHigh: scheme.surfaceContainerHigh.withValues(
+          alpha: 0.82,
+        ),
+        surfaceContainerHighest: scheme.surfaceContainerHighest.withValues(
+          alpha: 0.85,
+        ),
+      );
+    }
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -129,13 +150,13 @@ class WTermApp extends StatelessWidget {
         'PingFang SC',
         'Segoe UI',
       ],
-      scaffoldBackgroundColor: skin == null
-          ? follow
-                ? terminalTheme.background
-                : brightness == Brightness.light
-                ? const Color(0xfffafbfc)
-                : const Color(0xff171c22)
-          : Colors.transparent,
+      scaffoldBackgroundColor: hasSkin
+          ? Colors.transparent
+          : follow
+          ? terminalTheme.background
+          : brightness == Brightness.light
+          ? const Color(0xfffafbfc)
+          : const Color(0xff171c22),
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),
         isDense: true,
@@ -154,9 +175,9 @@ class WTermApp extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: terminalAppearance,
     builder: (context, _) {
-      final skin = builtInSkins[terminalAppearance.skin];
-      final themeMode = skin != null
-          ? skin.dark
+      final hasSkin = terminalAppearance.hasSkin;
+      final themeMode = hasSkin
+          ? terminalAppearance.activeSkinDark
               ? ThemeMode.dark
               : ThemeMode.light
           : terminalAppearance.uiToneFollowsTerminal
@@ -172,15 +193,15 @@ class WTermApp extends StatelessWidget {
         title: 'W Term',
         builder: (context, child) {
           Widget content = VaultPrivacyShield(child: child!);
-          if (skin != null) {
-            content = DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(skin.top), Color(skin.bottom)],
-                ),
-              ),
+          if (hasSkin) {
+            content = SkinBackdrop(
+              skinKey: terminalAppearance.skin,
+              dark: terminalAppearance.activeSkinDark,
+              top: terminalAppearance.activeSkinTop,
+              bottom: terminalAppearance.activeSkinBottom,
+              seed: terminalAppearance.activeSkinSeed,
+              overlay: terminalAppearance.activeSkinOverlay,
+              image: terminalAppearance.activeSkinBackground,
               child: content,
             );
           }
