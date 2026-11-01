@@ -6,7 +6,7 @@
 
 - 侧边栏文件夹可拖到另一个文件夹下；主机归属、子文件夹、折叠状态和文件夹图标同步迁移。
 - 拒绝移动到自身或子文件夹，目标同名时给出提示。
-- 验证：Flutter 全量 **335 项**与 `flutter analyze` 通过；三端 GitHub Actions 构建待执行。
+- 验证：Flutter 全量 **335 项**与 `flutter analyze` 通过；Windows CI [41286485651](https://github.com/WuBarlynn/W-term/actions/runs/41286485651) 与 Apple release CI [41286491063](https://github.com/WuBarlynn/W-term/actions/runs/41286491063) 成功。
 
 ## 1.0.73 主题预设补全（2026-10-31）
 
