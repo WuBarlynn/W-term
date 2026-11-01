@@ -7,7 +7,7 @@
 - iOS 启用多场景；iPad 工作区设置新增“新建窗口”，也可通过 `wterm://new-window` 打开新场景。
 - 新窗口通过进程内原生通道共享已解锁保险库令牌，无需再次输入主密码；最后一个窗口关闭时才锁定保险库。
 - 原生窗口计数与令牌只保存在内存，不写入文件或同步快照。
-- 验证：iPad 模拟器创建第二、第三场景成功；新增共享保险库入口测试；iPhone 模拟器启动回归通过；Flutter 全量 **328 项**通过，`flutter analyze` 无问题。
+- 验证：iPad 模拟器创建第二、第三场景成功；新增共享保险库入口测试；iPhone 模拟器启动回归通过；Flutter 全量 **328 项**通过，`flutter analyze` 无问题；macOS 双架构 DMG、iOS IPA 完成；Windows CI [41259201829](https://github.com/WuBarlynn/W-term/actions/runs/41259201829) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.66 会话与机器信息（2026-10-31）
 
