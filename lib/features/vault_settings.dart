@@ -171,7 +171,11 @@ class _VaultSettingsState extends State<VaultSettings> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('启动时自动解锁'),
-              subtitle: const Text('使用 Windows Hello / Touch ID / Face ID 自动验证；关闭后进入解锁页手动操作。'),
+              subtitle: Text(
+                quickEnabled
+                    ? '使用 Windows Hello / Touch ID / Face ID 自动验证；关闭后进入解锁页手动操作。'
+                    : '启用快速解锁后才会自动验证；关闭后启动时手动解锁。',
+              ),
               value: autoUnlock,
               onChanged: busy
                   ? null
