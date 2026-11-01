@@ -6,7 +6,7 @@
 
 - Windows/Linux 关闭主窗口且仍有终端时，询问“取消 / 直接退出 / 保留布局并退出”；选择会更新启动恢复布局设置。
 - macOS 保持既有关窗保活行为，不增加关闭拦截。
-- 验证：Flutter 全量 **335 项**与 `flutter analyze` 通过；三端 GitHub Actions 构建待执行。
+- 验证：Flutter 全量 **335 项**与 `flutter analyze` 通过；Windows CI [41290048603](https://github.com/WuBarlynn/W-term/actions/runs/41290048603) 与 Apple release CI [41290054042](https://github.com/WuBarlynn/W-term/actions/runs/41290054042) 成功。
 
 ## 1.0.75 图标边缘修复（2026-10-31）
 
