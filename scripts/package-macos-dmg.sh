@@ -21,7 +21,7 @@ mkdir -p "$out_dir"
 if [[ "$target_arch" == "x86_64" ]]; then
   dmg="$out_dir/wterm-macos-$version-$build-intel.dmg"
 else
-  dmg="$out_dir/wterm-macos-$version-$build.dmg"
+  dmg="$out_dir/wterm-macos-$version-$build-arm64.dmg"
 fi
 stage=$(mktemp -d "${TMPDIR:-/tmp}/wterm-dmg.XXXXXX")
 trap 'rm -rf "$stage"' EXIT

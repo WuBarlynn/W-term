@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'ai_assistant.dart';
+import 'folder_icons.dart';
 import 'keyword_highlights.dart';
 import 'pinned_commands.dart';
 import 'plugins.dart';
@@ -47,6 +48,7 @@ class SyncedSettings {
       'pinned': await pinnedCommands.exportSynced(),
       'highlights': await keywordHighlights.exportSynced(),
       'shortcuts': shortcutSettings.toJson(),
+      'folderIcons': folderIcons.toJson(),
       'ai': ?ai,
     });
   }
@@ -59,6 +61,7 @@ class SyncedSettings {
     await pinnedCommands.applySynced(value['pinned']);
     await keywordHighlights.applySynced(value['highlights']);
     await shortcutSettings.applySynced(value['shortcuts']);
+    await folderIcons.applySynced(value['folderIcons']);
     final ai = SyncedAiCodec.decode(value['ai']);
     if (ai != null) await const AiStore().saveProfiles(ai);
   }

@@ -11,6 +11,7 @@ import '../app/identity_store.dart';
 import '../app/auto_backup.dart';
 import '../app/errors.dart';
 import '../app/quick_unlock.dart';
+import '../app/vault_preferences.dart';
 
 class VaultSettings extends StatefulWidget {
   final VaultMaintenance store;
@@ -23,6 +24,7 @@ class _VaultSettingsState extends State<VaultSettings> {
   bool busy = false;
   String message = '';
   bool quickEnabled = false;
+  bool autoUnlock = vaultPreferences.autoUnlockOnLaunch;
   final quick = QuickUnlock();
   @override
   void initState() {
@@ -166,6 +168,34 @@ class _VaultSettingsState extends State<VaultSettings> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text('切换应用不会锁定保险库；完全退出后重新启动需要解锁。可在解锁页启用 Touch ID / Face ID。'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('启动时自动解锁'),
+              subtitle: const Text('使用 Windows Hello / Touch ID / Face ID 自动验证；关闭后进入解锁页手动操作。'),
+              value: autoUnlock,
+              onChanged: busy
+                  ? null
+                  : (value) async {
+                      setState(() => autoUnlock = value);
+                      try {
+                        await vaultPreferences.save(
+                          autoUnlockOnLaunchNext: value,
+                        );
+                        if (mounted) {
+                          setState(
+                            () => message = value ? '启动时将自动验证快速解锁' : '启动时将要求手动解锁',
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() {
+                            autoUnlock = !value;
+                            message = '保存失败：${userFacingError(e)}';
+                          });
+                        }
+                      }
+                    },
+            ),
             if (quickEnabled)
               TextButton.icon(
                 onPressed: busy ? null : disableQuick,

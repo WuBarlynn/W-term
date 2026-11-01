@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../app/host_import.dart';
 import '../app/host_store.dart';
 import '../app/host_icons.dart';
+import '../app/folder_icons.dart';
 import '../app/errors.dart';
 import '../app/identity_store.dart';
 import '../app/proxy_store.dart';
@@ -366,6 +368,25 @@ class HostsPageState extends State<HostsPage> {
     }
   }
 
+  Future<void> chooseFolderIcon(String path) async {
+    if (path.isEmpty || saving) return;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => HostIconPickerDialog(
+        selected: folderIcons.iconFor(path),
+      ),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await folderIcons.setIcon(path, result);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        setState(() => error = userFacingError(e));
+      }
+    }
+  }
+
   Future<void> renameFolder(String path) async {
     final store = widget.store;
     if (store is! FolderTreeStore || saving) return;
@@ -420,6 +441,9 @@ class HostsPageState extends State<HostsPage> {
         path,
         result,
       );
+      unawaited(
+        folderIcons.renamePrefix(path, destination).catchError((Object _) {}),
+      );
       if (!mounted) return;
       final nextCollapsed = collapsed
           .map(
@@ -470,6 +494,7 @@ class HostsPageState extends State<HostsPage> {
         path,
         deleteHosts: deleteHosts,
       );
+      unawaited(folderIcons.removePrefix(path).catchError((Object _) {}));
       collapsed.removeWhere((p) => p == path || p.startsWith('$path/'));
       await load();
     } catch (e) {
@@ -682,7 +707,7 @@ class HostsPageState extends State<HostsPage> {
             message: path.isEmpty ? '未分类' : path,
             child: Row(
               children: [
-                const Icon(Icons.folder_outlined, size: 16),
+                hostIconWidget(folderIcons.iconFor(path), size: 16),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
@@ -707,6 +732,8 @@ class HostsPageState extends State<HostsPage> {
                 edit(null, path);
               } else if (v == 'folder') {
                 addFolder(path);
+              } else if (v == 'icon') {
+                chooseFolderIcon(path);
               } else if (v == 'rename') {
                 renameFolder(path);
               } else {
@@ -717,6 +744,8 @@ class HostsPageState extends State<HostsPage> {
               const PopupMenuItem(value: 'host', child: Text('添加主机')),
               if (widget.store is FolderStore)
                 const PopupMenuItem(value: 'folder', child: Text('新建子文件夹')),
+              if (path.isNotEmpty)
+                const PopupMenuItem(value: 'icon', child: Text('修改图标')),
               if (path.isNotEmpty && widget.store is FolderTreeStore)
                 const PopupMenuItem(value: 'rename', child: Text('重命名')),
               if (path.isNotEmpty && widget.store is FolderTreeStore)

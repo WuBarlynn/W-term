@@ -6,6 +6,7 @@ import '../app/errors.dart';
 import '../app/app_version_label.dart';
 import '../app/quick_unlock.dart';
 import '../app/host_store.dart';
+import '../app/vault_preferences.dart';
 import '../app/vault_store.dart';
 import '../app/window_bridge.dart';
 import '../app/workspace.dart';
@@ -141,7 +142,10 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
           loading = false;
           error = null;
         });
-        if (found && enabled && type != null) {
+        if (found &&
+            enabled &&
+            type != null &&
+            vaultPreferences.autoUnlockOnLaunch) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted || autoBiometricAttempted) return;
             autoBiometricAttempted = true;

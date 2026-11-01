@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:local_auth_windows/local_auth_windows.dart';
 
 /// iOS uses biometric Keychain access; macOS uses a Secure Enclave protected
 /// envelope, which also works with a stable self-signed application identity.
@@ -28,7 +29,18 @@ class QuickUnlock {
     }
   }
 
+  final _windowsAuth = LocalAuthWindows();
+
   Future<String?> availableType() async {
+    if (Platform.isWindows) {
+      try {
+        return await _windowsAuth.isDeviceSupported()
+            ? 'Windows Hello'
+            : null;
+      } catch (_) {
+        return null;
+      }
+    }
     try {
       return await _channel.invokeMethod<String>('availableType');
     } on MissingPluginException {
@@ -50,7 +62,19 @@ class QuickUnlock {
 
   Future<void> enroll(String password) async {
     if (await availableType() == null) {
-      throw StateError('设备未设置可用的 Touch ID 或 Face ID');
+      throw StateError('设备未设置可用的 Windows Hello 或生物识别');
+    }
+    if (Platform.isWindows) {
+      bool ok;
+      try {
+        ok = await _windowsAuth.authenticate(
+          localizedReason: '启用 Windows Hello 快速解锁',
+          authMessages: const [],
+        );
+      } catch (error) {
+        throw QuickUnlockException('Windows Hello 验证失败：$error');
+      }
+      if (!ok) throw const QuickUnlockException('Windows Hello 验证未通过');
     }
     if (Platform.isMacOS) {
       await _invokeMac<void>('quickUnlockEnroll', {'password': password});
@@ -74,6 +98,18 @@ class QuickUnlock {
   }
 
   Future<String> read() async {
+    if (Platform.isWindows) {
+      bool ok;
+      try {
+        ok = await _windowsAuth.authenticate(
+          localizedReason: '解锁 W Term 加密库',
+          authMessages: const [],
+        );
+      } catch (error) {
+        throw QuickUnlockException('Windows Hello 验证失败：$error');
+      }
+      if (!ok) throw const QuickUnlockException('Windows Hello 验证未通过');
+    }
     final secret = Platform.isMacOS
         ? await _invokeMac<String>('quickUnlockRead')
         : await _storage.read(key: _key);

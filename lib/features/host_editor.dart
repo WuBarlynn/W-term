@@ -257,7 +257,7 @@ class _HostEditorState extends State<HostEditor> {
   Future<void> pickIcon() async {
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => _HostIconPickerDialog(selected: icon),
+      builder: (_) => HostIconPickerDialog(selected: icon),
     );
     if (result != null && mounted) setState(() => icon = result);
   }
@@ -645,14 +645,14 @@ class _HostEditorState extends State<HostEditor> {
   );
 }
 
-class _HostIconPickerDialog extends StatefulWidget {
+class HostIconPickerDialog extends StatefulWidget {
   final String selected;
-  const _HostIconPickerDialog({required this.selected});
+  const HostIconPickerDialog({super.key, required this.selected});
   @override
-  State<_HostIconPickerDialog> createState() => _HostIconPickerDialogState();
+  State<HostIconPickerDialog> createState() => HostIconPickerDialogState();
 }
 
-class _HostIconPickerDialogState extends State<_HostIconPickerDialog> {
+class HostIconPickerDialogState extends State<HostIconPickerDialog> {
   final search = TextEditingController();
   late List<HostIconOption> options = searchHostIcons('');
   List<OnlineIcon> online = const [];
