@@ -6,7 +6,7 @@
 
 - 本地 xterm 补丁新增 `cursorVisible` 控制；终端外观新增“光标闪烁”开关，默认关闭，聚焦时每 0.5 秒切换。
 - 开关随外观设置保存，并纳入 GitHub 加密设置同步。
-- 验证：外观与同步设置测试、`flutter analyze` 通过。
+- 验证：外观与同步设置测试、`flutter analyze` 通过；Flutter 全量 **329 项**通过；macOS 双架构 DMG、iOS IPA 完成；Windows CI [41262422358](https://github.com/WuBarlynn/W-term/actions/runs/41262422358) 构建、启动冒烟、Inno Setup、静默安装与 Rust 测试通过。
 
 ## 1.0.68 网卡吞吐（2026-10-31）
 
