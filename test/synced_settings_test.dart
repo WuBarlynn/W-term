@@ -61,6 +61,8 @@ void main() {
       'showStatusBar': false,
       'rightClickPaste': true,
       'showComposeBar': true,
+      'showSessionInfo': true,
+      'showMachineInfo': true,
       'selectionPin': false,
       'selectionSnippet': false,
       'selectionShare': false,
@@ -73,6 +75,8 @@ void main() {
     expect(store.linkUnderline, isFalse);
     expect(store.dragUpload, isFalse);
     expect(store.maxUploadSizeMb, 64);
+    expect(store.showSessionInfo, isTrue);
+    expect(store.showMachineInfo, isTrue);
     expect(store.compactTabs, isTrue);
     expect(store.showFavoritesBar, isFalse);
     expect(store.clickTabLocates, isTrue);

@@ -33,6 +33,8 @@ class PluginSettings extends ChangeNotifier {
   bool showStatusBar = true;
   bool rightClickPaste = false;
   bool showComposeBar = false;
+  bool showSessionInfo = false;
+  bool showMachineInfo = false;
   bool selectionPin = true;
   bool selectionSnippet = true;
   bool selectionShare = true;
@@ -75,6 +77,8 @@ class PluginSettings extends ChangeNotifier {
           showStatusBar = value['showStatusBar'] != false;
           rightClickPaste = value['rightClickPaste'] == true;
           showComposeBar = value['showComposeBar'] == true;
+          showSessionInfo = value['showSessionInfo'] == true;
+          showMachineInfo = value['showMachineInfo'] == true;
           selectionPin = value['selectionPin'] != false;
           selectionSnippet = value['selectionSnippet'] != false;
           selectionShare = value['selectionShare'] != false;
@@ -108,6 +112,8 @@ class PluginSettings extends ChangeNotifier {
     'showStatusBar': showStatusBar,
     'rightClickPaste': rightClickPaste,
     'showComposeBar': showComposeBar,
+    'showSessionInfo': showSessionInfo,
+    'showMachineInfo': showMachineInfo,
     'selectionPin': selectionPin,
     'selectionSnippet': selectionSnippet,
     'selectionShare': selectionShare,
@@ -142,6 +148,8 @@ class PluginSettings extends ChangeNotifier {
       showStatusBarNext: data['showStatusBar'] != false,
       rightClickPasteNext: data['rightClickPaste'] == true,
       showComposeBarNext: data['showComposeBar'] == true,
+      showSessionInfoNext: data['showSessionInfo'] == true,
+      showMachineInfoNext: data['showMachineInfo'] == true,
       selectionPinNext: data['selectionPin'] != false,
       selectionSnippetNext: data['selectionSnippet'] != false,
       selectionShareNext: data['selectionShare'] != false,
@@ -169,6 +177,8 @@ class PluginSettings extends ChangeNotifier {
     bool? showStatusBarNext,
     bool? rightClickPasteNext,
     bool? showComposeBarNext,
+    bool? showSessionInfoNext,
+    bool? showMachineInfoNext,
     bool? selectionPinNext,
     bool? selectionSnippetNext,
     bool? selectionShareNext,
@@ -193,6 +203,8 @@ class PluginSettings extends ChangeNotifier {
     showStatusBar = showStatusBarNext ?? showStatusBar;
     rightClickPaste = rightClickPasteNext ?? rightClickPaste;
     showComposeBar = showComposeBarNext ?? showComposeBar;
+    showSessionInfo = showSessionInfoNext ?? showSessionInfo;
+    showMachineInfo = showMachineInfoNext ?? showMachineInfo;
     selectionPin = selectionPinNext ?? selectionPin;
     selectionSnippet = selectionSnippetNext ?? selectionSnippet;
     selectionShare = selectionShareNext ?? selectionShare;
@@ -221,6 +233,8 @@ class PluginSettings extends ChangeNotifier {
         'showStatusBar': showStatusBar,
         'rightClickPaste': rightClickPaste,
         'showComposeBar': showComposeBar,
+    'showSessionInfo': showSessionInfo,
+    'showMachineInfo': showMachineInfo,
         'selectionPin': selectionPin,
         'selectionSnippet': selectionSnippet,
         'selectionShare': selectionShare,

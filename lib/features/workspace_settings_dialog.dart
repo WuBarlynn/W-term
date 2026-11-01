@@ -19,6 +19,8 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
   late bool showStatusBar = pluginSettings.showStatusBar;
   late bool rightClickPaste = pluginSettings.rightClickPaste;
   late bool showComposeBar = pluginSettings.showComposeBar;
+  late bool showSessionInfo = pluginSettings.showSessionInfo;
+  late bool showMachineInfo = pluginSettings.showMachineInfo;
   bool saving = false;
   String error = '';
 
@@ -41,6 +43,8 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
         showStatusBarNext: showStatusBar,
         rightClickPasteNext: rightClickPaste,
         showComposeBarNext: showComposeBar,
+        showSessionInfoNext: showSessionInfo,
+        showMachineInfoNext: showMachineInfo,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -121,6 +125,24 @@ class _WorkspaceSettingsDialogState extends State<WorkspaceSettingsDialog> {
                 : (value) => setState(() => showComposeBar = value),
             title: const Text('显示底部撰写栏'),
             subtitle: const Text('在终端底部编辑多行命令，发送到当前输入目标。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showSessionInfo,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => showSessionInfo = value),
+            title: const Text('显示会话信息'),
+            subtitle: const Text('在终端上方显示用户名、主机与连接时长。'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showMachineInfo,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => showMachineInfo = value),
+            title: const Text('显示机器信息'),
+            subtitle: const Text('连接后读取远端系统、内核与主机名。'),
           ),
           if (error.isNotEmpty)
             Text(

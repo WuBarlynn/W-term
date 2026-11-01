@@ -101,6 +101,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   Timer? _statusTimer;
   bool _statusSampling = false;
   ProcSnapshot? _lastProc;
+  final _connectedAt = DateTime.now();
+  String _machineInfo = '';
+  Timer? _infoTimer;
   double? _cpuPercent, _memoryPercent;
   double? _load1;
   int? _diskPercent;
@@ -129,7 +132,18 @@ class _TerminalPaneState extends State<TerminalPane> {
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_sampleStatus());
+        if (mounted && pluginSettings.showMachineInfo) {
+          unawaited(_loadMachineInfo());
+        }
       });
+    }
+    if (pluginSettings.showSessionInfo) {
+      _infoTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) {
+          if (mounted) setState(() {});
+        },
+      );
     }
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -184,9 +198,82 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   void _pluginSettingsChanged() {
     if (!pluginSettings.commandCompletion) _refreshCompletions();
+    if (pluginSettings.showMachineInfo &&
+        _machineInfo.isEmpty &&
+        !widget.session.isLocal) {
+      unawaited(_loadMachineInfo());
+    }
     _applyImeState();
     if (mounted) setState(() {});
   }
+
+  Future<void> _loadMachineInfo() async {
+    if (widget.session.isLocal || _machineInfo.isNotEmpty) return;
+    try {
+      final raw = await native.runCommand(
+        connectionId: widget.session.connectionId,
+        command: "sh -c 'uname -srm 2>/dev/null; hostname 2>/dev/null'",
+      );
+      final lines = raw
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .take(2)
+          .toList();
+      if (!mounted || lines.isEmpty) return;
+      setState(() => _machineInfo = lines.join(' · '));
+    } catch (_) {
+      // Machine details are optional; the session remains usable.
+    }
+  }
+
+  String _sessionDuration() {
+    final elapsed = DateTime.now().difference(_connectedAt);
+    final hours = elapsed.inHours.toString().padLeft(2, '0');
+    final minutes = (elapsed.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  Widget _infoBar() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
+    child: Wrap(
+      spacing: 18,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (pluginSettings.showSessionInfo)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.person_outline, size: 13),
+              const SizedBox(width: 4),
+              Text(
+                '${widget.session.username}@${widget.session.host} · 已连接 ${_sessionDuration()}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+          ),
+        if (pluginSettings.showMachineInfo && !widget.session.isLocal)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.computer, size: 13),
+              const SizedBox(width: 4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Text(
+                  _machineInfo.isEmpty ? '正在读取机器信息…' : _machineInfo,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+      ],
+    ),
+  );
 
   void _markLinksDirty() {
     _linkRepaint.value++;
@@ -1591,6 +1678,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _highlightTimer?.cancel();
     _shellProbeTimer?.cancel();
     _statusTimer?.cancel();
+    _infoTimer?.cancel();
     compose.dispose();
     controller.removeListener(_selectionForCopy);
     pluginSettings.removeListener(_pluginSettingsChanged);
@@ -1704,6 +1792,9 @@ class _TerminalPaneState extends State<TerminalPane> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: _toolbar(),
           ),
+          if (pluginSettings.showSessionInfo ||
+              (pluginSettings.showMachineInfo && !widget.session.isLocal))
+            _infoBar(),
           if (pluginSettings.showStatusBar &&
               (_latencyMs != null ||
                   _cpuPercent != null ||
