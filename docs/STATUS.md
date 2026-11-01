@@ -6,7 +6,7 @@
 
 - macOS 应用与 Dock 图标移除深色外沿描边，恢复原始透明圆角。
 - Windows ICO 去除透明圆角边缘，使用不透明边缘绘制，避免桌面图标白边；托盘继续使用原始 PNG。
-- 验证：图标资源已重新生成；三端 GitHub Actions 构建待执行。
+- 验证：图标资源已重新生成；Windows CI [41288117344](https://github.com/WuBarlynn/W-term/actions/runs/41288117344) 与 Apple release CI [41288124198](https://github.com/WuBarlynn/W-term/actions/runs/41288124198) 成功。
 
 ## 1.0.74 文件夹拖拽移动（2026-10-31）
 
