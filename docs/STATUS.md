@@ -9,7 +9,7 @@
 - 主机文件夹支持自定义图标，图标来源与主机一致：内置图标与 Iconify 在线搜索；重命名/删除文件夹同步迁移或清理图标，并随 GitHub 加密设置同步。
 - 重新生成 Windows ICO 与 macOS 图标，深色外沿与透明边处理去除缩放白边。
 - macOS DMG 文件名包含架构：`-arm64.dmg` 与 `-intel.dmg`。
-- 验证：Flutter 分析与新增保险库偏好/文件夹图标测试通过；三端 GitHub Actions 构建待执行。
+- 验证：Flutter 全量 **333 项**与 `flutter analyze` 通过；Windows CI [41281001024](https://github.com/WuBarlynn/W-term/actions/runs/41281001024) 成功；Apple release CI [41280243602](https://github.com/WuBarlynn/W-term/actions/runs/41280243602) 生成 `-arm64.dmg`、`-intel.dmg` 与未签名 IPA。
 
 ## 1.0.70 托盘快捷入口（2026-10-31）
 
