@@ -1,0 +1,73 @@
+name: Apple release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.98.1'
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-darwin
+      - run: flutter pub get --enforce-lockfile
+      - name: Create ephemeral self-signed signing identity
+        run: |
+          set -euo pipefail
+          keychain=build.keychain
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          cat > cert.cnf <<'EOF'
+          [req]
+          distinguished_name=dn
+          x509_extensions=ext
+          prompt=no
+          [dn]
+          CN=W Term Vault Code Signing
+          [ext]
+          keyUsage=critical,digitalSignature
+          extendedKeyUsage=critical,codeSigning
+          basicConstraints=critical,CA:false
+          EOF
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
+            -keyout key.pem -out cert.pem -config cert.cnf
+          openssl pkcs12 -export -out cert.p12 -inkey key.pem -in cert.pem \
+            -passout pass:"$password"
+          security import cert.p12 -k "$keychain" -P "$password" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$password" "$keychain"
+          security default-keychain -s "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain
+          security find-identity -v -p codesigning
+      - name: Build Apple Silicon app
+        run: bash scripts/build-macos-signed.sh
+      - name: Build Intel app
+        run: WTERM_MACOS_ARCH=x86_64 bash scripts/build-macos-signed.sh
+      - name: Package macOS DMGs
+        run: |
+          bash scripts/package-macos-dmg.sh
+          WTERM_MACOS_ARCH=x86_64 bash scripts/package-macos-dmg.sh
+      - name: Package unsigned iOS IPA
+        run: bash scripts/package-ios-unsigned.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wterm-apple-release
+          path: |
+            build/macos/*.dmg
+            build/ios/*.ipa
