@@ -107,7 +107,8 @@ class _RouteHop {
   });
 }
 
-class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
+class _WorkspaceState extends State<Workspace>
+    with WidgetsBindingObserver, WindowListener {
   late final TrustStore trust = widget.trustStore ?? KeychainTrustStore();
   late final HostStore hostStore = widget.hostStore ?? KeychainHostStore();
   final scaffoldKey = GlobalKey<ScaffoldState>();
@@ -194,6 +195,10 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
         ).setMethodCallHandler(_handleWindowRecall),
       );
     }
+    if (Platform.isWindows || Platform.isLinux) {
+      unawaited(windowManager.setPreventClose(true));
+      windowManager.addListener(this);
+    }
     unawaited(_restoreLayout());
     unawaited(_refreshTrayHosts());
     _trayHostTimer = Timer.periodic(
@@ -208,6 +213,9 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isWindows || Platform.isLinux) {
+      windowManager.removeListener(this);
+    }
     shortcutSettings.removeListener(_shortcutsChanged);
     taskMonitor.removeListener(_taskCompleted);
     taskMonitor.cancelAll();
@@ -976,6 +984,58 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
       return;
     }
     unawaited(connect(profile));
+  }
+
+  bool _allowWindowClose = false, _closeDialogOpen = false;
+
+  @override
+  void onWindowClose() {
+    unawaited(_confirmWindowClose());
+  }
+
+  Future<void> _confirmWindowClose() async {
+    if (_allowWindowClose || _closeDialogOpen) return;
+    if (sessions.isEmpty) {
+      _allowWindowClose = true;
+      await windowManager.destroy();
+      return;
+    }
+    _closeDialogOpen = true;
+    try {
+      final keepLayout = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('退出 W Term'),
+          content: const Text('当前仍有打开的终端。下次启动是否恢复标签与分屏布局？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('直接退出'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('保留布局并退出'),
+            ),
+          ],
+        ),
+      );
+      if (keepLayout == null || !mounted) return;
+      await pluginSettings.save(
+        json: pluginSettings.jsonFormatter,
+        ip: pluginSettings.ipLookup,
+        preview: pluginSettings.filePreview,
+        restoreLayoutNext: keepLayout,
+      );
+      _allowWindowClose = true;
+      await windowManager.destroy();
+    } finally {
+      _closeDialogOpen = false;
+    }
   }
 
   void _trayConnectRequested() {
