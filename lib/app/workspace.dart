@@ -3846,6 +3846,7 @@ class _TabViewState extends State<_TabView> {
         final filesPane = FilesPane(
           key: _filesKey(active.id),
           connectionId: active.id,
+          hostId: active.hostId,
           dropActive: widget.active && files && active.connected,
           followedPath: active.terminal.currentDirectory,
         );

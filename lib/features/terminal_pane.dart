@@ -847,8 +847,11 @@ class _TerminalPaneState extends State<TerminalPane> {
       return;
     }
     try {
-      final result = await lookupIp(ip);
+      final result = await lookupIp(ip, cache: defaultIpLookupCache);
       if (!mounted) return;
+      final source = result.cached
+          ? (result.stale ? '\n\n来源：本地缓存（网络查询失败）' : '\n\n来源：本地缓存')
+          : '';
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -859,7 +862,7 @@ class _TerminalPaneState extends State<TerminalPane> {
             '城市：${result.city}\n'
             '运营商：${result.isp}\n'
             '组织：${result.org}\n'
-            '时区：${result.timezone}',
+            '时区：${result.timezone}$source',
           ),
           actions: [
             TextButton(
@@ -1998,6 +2001,19 @@ class _TerminalPaneState extends State<TerminalPane> {
                                         await paste();
                                         return;
                                       }
+                                      final selection = controller.selection;
+                                      final selectedTerminalText =
+                                          selection == null
+                                          ? ''
+                                          : widget.session.terminal.buffer
+                                                .getText(selection)
+                                                .trim();
+                                      final canFormatJson =
+                                          pluginSettings.jsonFormatter &&
+                                          isJsonText(selectedTerminalText);
+                                      final canLookupIp =
+                                          pluginSettings.ipLookup &&
+                                          isIpv4(selectedTerminalText);
                                       final selected = await showMenu<String>(
                                         context: context,
                                         position: RelativeRect.fromLTRB(
@@ -2025,12 +2041,12 @@ class _TerminalPaneState extends State<TerminalPane> {
                                               value: 'files',
                                               child: Text('打开文件面板'),
                                             ),
-                                          if (pluginSettings.jsonFormatter)
+                                          if (canFormatJson)
                                             const PopupMenuItem(
                                               value: 'json',
                                               child: Text('格式化选中 JSON'),
                                             ),
-                                          if (pluginSettings.ipLookup)
+                                          if (canLookupIp)
                                             const PopupMenuItem(
                                               value: 'ip',
                                               child: Text('查询选中 IP 归属'),

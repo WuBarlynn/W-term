@@ -54,7 +54,7 @@ class _UploadTasksDialogState extends State<UploadTasksDialog> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '取消剩余任务时，正在传输的文件会先完成。记录仅保留在当前会话，下一批上传会替换此列表。重试会重新读取原文件，并再次确认同名冲突。',
+                '取消剩余任务时，正在传输的文件会先完成。记录保留在当前应用会话，下一批上传会替换此列表；失败项可在同一主机的其他文件面板中重试。重试会重新读取原文件，并再次确认同名冲突。',
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 8),

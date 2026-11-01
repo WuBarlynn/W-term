@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wterm/app/upload_batch.dart';
@@ -260,6 +261,106 @@ void main() {
     final second = UploadBatch('/two', ['b']);
     uploadQueue.begin(second);
     expect(identical(uploadQueue.batch, second), isTrue);
+    uploadQueue.finish();
+  });
+
+  test('failed uploads stay retryable from another pane on the same host', () {
+    uploadQueue.finish();
+    final batch = UploadBatch('/srv/data', ['report.csv', 'nested']);
+    batch.start(1);
+    batch.fail(1, 'permission denied');
+    batch.finish();
+    final sources = [XFile('/tmp/report.csv'), XFile('/tmp/nested')];
+    uploadQueue.begin(
+      batch,
+      connectionId: 'session-a',
+      hostId: 'host-1',
+      sources: sources,
+    );
+    uploadQueue.finish(keepForRetry: true);
+
+    expect(uploadQueue.retryAccess, isNull);
+    expect(uploadQueue.sources, sources);
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'session-b',
+        hostId: 'host-1',
+        busy: false,
+      ),
+      isTrue,
+    );
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'session-b',
+        hostId: 'host-2',
+        busy: false,
+      ),
+      isFalse,
+    );
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'session-b',
+        hostId: 'host-1',
+        busy: true,
+      ),
+      isFalse,
+    );
+    expect(
+      uploadQueue.canRetry(
+        UploadBatch('/other', ['x']),
+        connectionId: 'session-b',
+        hostId: 'host-1',
+        busy: false,
+      ),
+      isFalse,
+    );
+
+    uploadQueue.finish();
+    expect(uploadQueue.sources, isEmpty);
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'session-b',
+        hostId: 'host-1',
+        busy: false,
+      ),
+      isFalse,
+    );
+  });
+
+  test('ad-hoc connections retry only in the original SSH session', () {
+    uploadQueue.finish();
+    final batch = UploadBatch('/tmp', ['notes.txt']);
+    batch.start(0);
+    batch.fail(0, 'closed');
+    batch.finish();
+    uploadQueue.begin(
+      batch,
+      connectionId: 'adhoc-session',
+      sources: [XFile('/tmp/notes.txt')],
+    );
+    uploadQueue.finish(keepForRetry: true);
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'adhoc-session',
+        hostId: '',
+        busy: false,
+      ),
+      isTrue,
+    );
+    expect(
+      uploadQueue.canRetry(
+        batch,
+        connectionId: 'another-session',
+        hostId: '',
+        busy: false,
+      ),
+      isFalse,
+    );
     uploadQueue.finish();
   });
 }

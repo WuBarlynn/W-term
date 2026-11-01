@@ -42,11 +42,13 @@ import '../src/rust/api/client.dart' as native;
 
 class FilesPane extends StatefulWidget {
   final String connectionId;
+  final String hostId;
   final bool dropActive;
   final String? followedPath;
   const FilesPane({
     super.key,
     required this.connectionId,
+    this.hostId = '',
     this.dropActive = true,
     this.followedPath,
   });
@@ -513,17 +515,29 @@ class FilesPaneState extends State<FilesPane> {
   Future<void> showUploadTasks() async {
     final batch = uploadQueue.batch;
     if (batch == null) return;
-    final canRetry =
-        identical(batch, uploadBatch) && uploadSources.isNotEmpty && !busy;
+    final canRetry = uploadQueue.canRetry(
+      batch,
+      connectionId: widget.connectionId,
+      hostId: widget.hostId,
+      busy: busy,
+    );
     final retry = await showDialog<bool>(
       context: context,
       builder: (_) => UploadTasksDialog(batch: batch, allowRetry: canRetry),
     );
-    if (retry == true &&
-        mounted &&
-        canRetry &&
-        identical(batch, uploadQueue.batch)) {
-      await uploadFiles(uploadSources, retryBatch: batch);
+    if (retry == true && mounted && uploadQueue.running == false) {
+      final pending = uploadQueue.batch;
+      if (pending != null &&
+          uploadQueue.canRetry(
+            pending,
+            connectionId: widget.connectionId,
+            hostId: widget.hostId,
+            busy: busy,
+          )) {
+        final sources = uploadQueue.sources;
+        final access = uploadQueue.retryAccess;
+        await uploadFiles(sources, retryBatch: pending, retryAccess: access);
+      }
     }
   }
 
@@ -541,6 +555,7 @@ class FilesPaneState extends State<FilesPane> {
     String? destination,
     UploadBatch? retryBatch,
     FolderAccess? newFolderAccess,
+    FolderAccess? retryAccess,
   }) async {
     if (listing == null || busy || files.isEmpty) return;
     if (retryBatch == null && uploadQueue.running) {
@@ -562,13 +577,21 @@ class FilesPaneState extends State<FilesPane> {
         ? List.generate(files.length, (i) => i)
         : batch.retryFailures();
     if (indices.isEmpty) return;
-    uploadQueue.begin(batch);
     if (retryBatch == null) {
       final previous = folderAccess;
       folderAccess = newFolderAccess;
       previous?.release().catchError((Object _) {});
     }
-    final transferAccess = folderAccess;
+    final transferAccess = retryBatch == null
+        ? folderAccess
+        : retryAccess ?? folderAccess;
+    uploadQueue.begin(
+      batch,
+      connectionId: widget.connectionId,
+      hostId: widget.hostId,
+      sources: files,
+      access: transferAccess,
+    );
     transferAccess?.retain();
     setState(() {
       busy = true;
@@ -777,8 +800,9 @@ class FilesPaneState extends State<FilesPane> {
           }
         }
       } finally {
+        final keepForRetry = batch.failedIndices.isNotEmpty;
         batch.finish();
-        uploadQueue.finish();
+        uploadQueue.finish(keepForRetry: keepForRetry);
         await transferAccess?.release();
       }
     }

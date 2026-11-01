@@ -14,6 +14,100 @@ void main() {
     expect(isIpv4(''), isFalse);
   });
 
+  test('JSON detection accepts objects and arrays only', () {
+    expect(isJsonText('{"a":1}'), isTrue);
+    expect(isJsonText(' [1, 2, 3] '), isTrue);
+    expect(isJsonText('[]'), isTrue);
+    expect(isJsonText('{"a":}'), isFalse);
+    expect(isJsonText('42'), isFalse);
+    expect(isJsonText('"text"'), isFalse);
+    expect(isJsonText(''), isFalse);
+    expect(isJsonText('ls -la'), isFalse);
+  });
+
+  test(
+    'IP lookup cache persists fresh entries and falls back to stale',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('wterm-ip-cache-');
+      final file = File('${dir.path}/ip-cache.json');
+      var now = DateTime.utc(2026, 11, 1, 12);
+      const result = IpLookupResult(
+        country: 'China',
+        region: 'Zhejiang',
+        city: 'Hangzhou',
+        isp: 'Example ISP',
+        org: 'Example Org',
+        timezone: 'Asia/Shanghai',
+      );
+      try {
+        final cache = IpLookupCache(file: () async => file, now: () => now);
+        await cache.write('1.2.3.4', result);
+        final fresh = await cache.read('1.2.3.4');
+        expect(fresh?.city, 'Hangzhou');
+        expect(fresh?.cached, isTrue);
+        expect(fresh?.stale, isFalse);
+
+        final restored = IpLookupCache(file: () async => file, now: () => now);
+        expect((await restored.read('1.2.3.4'))?.country, 'China');
+
+        now = now.add(const Duration(hours: 25));
+        expect(await restored.read('1.2.3.4'), isNull);
+        final stale = await restored.read('1.2.3.4', includeStale: true);
+        expect(stale?.stale, isTrue);
+        expect(stale?.isp, 'Example ISP');
+        expect(await restored.read('not-an-ip', includeStale: true), isNull);
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'IP lookup cache ignores corrupt files and prunes oldest entries',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('wterm-ip-cache-');
+      final file = File('${dir.path}/ip-cache.json');
+      var now = DateTime.utc(2026, 11, 1, 12);
+      IpLookupResult result(String city) => IpLookupResult(
+        country: 'CN',
+        region: '',
+        city: city,
+        isp: '',
+        org: '',
+        timezone: '',
+      );
+      try {
+        await file.writeAsString('{broken');
+        final cache = IpLookupCache(
+          file: () async => file,
+          now: () => now,
+          maxEntries: 2,
+        );
+        expect(await cache.read('1.1.1.1'), isNull);
+        await cache.write('1.1.1.1', result('A'));
+        now = now.add(const Duration(minutes: 1));
+        await cache.write('2.2.2.2', result('B'));
+        now = now.add(const Duration(minutes: 1));
+        await cache.write('3.3.3.3', result('C'));
+
+        final restored = IpLookupCache(
+          file: () async => file,
+          now: () => now,
+          maxEntries: 2,
+        );
+        expect(await restored.read('1.1.1.1'), isNull);
+        expect((await restored.read('2.2.2.2'))?.city, 'B');
+        expect((await restored.read('3.3.3.3'))?.city, 'C');
+
+        await restored.clear();
+        expect(await restored.read('2.2.2.2'), isNull);
+        expect(await file.exists(), isFalse);
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    },
+  );
+
   test('preview path resolution and image detection', () {
     expect(
       resolveRemotePath('/var/log/app.log', '/home/a'),

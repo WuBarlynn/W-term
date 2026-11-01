@@ -16,6 +16,22 @@ bool isIpv4(String value) {
   return true;
 }
 
+/// Selection-aware JSON detection for the terminal context menu. Scalars are
+/// valid JSON but too easy to trigger by accident, so only objects/arrays are
+/// offered for formatting.
+bool isJsonText(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length < 2) return false;
+  final first = trimmed.codeUnitAt(0);
+  if (first != 0x7B && first != 0x5B) return false;
+  try {
+    jsonDecode(trimmed);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 class PluginSettings extends ChangeNotifier {
   final Future<File> Function() _file;
   bool jsonFormatter = true, ipLookup = true, filePreview = true;
@@ -233,8 +249,8 @@ class PluginSettings extends ChangeNotifier {
         'showStatusBar': showStatusBar,
         'rightClickPaste': rightClickPaste,
         'showComposeBar': showComposeBar,
-    'showSessionInfo': showSessionInfo,
-    'showMachineInfo': showMachineInfo,
+        'showSessionInfo': showSessionInfo,
+        'showMachineInfo': showMachineInfo,
         'selectionPin': selectionPin,
         'selectionSnippet': selectionSnippet,
         'selectionShare': selectionShare,
@@ -253,6 +269,8 @@ bool uploadTooLarge(int bytes, int maxMb) =>
 
 class IpLookupResult {
   final String country, region, city, isp, org, timezone;
+  final bool cached;
+  final bool stale;
   const IpLookupResult({
     required this.country,
     required this.region,
@@ -260,15 +278,156 @@ class IpLookupResult {
     required this.isp,
     required this.org,
     required this.timezone,
+    this.cached = false,
+    this.stale = false,
   });
+
+  Map<String, Object?> toJson() => {
+    'country': country,
+    'region': region,
+    'city': city,
+    'isp': isp,
+    'org': org,
+    'timezone': timezone,
+  };
+
+  static IpLookupResult? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    return IpLookupResult(
+      country: '${raw['country'] ?? ''}',
+      region: '${raw['region'] ?? ''}',
+      city: '${raw['city'] ?? ''}',
+      isp: '${raw['isp'] ?? ''}',
+      org: '${raw['org'] ?? ''}',
+      timezone: '${raw['timezone'] ?? ''}',
+    );
+  }
+
+  IpLookupResult markCached({required bool stale}) => IpLookupResult(
+    country: country,
+    region: region,
+    city: city,
+    isp: isp,
+    org: org,
+    timezone: timezone,
+    cached: true,
+    stale: stale,
+  );
 }
 
-Future<IpLookupResult> lookupIp(String ip) async {
+/// Disk-backed IPv4 attribution cache. Fresh entries avoid the third-party
+/// request; a stale entry is still useful when the network is unavailable.
+class IpLookupCache {
+  static const defaultTtl = Duration(hours: 24);
+  static const defaultMaxEntries = 256;
+  final Future<File> Function() _file;
+  final DateTime Function() _now;
+  final Duration ttl;
+  final int maxEntries;
+  Map<String, Map<String, Object?>>? _entries;
+
+  IpLookupCache({
+    Future<File> Function()? file,
+    DateTime Function()? now,
+    this.ttl = defaultTtl,
+    this.maxEntries = defaultMaxEntries,
+  }) : _file =
+           file ??
+           (() async => File(
+             '${(await getApplicationSupportDirectory()).path}/ip-lookup-cache.json',
+           )),
+       _now = now ?? DateTime.now;
+
+  Future<Map<String, Map<String, Object?>>> _load() async {
+    final loaded = _entries;
+    if (loaded != null) return loaded;
+    final entries = <String, Map<String, Object?>>{};
+    try {
+      final file = await _file();
+      if (await file.exists()) {
+        final value = jsonDecode(await file.readAsString());
+        if (value is Map && value['entries'] is Map) {
+          for (final item in (value['entries'] as Map).entries) {
+            final key = '${item.key}';
+            final raw = item.value;
+            if (key.isEmpty || raw is! Map) continue;
+            entries[key] = Map<String, Object?>.from(raw);
+          }
+        }
+      }
+    } catch (_) {
+      // A corrupt or unreadable cache must never block a new lookup.
+    }
+    return _entries = entries;
+  }
+
+  Future<IpLookupResult?> read(String ip, {bool includeStale = false}) async {
+    if (!isIpv4(ip)) return null;
+    final entries = await _load();
+    final entry = entries[ip.trim()];
+    if (entry == null) return null;
+    final cachedAt = DateTime.tryParse('${entry['cachedAt'] ?? ''}');
+    if (cachedAt == null) return null;
+    final age = _now().difference(cachedAt);
+    final fresh = !age.isNegative && age <= ttl;
+    if (!fresh && !includeStale) return null;
+    final result = IpLookupResult.fromJson(entry['result']);
+    return result?.markCached(stale: !fresh);
+  }
+
+  Future<void> write(String ip, IpLookupResult result) async {
+    if (!isIpv4(ip)) return;
+    final entries = await _load();
+    final key = ip.trim();
+    entries[key] = {
+      'cachedAt': _now().toUtc().toIso8601String(),
+      'result': result.toJson(),
+    };
+    if (entries.length > maxEntries) {
+      final ordered = entries.entries.toList()
+        ..sort((a, b) {
+          final left = '${a.value['cachedAt'] ?? ''}';
+          final right = '${b.value['cachedAt'] ?? ''}';
+          return left.compareTo(right);
+        });
+      for (final entry in ordered.take(entries.length - maxEntries)) {
+        entries.remove(entry.key);
+      }
+    }
+    try {
+      final file = await _file();
+      await file.parent.create(recursive: true);
+      await file.writeAsString(
+        jsonEncode({'version': 1, 'entries': entries}),
+        flush: true,
+      );
+    } catch (_) {
+      // Keep the in-memory cache even when the support directory is read-only.
+    }
+  }
+
+  Future<void> clear() async {
+    _entries = {};
+    try {
+      final file = await _file();
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // The cache is optional state.
+    }
+  }
+}
+
+final defaultIpLookupCache = IpLookupCache();
+
+Future<IpLookupResult> lookupIp(String ip, {IpLookupCache? cache}) async {
   if (!isIpv4(ip)) throw const FormatException('请选择有效的 IPv4 地址');
+  final normalized = ip.trim();
+  final cached = await cache?.read(normalized);
+  if (cached != null) return cached;
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
   try {
     final request = await client
-        .getUrl(Uri.parse('https://ipwho.is/${ip.trim()}'))
+        .getUrl(Uri.parse('https://ipwho.is/$normalized'))
         .timeout(const Duration(seconds: 10));
     final response = await request.close().timeout(const Duration(seconds: 10));
     final body = await utf8.decoder.bind(response).join();
@@ -285,7 +444,7 @@ Future<IpLookupResult> lookupIp(String ip) async {
     final timezone = value['timezone'] is Map
         ? value['timezone'] as Map
         : const {};
-    return IpLookupResult(
+    final result = IpLookupResult(
       country: '${value['country'] ?? ''}',
       region: '${value['region'] ?? ''}',
       city: '${value['city'] ?? ''}',
@@ -293,6 +452,18 @@ Future<IpLookupResult> lookupIp(String ip) async {
       org: '${connection['org'] ?? ''}',
       timezone: '${timezone['id'] ?? ''}',
     );
+    if (cache != null) {
+      try {
+        await cache.write(normalized, result);
+      } catch (_) {
+        /* The lookup result is still usable without persistence. */
+      }
+    }
+    return result;
+  } catch (_) {
+    final stale = await cache?.read(normalized, includeStale: true);
+    if (stale != null) return stale;
+    rethrow;
   } finally {
     client.close(force: true);
   }

@@ -1,4 +1,7 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
+
+import 'folder_access.dart';
 
 enum UploadState { waiting, running, completed, failed, cancelled, skipped }
 
@@ -115,20 +118,68 @@ List<UploadTask> filterUploadTasks(
 }
 
 /// Application-wide upload queue. The batch keeps running when its originating
-/// file pane is disposed so another tab can observe progress.
+/// file pane is disposed; failed items keep their sources and Apple security
+/// scope so another pane attached to the same host can retry them.
 class UploadQueue extends ChangeNotifier {
   UploadBatch? batch;
   bool running = false;
+  String connectionId = '';
+  String hostId = '';
+  List<XFile> sources = const [];
+  FolderAccess? _access;
 
-  void begin(UploadBatch next) {
+  FolderAccess? get retryAccess => _access;
+
+  /// A retry crosses panes only when both panes point at the same saved host.
+  /// Ad-hoc connections have no stable host identity, so they stay bound to
+  /// the original SSH connection.
+  bool canRetry(
+    UploadBatch candidate, {
+    required String connectionId,
+    required String hostId,
+    required bool busy,
+  }) {
+    if (busy || running || !identical(candidate, batch)) return false;
+    if (sources.isEmpty || candidate.failedIndices.isEmpty) return false;
+    if (this.hostId.isNotEmpty && hostId.isNotEmpty) {
+      return this.hostId == hostId;
+    }
+    return this.hostId.isEmpty && this.connectionId == connectionId;
+  }
+
+  void begin(
+    UploadBatch next, {
+    String connectionId = '',
+    String hostId = '',
+    List<XFile> sources = const [],
+    FolderAccess? access,
+  }) {
+    if (!identical(_access, access)) {
+      final retained = access?..retain();
+      _releaseAccess();
+      _access = retained;
+    }
+    this.connectionId = connectionId;
+    this.hostId = hostId;
+    this.sources = List.unmodifiable(sources);
     batch = next;
     running = true;
     notifyListeners();
   }
 
-  void finish() {
+  void finish({bool keepForRetry = false}) {
     running = false;
+    if (!keepForRetry) {
+      sources = const [];
+      _releaseAccess();
+    }
     notifyListeners();
+  }
+
+  void _releaseAccess() {
+    final access = _access;
+    _access = null;
+    access?.release().catchError((Object _) {});
   }
 }
 
