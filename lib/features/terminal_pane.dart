@@ -1002,21 +1002,29 @@ class _TerminalPaneState extends State<TerminalPane> {
     try {
       final result = await lookupIp(ip, cache: defaultIpLookupCache);
       if (!mounted) return;
-      final source = result.cached
-          ? (result.stale ? '\n\n来源：本地缓存（网络查询失败）' : '\n\n来源：本地缓存')
-          : '';
+      final details = <String>[
+        if (result.local)
+          '地址类型：${result.country}'
+        else
+          '国家/地区：${result.country}',
+        if (result.region.isNotEmpty) '省/州：${result.region}',
+        if (result.city.isNotEmpty) '城市：${result.city}',
+        if (result.isp.isNotEmpty) '运营商：${result.isp}',
+        if (result.org.isNotEmpty) '组织：${result.org}',
+        if (result.asn.isNotEmpty) 'ASN：${result.asn}',
+        if (result.timezone.isNotEmpty) '时区：${result.timezone}',
+        if (result.latitude != null && result.longitude != null)
+          '经纬度：${result.latitude!.toStringAsFixed(4)}, '
+              '${result.longitude!.toStringAsFixed(4)}',
+        if (result.cached)
+          result.stale ? '来源：本地缓存（网络查询失败）' : '来源：本地缓存',
+        if (result.local) '来源：本地判定（未联网）',
+      ];
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text('IP 归属 · $ip'),
-          content: SelectableText(
-            '国家/地区：${result.country}\n'
-            '省/州：${result.region}\n'
-            '城市：${result.city}\n'
-            '运营商：${result.isp}\n'
-            '组织：${result.org}\n'
-            '时区：${result.timezone}$source',
-          ),
+          content: SelectableText(details.join('\n')),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),

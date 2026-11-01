@@ -16,6 +16,26 @@ bool isIpv4(String value) {
   return true;
 }
 
+/// Non-routable IPv4 scopes that must never be sent to a third-party service.
+String? localIpv4Label(String value) {
+  if (!isIpv4(value)) return null;
+  final parts = value.trim().split('.').map(int.parse).toList();
+  final first = parts[0], second = parts[1];
+  if (first == 127) return '本机回环地址';
+  if (first == 169 && second == 254) return '链路本地地址';
+  if (first == 10 ||
+      (first == 172 && second >= 16 && second <= 31) ||
+      (first == 192 && second == 168)) {
+    return '局域网地址';
+  }
+  if (first == 100 && second >= 64 && second <= 127) {
+    return '运营商级 NAT 地址';
+  }
+  if (first == 0) return '保留地址';
+  if (first >= 224) return '组播或保留地址';
+  return null;
+}
+
 /// Selection-aware JSON detection for the terminal context menu. Scalars are
 /// valid JSON but too easy to trigger by accident, so only objects/arrays are
 /// offered for formatting.
@@ -275,9 +295,11 @@ bool uploadTooLarge(int bytes, int maxMb) =>
     maxMb > 0 && bytes > maxMb * 1024 * 1024;
 
 class IpLookupResult {
-  final String country, region, city, isp, org, timezone;
+  final String country, region, city, isp, org, timezone, asn;
+  final double? latitude, longitude;
   final bool cached;
   final bool stale;
+  final bool local;
   const IpLookupResult({
     required this.country,
     required this.region,
@@ -285,9 +307,16 @@ class IpLookupResult {
     required this.isp,
     required this.org,
     required this.timezone,
+    this.asn = '',
+    this.latitude,
+    this.longitude,
     this.cached = false,
     this.stale = false,
+    this.local = false,
   });
+
+  static double? _number(Object? value) =>
+      value is num ? value.toDouble() : double.tryParse('${value ?? ''}');
 
   Map<String, Object?> toJson() => {
     'country': country,
@@ -296,6 +325,9 @@ class IpLookupResult {
     'isp': isp,
     'org': org,
     'timezone': timezone,
+    'asn': asn,
+    'latitude': latitude,
+    'longitude': longitude,
   };
 
   static IpLookupResult? fromJson(Object? raw) {
@@ -307,6 +339,9 @@ class IpLookupResult {
       isp: '${raw['isp'] ?? ''}',
       org: '${raw['org'] ?? ''}',
       timezone: '${raw['timezone'] ?? ''}',
+      asn: '${raw['asn'] ?? ''}',
+      latitude: _number(raw['latitude']),
+      longitude: _number(raw['longitude']),
     );
   }
 
@@ -317,8 +352,12 @@ class IpLookupResult {
     isp: isp,
     org: org,
     timezone: timezone,
+    asn: asn,
+    latitude: latitude,
+    longitude: longitude,
     cached: true,
     stale: stale,
+    local: local,
   );
 }
 
@@ -429,6 +468,18 @@ final defaultIpLookupCache = IpLookupCache();
 Future<IpLookupResult> lookupIp(String ip, {IpLookupCache? cache}) async {
   if (!isIpv4(ip)) throw const FormatException('请选择有效的 IPv4 地址');
   final normalized = ip.trim();
+  final localLabel = localIpv4Label(normalized);
+  if (localLabel != null) {
+    return IpLookupResult(
+      country: localLabel,
+      region: '',
+      city: '',
+      isp: '',
+      org: '',
+      timezone: '',
+      local: true,
+    );
+  }
   final cached = await cache?.read(normalized);
   if (cached != null) return cached;
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
@@ -458,6 +509,9 @@ Future<IpLookupResult> lookupIp(String ip, {IpLookupCache? cache}) async {
       isp: '${connection['isp'] ?? ''}',
       org: '${connection['org'] ?? ''}',
       timezone: '${timezone['id'] ?? ''}',
+      asn: '${connection['asn'] ?? ''}',
+      latitude: IpLookupResult._number(value['latitude']),
+      longitude: IpLookupResult._number(value['longitude']),
     );
     if (cache != null) {
       try {

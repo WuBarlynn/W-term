@@ -14,6 +14,20 @@ void main() {
     expect(isIpv4(''), isFalse);
   });
 
+  test('private IPv4 scopes resolve locally without network', () async {
+    expect(localIpv4Label('192.168.1.8'), '局域网地址');
+    expect(localIpv4Label('10.0.0.2'), '局域网地址');
+    expect(localIpv4Label('172.20.1.1'), '局域网地址');
+    expect(localIpv4Label('127.0.0.1'), '本机回环地址');
+    expect(localIpv4Label('169.254.10.1'), '链路本地地址');
+    expect(localIpv4Label('100.64.0.1'), '运营商级 NAT 地址');
+    expect(localIpv4Label('8.8.8.8'), isNull);
+    final result = await lookupIp('127.0.0.1');
+    expect(result.local, isTrue);
+    expect(result.country, '本机回环地址');
+    expect(result.cached, isFalse);
+  });
+
   test('JSON detection accepts objects and arrays only', () {
     expect(isJsonText('{"a":1}'), isTrue);
     expect(isJsonText(' [1, 2, 3] '), isTrue);
@@ -38,17 +52,23 @@ void main() {
         isp: 'Example ISP',
         org: 'Example Org',
         timezone: 'Asia/Shanghai',
+        asn: '64512',
+        latitude: 30.2741,
+        longitude: 120.1551,
       );
       try {
         final cache = IpLookupCache(file: () async => file, now: () => now);
         await cache.write('1.2.3.4', result);
         final fresh = await cache.read('1.2.3.4');
         expect(fresh?.city, 'Hangzhou');
+        expect(fresh?.asn, '64512');
+        expect(fresh?.latitude, 30.2741);
         expect(fresh?.cached, isTrue);
         expect(fresh?.stale, isFalse);
 
         final restored = IpLookupCache(file: () async => file, now: () => now);
         expect((await restored.read('1.2.3.4'))?.country, 'China');
+        expect((await restored.read('1.2.3.4'))?.longitude, 120.1551);
 
         now = now.add(const Duration(hours: 25));
         expect(await restored.read('1.2.3.4'), isNull);
