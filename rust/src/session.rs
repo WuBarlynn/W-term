@@ -416,6 +416,7 @@ pub(crate) fn split_key_material(material: &str) -> Result<(&str, Option<&str>)>
     Ok((key, Some(&material[start..end])))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn authenticate_inner(
     id: &str,
     approved: &str,
